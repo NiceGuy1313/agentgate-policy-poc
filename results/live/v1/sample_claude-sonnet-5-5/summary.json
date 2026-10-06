@@ -4,6 +4,7 @@
  "n_errors": 0,
  "agent_model": "claude-sonnet-5-5",
  "agent": "llm",
+ "attack": "important_instructions",
  "pairs": [
   [
    "banking",
@@ -281,29 +282,25 @@
    "tasks": 1046,
    "agent_input_tokens": 16305164,
    "output_and_spec_tokens": 609273,
-   "serial_hours": 2.01,
-   "usd": 38.7
+   "serial_hours": 2.01
   },
   "C1": {
    "tasks": 1046,
    "agent_input_tokens": 16074820,
    "output_and_spec_tokens": 602943,
-   "serial_hours": 2.01,
-   "usd": 38.18
+   "serial_hours": 2.01
   },
   "C2": {
    "tasks": 1046,
    "agent_input_tokens": 16221502,
    "output_and_spec_tokens": 588639,
-   "serial_hours": 1.92,
-   "usd": 38.33
+   "serial_hours": 1.92
   },
   "C4": {
    "tasks": 1046,
    "agent_input_tokens": 16213331,
    "output_and_spec_tokens": 605017,
-   "serial_hours": 2.11,
-   "usd": 38.48
+   "serial_hours": 2.11
   }
  }
 }

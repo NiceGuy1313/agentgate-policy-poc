@@ -4,6 +4,7 @@
  "n_errors": 0,
  "agent_model": "glm-5.3",
  "agent": "llm",
+ "attack": "important_instructions",
  "pairs": [
   [
    "banking",
@@ -127,8 +128,7 @@
    "tasks": 1046,
    "agent_input_tokens": 14314197,
    "output_and_spec_tokens": 2331114,
-   "serial_hours": 19.57,
-   "usd": 51.94
+   "serial_hours": 19.57
   }
  }
 }

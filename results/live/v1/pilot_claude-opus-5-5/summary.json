@@ -4,6 +4,7 @@
  "n_errors": 0,
  "agent_model": "claude-opus-5-5",
  "agent": "llm",
+ "attack": "important_instructions",
  "pairs": [
   [
    "banking",
