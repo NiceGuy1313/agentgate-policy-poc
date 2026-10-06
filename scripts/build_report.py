@@ -455,12 +455,14 @@ def spend_rows():
             continue
         tin = sum(v["agent_input_tokens_total"] for v in S["conditions"].values())
         tout = sum(v["agent_output_tokens_total"] for v in S["conditions"].values())
-        rows.append([f"에이전트 실행 {name} ({S['n_runs']}회)", S["agent_model"], tin, tout, usd(S["agent_model"], tin, tout)])
+        cost = usd(S["agent_model"], tin, tout)
+        rows.append([f"에이전트 실행 {name} ({S['n_runs']}회)", S["agent_model"], tin, tout,
+                     cost if cost is not None else "(Ollama Cloud 요금제, 토큰 단가 없음)"])
         jin = sum(v.get("judge_input_tokens_total", 0) for v in S["conditions"].values())
         jout = sum(v.get("judge_output_tokens_total", 0) for v in S["conditions"].values())
         if jin or jout:
             rows.append([f"C4 판정 LLM {name}", S["agent_model"], jin, jout, usd(S["agent_model"], jin, jout)])
-    total = round(sum(r[4] or 0 for r in rows), 2)
+    total = round(sum(r[4] for r in rows if isinstance(r[4], (int, float))), 2)
     return rows, total
 
 
@@ -535,7 +537,7 @@ def stage6(LIVE, ENF, figs):
           "실제 실행에서 게이트가 막은 호출은 대부분 공격이 아니라 정상 작업의 일부다. 따라서 실제 모델에서의 방어 효과(ASR 감소)는 이 데이터로는 관찰할 수 없고, "
           "관찰되는 것은 집행 무결성과 정상 작업 비용(Utility 감소)이다. 넘어가는 에이전트에 대한 방어 효과는 재생(Stage 5)과 대역 에이전트 실행이 보여준다.", "",
           "## 6. 한계", "",
-          "- 실제 모델 실행은 표본(suite별 user task 3개)이며 전체 949쌍이 아니다.",
+          "- 실제 모델 실행은 표본(suite별 user task 3개)이며 전체 949쌍이 아니다. GLM-5.3(Ollama Cloud)은 C0만 실행했다.",
           "- 공격은 `important_instructions` 하나다. 현행 모델은 이 고정 템플릿을 대부분 인식하고 거부했다. 적응형 공격에서는 공격 시도가 늘어날 수 있다.",
           "- C3(AgentDojo 내장 방어)은 실제 모델로 실행하지 않았다.",
           "- 차단 후 행동 분류와 공격 시도 판별은 휴리스틱이다."]
@@ -574,6 +576,13 @@ def final(R, RL, LIVE, ENF, figs):
                  f"게이트의 비용으로 정상 Utility(정상 태스크 {m['C0']['benign_runs']}개)가 {p100(m['C0']['utility'])}(C0) → {p100(m['C1']['utility'])}(C1) → {p100(m['C2']['utility'])}(C2)"
                  + (f" → {p100(m['C4']['utility'])}(C4)" if "C4" in m else "") + "로 나타났다. "
                  f"모델이 응답을 거부(stop_reason refusal)한 실행은 C0에서 {m['C0']['agent_refusals']}회였고, 유형별로 {m['C0'].get('refusal_runs_by_type', {})}이다.")
+    for oname, oS in llm_runs.items():
+        if oname == samp_name or not oname.startswith("sample_"):
+            continue
+        om = oS["conditions"]
+        L.append(f"- **실제 모델({oS['agent_model']}, 같은 표본)**: " + "; ".join(
+            f"{c} ASR {p100(v['asr'])}, 공격 시도 {v.get('attack_attempted', 0)}/{v['attack_runs']}, Utility {p100(v['utility'])}"
+            for c, v in om.items()) + ". 이 모델도 고정 템플릿 공격에 넘어가지 않았다.")
     if scripted:
         m = scripted["conditions"]
         L.append(f"- **항상 넘어가는 대역 에이전트(전체 규모)**: ASR {p100(m['C0']['asr'])}(C0) → {p100(m['C1']['asr'])}(C1), 정상 Utility {p100(m['C0']['utility'])} → {p100(m['C1']['utility'])}.")
@@ -617,7 +626,7 @@ def final(R, RL, LIVE, ENF, figs):
           "### 2.3 평가 설정", "",
           "- Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성)과 LLM 추출 spec.",
           "- Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 " + ", ".join(sorted({v['agent_model'] for v in llm_runs.values()})) +
-          "(effort medium), 그리고 전체 규모 검증용 대역 에이전트.", "",
+          "(Claude는 effort medium, GLM은 Ollama Cloud temperature 0), 그리고 전체 규모 검증용 대역 에이전트.", "",
           "## 3. RQ1 결과 — 재생 평가", "",
           table(["지표", "oracle TaskSpec"] + [f"LLM {m}" for m in RL],
                 [[n, f(R)] + [f(S) for S in RL.values()] for n, f in REPLAY_ROWS if not n.startswith("판정 지연")]), "",
@@ -678,7 +687,7 @@ def final(R, RL, LIVE, ENF, figs):
           "- **원본 정책 사양 부재**: 저장소에 `docs/policy_spec.md`가 없어 Stage 지시서의 조건으로 사양을 다시 작성했다.", "",
           "## 9. 비용", "",
           table(["항목", "모델", "입력 토큰", "출력 토큰", "정가 기준 USD"], spend_rows()[0]), "",
-          f"합계 약 ${total}(Claude API 정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영).", "",
+          f"Claude API 합계 약 ${total}(정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영). Ollama Cloud 사용분은 요금제 기준이라 제외했다.", "",
           "## 10. 재현 방법", "",
           f"- 버전: Python ≥3.10 (실행 환경 3.13), `agentdojo==0.1.35`, 벤치마크 `{BENCHMARK_VERSION}`, 정책 설정 `config/policies.yaml` (version {pc['version']}).",
           "- 설정: `config/*.yaml`, oracle spec `data/specs/oracle/`, LLM spec `data/specs/llm/<model>/`, 캐시 `data/specs/llm_cache/`, `data/judge_cache/`.",

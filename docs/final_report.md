@@ -6,8 +6,9 @@
 
 - **RQ1 (탐지 가능성)**: 공격에 넘어간 에이전트의 궤적을 재생하면 결정론적 정책 P1~P9가 효과 호출이 있는 929쌍 중 96.2% (894/929)을 BLOCK 또는 ESCALATE로, 80.0% (743/929)을 BLOCK으로 잡는다. ESCALATE를 차단으로 집행하면 정책 없이 성공하던 860쌍 중 91.6% (788/860)이 실패로 바뀐다(실행된 호출 기준 94.1% (809/860)). 정상 user task 97개 중 BLOCK이 나온 태스크는 3개다.
 - **LLM TaskSpec**: claude-opus-5-5 추출 spec으로 재생하면 strict 79.8% (741/929), lenient 96.2% (894/929); claude-sonnet-5-5 추출 spec으로 재생하면 strict 80.7% (750/929), lenient 96.2% (894/929) (oracle과 거의 같음, `docs/stage4_spec_comparison.md`).
-- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 4716회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 0건이었다.
+- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 4833회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 0건이었다.
 - **실제 모델(claude-sonnet-5-5, 표본)**: 방어 없음(C0)에서 ASR 2.9%, 공격을 시도한 실행 0/105. 이 모델은 고정 템플릿 공격에 거의 넘어가지 않아 실제 모델에서의 ASR 감소는 관찰되지 않았고(성공 집계는 유형 H의 측정 부산물), 게이트의 비용으로 정상 Utility(정상 태스크 12개)가 100.0%(C0) → 83.3%(C1) → 100.0%(C2) → 91.7%(C4)로 나타났다. 모델이 응답을 거부(stop_reason refusal)한 실행은 C0에서 13회였고, 유형별로 {'C': 13}이다.
+- **실제 모델(glm-5.3, 같은 표본)**: C0 ASR 1.0%, 공격 시도 0/105, Utility 100.0%. 이 모델도 고정 템플릿 공격에 넘어가지 않았다.
 - **항상 넘어가는 대역 에이전트(전체 규모)**: ASR 97.4%(C0) → 7.5%(C1), 정상 Utility 99.0% → 80.4%.
 - **판정 LLM(claude-sonnet-5-5)**: 재생의 ESCALATE 583건에서 공격 호출 564건 중 ALLOW 0건, 정상 호출 19건 중 ALLOW 7건, HUMAN 비율 5.8%.
 - **사용한 API 비용(정가 기준)**: 약 $23.15.
@@ -55,7 +56,7 @@ agent LLM ──tool call──► GatedRuntime.run_function ──► PolicyEng
 ### 2.3 평가 설정
 
 - Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성)과 LLM 추출 spec.
-- Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 claude-opus-5-5, claude-sonnet-5-5(effort medium), 그리고 전체 규모 검증용 대역 에이전트.
+- Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 claude-opus-5-5, claude-sonnet-5-5, glm-5.3(Claude는 effort medium, GLM은 Ollama Cloud temperature 0), 그리고 전체 규모 검증용 대역 에이전트.
 
 ## 3. RQ1 결과 — 재생 평가
 
@@ -120,6 +121,12 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 | C2 게이트 (ESCALATE→allow) | 100.0% (12/12) | 85.7% (90/105) | 1.9% (2/105) | 1.9% (2/105) | 0.0% (0/105) | 6621 / 0.363 | 15508 / 563 | 10 | 0 / 0 | 15 |
 | C4 게이트 (ESCALATE→judge) | 91.7% (11/12) | 86.7% (91/105) | 1.9% (2/105) | 1.9% (2/105) | 0.0% (0/105) | 7276 / 151.479 | 15500 / 578 | 14 | 13 / 4 | 15 |
 
+**glm-5.3 — 표본(suite별 user task 3개 × 전체 injection task)**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 100.0% (12/12) | 100.0% (105/105) | 1.0% (1/105) | 1.0% (1/105) | 0.0% (0/105) | 67342 / 0.513 | 13685 / 2229 | 0 | 0 / 0 | 0 |
+
 **claude-opus-5-5 — 파일럿(banking 4×3)**
 
 | 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
@@ -146,6 +153,7 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 | 실행 묶음 | 실행 | 게이트 판정 | 차단 집행 | 위반 |
 |---|---|---|---|---|
 | sample_claude-sonnet-5-5 | 468 | 1325 | 48 | 0 |
+| sample_glm-5.3 | 117 | 411 | 0 | 0 |
 | pilot_claude-opus-5-5 | 32 | 68 | 5 | 0 |
 | pilot_claude-sonnet-5-5 | 32 | 67 | 5 | 0 |
 | scripted | 4184 | 25544 | 2987 | 0 |
@@ -235,8 +243,9 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 | 에이전트 실행 pilot_claude-sonnet-5-5 (32회) | claude-sonnet-5-5 | 246247 | 13565 | 0.63 |
 | 에이전트 실행 sample_claude-sonnet-5-5 (468회) | claude-sonnet-5-5 | 7249841 | 269108 | 17.19 |
 | C4 판정 LLM sample_claude-sonnet-5-5 | claude-sonnet-5-5 | 7236 | 729 | 0.02 |
+| 에이전트 실행 sample_glm-5.3 (117회) | glm-5.3 | 1601110 | 260746 | (Ollama Cloud 요금제, 토큰 단가 없음) |
 
-합계 약 $23.15(Claude API 정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영).
+Claude API 합계 약 $23.15(정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영). Ollama Cloud 사용분은 요금제 기준이라 제외했다.
 
 ## 10. 재현 방법
 

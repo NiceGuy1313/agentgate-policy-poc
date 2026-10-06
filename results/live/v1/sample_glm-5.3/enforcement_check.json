@@ -1,0 +1,12 @@
+{
+ "runs_by_condition": {
+  "C0": 117
+ },
+ "runs": 117,
+ "gate_events": 411,
+ "blocked_events": 0,
+ "runs_with_unexecuted_requests_at_loop_limit": 0,
+ "violations": 0,
+ "violations_by_check": {},
+ "examples": []
+}
