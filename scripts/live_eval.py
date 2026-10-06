@@ -30,6 +30,7 @@ from pathlib import Path
 
 from agentgate import SUITES
 from agentgate.env import load_dotenv
+from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
 from agentgate.pipeline import RecordingPipeline, ScriptedAgent, build_pipeline, run_live_task
 from agentgate.replay import REPLAY_PIPELINE_NAME, _attack
 from agentgate.runtime import GatedRuntime
@@ -44,45 +45,55 @@ GATE = {"C0": ("audit", "block"), "C1": ("enforce", "block"), "C2": ("enforce", 
 
 
 class UsageMeter:
-    """Counts tokens of the agent LLM by wrapping the SDK client's create method."""
+    """Agent LLM usage. ClaudeAgentLLM counts its own usage; OpenAI clients are wrapped."""
 
     def __init__(self):
         self.input_tokens = self.output_tokens = self.calls = 0
         self.ms = 0.0
+        self.llm = None
+        self.refusals = 0
 
-    def wrap(self, provider: str, client):
-        target = client.messages if provider == "anthropic" else client.chat.completions
-        orig = target.create
+    def collect(self):
+        if self.llm is not None and hasattr(self.llm, "usage"):
+            u = self.llm.usage
+            self.input_tokens, self.output_tokens, self.calls, self.ms = (u["input_tokens"], u["output_tokens"],
+                                                                         u["calls"], u["ms"])
+            self.refusals = u.get("refusals", 0)
+
+    def wrap_openai(self, client):
+        orig = client.chat.completions.create
 
         def create(*a, **k):
             t0 = time.perf_counter()
             r = orig(*a, **k)
             self.ms += (time.perf_counter() - t0) * 1000
             self.calls += 1
-            u = r.usage
-            self.input_tokens += getattr(u, "input_tokens", None) or getattr(u, "prompt_tokens", 0) or 0
-            self.output_tokens += getattr(u, "output_tokens", None) or getattr(u, "completion_tokens", 0) or 0
+            self.input_tokens += r.usage.prompt_tokens or 0
+            self.output_tokens += r.usage.completion_tokens or 0
             return r
 
-        target.create = create
+        client.chat.completions.create = create
         return client
 
 
 def make_llm(meter: UsageMeter):
-    from agentdojo.agent_pipeline.llms.anthropic_llm import AnthropicLLM
-    from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
-
-    provider = os.environ.get("AGENTGATE_AGENT_PROVIDER", "anthropic")
-    model = os.environ["AGENTGATE_AGENT_MODEL"]
+    provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
+    model = os.environ.get("AGENTGATE_AGENT_MODEL") or (DEFAULT_ANTHROPIC_MODEL if provider == "anthropic" else "")
+    if not model:
+        raise RuntimeError("AGENTGATE_AGENT_MODEL is not set")
     if provider == "anthropic":
         import anthropic
-        llm = AnthropicLLM(meter.wrap(provider, anthropic.Anthropic()), model, temperature=0.0)
+
+        from agentgate.agent_llm import ClaudeAgentLLM
+        llm = ClaudeAgentLLM(anthropic.Anthropic(), model)
+        meter.llm = llm
     elif provider == "openai":
         import openai
-        llm = OpenAILLM(meter.wrap(provider, openai.OpenAI()), model, temperature=0.0)
+        from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
+        llm = OpenAILLM(meter.wrap_openai(openai.OpenAI()), model, temperature=0.0)
+        llm.name = model
     else:
         raise ValueError(provider)
-    llm.name = model
     return llm
 
 
@@ -144,13 +155,14 @@ def run_one(job: dict) -> str:
         err = None
     except Exception as e:  # keep going; record the failure
         res, err = {}, f"{type(e).__name__}: {e}\n{traceback.format_exc()[-1500:]}"
+    meter.collect()
     record = {
         "condition": cond, "suite": s, "user_task": ut_id, "injection_task": it_id, "agent": job["agent"],
         "agent_model": getattr(llm, "name", None), "attack": job["attack"] if it else None,
         "spec_source": job["spec"] if gated else "oracle(audit)", "spec_meta": runtime.spec_meta,
         "error": err, **res,
         "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
-                         "llm_ms": round(meter.ms, 1)},
+                         "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
         "judge": judge_obj.stats if judge_obj else None,
         "trace": runtime.trace_records(),
@@ -180,7 +192,7 @@ def main():
     a = ap.parse_args()
     if a.pilot:
         a.suites, a.user_tasks, a.injection_tasks = PILOT["suites"], PILOT["user_tasks"], PILOT["injection_tasks"]
-    attack_model = a.attack_model_name or ("Claude" if os.environ.get("AGENTGATE_AGENT_PROVIDER", "anthropic") ==
+    attack_model = a.attack_model_name or ("Claude" if (os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic") ==
                                           "anthropic" else "GPT-4")
     jobs = []
     for cond in a.conditions:

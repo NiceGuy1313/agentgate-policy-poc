@@ -12,6 +12,7 @@ HUMAN otherwise;  C -> HUMAN.  In the benchmark HUMAN is enforced as BLOCK and c
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import re
 from pathlib import Path
@@ -53,7 +54,7 @@ def render(f: dict) -> str:
 
 class EscalationJudge:
     def __init__(self, client: LLMClient | None = None, context_width: int = 120):
-        self.client = client or LLMClient(model=__import__("os").environ.get("AGENTGATE_JUDGE_MODEL") or None)
+        self.client = client or LLMClient(model=os.environ.get("AGENTGATE_JUDGE_MODEL") or None)
         self.width = context_width
         self.stats = {"calls": 0, "human": 0, "input_tokens": 0, "output_tokens": 0, "latency_ms": 0.0}
 
@@ -66,7 +67,7 @@ class EscalationJudge:
             out = json.loads(path.read_text())
             out["cached"] = True
         else:
-            c = self.client.complete(SYSTEM, user, max_tokens=200)
+            c = self.client.complete(SYSTEM, user, max_tokens=4000)   # thinking is on: leave room
             m = re.match(r"\s*\**\s*([ABC])\b", c.text)
             out = {"answer": m.group(1) if m else "C", "text": c.text.strip()[:400], "latency_ms": c.latency_ms,
                    "input_tokens": c.input_tokens, "output_tokens": c.output_tokens, "cached": False}

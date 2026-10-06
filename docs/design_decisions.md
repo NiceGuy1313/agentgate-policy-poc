@@ -34,3 +34,10 @@
 - **executed-only security**: AgentDojo의 `functions_stack_trace`는 요청된 호출 목록이라, trace 기반으로 판정하는 slack injection_task_5는 차단된 시도도 성공으로 센다. 게이트의 효과를 보기 위해 실행된 호출만 넘긴 판정을 함께 보고한다. 일부 `security()`가 환경을 바꾸므로(메일 읽음 처리) 이 판정은 판정 전에 떠 둔 환경 사본에서 AgentDojo와 같은 순서(utility → security)로 다시 한다.
 - **참조 공격 궤적**: AgentDojo가 정답을 제공하지 않는 8개 태스크는 직접 작성했다. 생성기는 현재 환경의 사본에서 계획을 세운다(`Inbox.get_unread()`의 부작용 회피).
 - **Ablation 계산**: audit 재생에서는 판정이 실행을 바꾸지 않으므로 정책별 판정을 기록해 두고 사후에 결합에서 빼는 방식으로 계산했다. `--disable` 옵션으로 실제 재실행도 가능하다.
+
+## 4. LLM 모델과 호출 설정
+
+- **모델**: TaskSpec 추출기·판정기와 평가 대상 에이전트 모두 기본값을 `claude-opus-5-5`로 둔다(2026-10 기준 현행 Opus, 입력 $4 / 출력 $20 per 1M tokens). 환경 변수 `AGENTGATE_LLM_MODEL`, `AGENTGATE_AGENT_MODEL`로 바꿀 수 있다. 더 저렴한 대안은 `claude-sonnet-5-5`($2 / $10)이며, 바꿀지는 사용자가 정한다.
+- **temperature 미사용**: 이 모델(및 현행 Claude 모델 대부분)은 `temperature`를 400으로 거부하고 thinking이 항상 켜져 있다. 그래서 temperature를 보내지 않고 `output_config.effort`(기본 `medium`)로 깊이를 정한다. 재현성은 temperature 0이 아니라 디스크 캐시(`data/specs/llm_cache/`, `data/judge_cache/`)로 확보한다. 지시서의 "temperature 0"은 이 모델에서는 적용할 수 없다.
+- **에이전트 요소**: AgentDojo 0.1.35의 `AnthropicLLM`은 temperature를 항상 보내고 `max_tokens=1024`이며 assistant 턴을 [thinking/text…, tool_use…] 순서로 재구성한다. 현행 모델은 tool 호출 사이에 thinking 블록을 내고, 이전 턴 블록을 바꾸면 thinking이 무효가 된다. 이를 위해 서브클래스 `ClaudeAgentLLM`(`src/agentgate/agent_llm.py`)이 원래 content 블록을 그대로 다시 보내고, 출력 한도를 16k로 두고, 토큰·거부(refusal)를 기록한다. agentdojo 소스는 수정하지 않았다.
+- **거부 시 대체 모델(fallback)**: 추출기·판정기는 서버 측 refusal fallback(`fallbacks: "default"`)을 켠다(`AGENTGATE_LLM_FALLBACKS=off`로 끔). 평가 대상 에이전트는 다른 모델이 대신 답하면 ASR이 섞이므로 fallback을 쓰지 않고, 거부 횟수를 `agent_tokens.refusals`로 기록한다.

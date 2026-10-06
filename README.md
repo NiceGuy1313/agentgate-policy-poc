@@ -57,7 +57,7 @@ python scripts/inspect_trace.py call --prompt "Pay the bill 'bill-december-2023.
 
 ### LLM이 필요한 단계 (API 키)
 
-`.env.example`을 `.env`로 복사하고 키와 모델을 넣는다(`.env`는 git에서 제외된다).
+`ANTHROPIC_API_KEY`만 있으면 된다. 클라우드에서는 환경 설정의 환경 변수로, 로컬에서는 `.env.example`을 `.env`로 복사해 넣는다(`.env`는 git에서 제외). 모델 기본값은 추출기·판정기·에이전트 모두 `claude-opus-5-5`이며 `AGENTGATE_*_MODEL`로 바꿀 수 있다(`docs/design_decisions.md` 4절).
 
 ```bash
 python scripts/extract_specs.py                         # Stage 4: LLM TaskSpec 추출 (캐시됨)
