@@ -215,9 +215,11 @@ flowchart TB
 - **대역 에이전트**(`ScriptedAgent`)
   - 항상 injection을 따르는 가짜 에이전트다.
   - 게이트가 실제 파이프라인 안에서 재생 평가와 같은 효과를 내는지 949쌍으로 확인한다.
-- **실제 모델 표본**
-  - suite별 user task 3개 × 해당 suite의 injection task 전부(105쌍)와 정상 태스크 12개.
-  - 조건 C0·C1·C2·C4.
+- **실제 모델 층화 표본(본 실험)**
+  - user task 97개 전부 × 같은 suite의 injection task 3개(291쌍)와 정상 태스크 97개.
+  - 조건 C0·C1·C2·C4, 공격 `tool_knowledge`, 모델 gpt-oss:120b·mistral-large-3:675b.
+  - 신뢰구간과 C0 대비 검정은 `scripts/significance_live.py`로 낸다.
+  - 이전의 소규모 표본(suite별 user task 3개 × 전체 injection task, 105쌍 + 정상 12개)은 파일럿으로 남겼다.
   - 모델 선택 근거와 조건 정의는 `docs/conditions_and_attacks.md`에 있다.
 - **기록**
   - 실행마다 메시지 전체, 게이트 trace, utility, security(원래 판정과 실행된 호출만의 판정), 토큰 사용량을 남긴다.

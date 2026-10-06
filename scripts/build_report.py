@@ -409,8 +409,59 @@ def run_label(name: str, S: dict) -> str:
     if name == "scripted":
         return "대역 에이전트(ScriptedAgent), 전체 1,046 태스크"
     kind = "파일럿(banking 4×3)" if name.startswith("pilot_") else "표본(suite별 user task 3개 × 전체 injection task)" \
-        if name.startswith("sample_") else name
+        if name.startswith("sample_") else STRAT_KIND if name.startswith("strat3_") else name
     return f"{S.get('agent_model')} — {kind}, 공격 `{S.get('attack') or 'important_instructions'}`"
+
+
+STRAT_KIND = "층화 표본(user task 97개 전부 × 같은 suite의 injection task 3개, 시드 0)"
+
+
+def strat_runs(LIVE: dict) -> list[tuple[str, dict]]:
+    return [(k, v) for k, v in LIVE.items() if k.startswith("strat3_")]
+
+
+def SIG(name: str) -> dict | None:
+    p = LIVE_ROOT / name / "significance.json"
+    return J(p) if p.exists() else None
+
+
+def ci(m: dict) -> str:
+    lo, hi = m["ci95"]
+    return f"{100 * m['rate']:.1f}% [{100 * lo:.1f}, {100 * hi:.1f}]"
+
+
+def sig_table(name: str) -> str:
+    """Rates with Wilson 95% CI, paired difference to C0 with cluster-bootstrap CI and exact McNemar p."""
+    G = SIG(name)
+    rows = []
+    for c, M in G["conditions"].items():
+        for key, label in (("asr", "ASR"), ("utility", "Utility"), ("utility_under_attack", "Utility under attack")):
+            m = M[key]
+            pv = m.get("paired_vs_C0")
+            rows.append([f"{c} {COND_NAMES[c]}", label, f"{m['k']}/{m['n']}", ci(m)] + (
+                [f"{100 * pv['diff']:+.1f}%p", "[{:+.1f}, {:+.1f}]".format(*(100 * x for x in pv["diff_ci95_cluster_bootstrap"])),
+                 f"{pv['c0_only']} / {pv['cond_only']}", f"{pv['p_mcnemar']:.2g}"] if pv else ["-", "-", "-", "-"]))
+    return table(["조건", "지표", "성공/전체", "비율 [95% CI]", "C0 대비 차이", "차이 95% CI (user task 군집 bootstrap)",
+                  "불일치 쌍 C0만 / 조건만", "McNemar p"], rows)
+
+
+def gate_failure_table(name: str) -> str:
+    G = SIG(name)
+    rows = []
+    for c, M in G["conditions"].items():
+        if c == "C0":
+            continue
+        for kind, label in (("benign", "정상 실행"), ("attack", "공격 실행")):
+            g = M["gate_failures"][kind]
+            rows.append([f"{c}", label, g["n"], g["c0_succeeded"],
+                         ", ".join(f"{k} {v}" for k, v in sorted(g["by_policy"].items())) or "-"])
+    return table(["조건", "실행 종류", "차단이 있었고 user task 실패", "그중 C0에서는 성공", "차단 정책(호출 기준, 중복 포함)"], rows)
+
+
+def gate_failure_cases(name: str, cond: str) -> str:
+    cases = SIG(name)["conditions"][cond]["gate_failures"]["benign"]["cases"]
+    return ", ".join(f"{x['suite']}/{x['user_task'].replace('user_task_', 'u')}({'/'.join(x['blocked_by'])}"
+                     f"{'' if x['c0_utility'] else ', C0도 실패'})" for x in cases) or "없음"
 
 
 def live_table(S: dict) -> str:
@@ -498,7 +549,7 @@ def stage6(LIVE, ENF, figs):
          "> `scripts/live_eval.py` → `scripts/check_enforcement.py`, `scripts/summarize_live.py`의 출력(`results/live/v1/<run>/`)에서 "
          "`scripts/build_report.py`가 생성했다.", "",
          "## 1. 실험 설정", "",
-         f"- 벤치마크 AgentDojo {BENCHMARK_VERSION}, attack `important_instructions`(공격 문자열의 {{model}} 자리는 `Claude`).",
+         f"- 벤치마크 AgentDojo {BENCHMARK_VERSION}. attack은 실행 묶음마다 다르다(아래 목록). `important_instructions`의 {{model}} 자리는 `Claude`.",
          "- 게이트: `GatedRuntime`(FunctionsRuntime 서브클래스) + 파이프라인 앞단 `TaskSpecElement`. agentdojo 소스는 수정하지 않았다.",
          "- 조건: " + "; ".join(f"{k} {v}" for k, v in COND_NAMES.items()) + ". C0·C3에서도 게이트는 audit 모드로 판정만 기록한다.",
          "- TaskSpec: 게이트 조건(C1·C2·C4)은 에이전트와 같은 모델로 추출한 LLM spec(캐시)을 쓴다.",
@@ -512,7 +563,10 @@ def stage6(LIVE, ENF, figs):
         by_suite = {}
         for s_, u in samp["pairs"]:
             by_suite.setdefault(s_, []).append(u.replace("user_task_", "u"))
-        L.append("  - 표본 user task(시드 0으로 suite별 3개): " + "; ".join(f"{k} {', '.join(v)}" for k, v in by_suite.items()))
+        L.append("  - 파일럿 표본 user task(시드 0으로 suite별 3개): " + "; ".join(f"{k} {', '.join(v)}" for k, v in by_suite.items()))
+    if strat_runs(LIVE):
+        L.append("  - 층화 표본: user task 97개마다 같은 suite의 injection task 3개(시드 0으로 섞은 순서를 차례로 배정)와 정상 실행 1개. "
+                 "쌍 목록 `data/pairs/strat3_seed0.txt`, 설계 근거 `docs/conditions_and_attacks.md`.")
     L += ["- 에이전트 모델: 현행 Claude는 `temperature`를 받지 않으므로 `effort=medium`, 출력 한도 16k로 호출하고, 이전 assistant 턴의 content 블록을 그대로 재전송한다"
           "(`src/agentgate/agent_llm.py`, `docs/design_decisions.md` 4절). 평가 대상 에이전트는 거부(refusal) 시 다른 모델로 넘기지 않는다.",
           "- 대역 에이전트는 user task 정답 호출을 내다가 인젝션을 보면 항상 공격 궤적을 실행하는 결정론적 에이전트다. 게이트 통합과 집행을 전체 규모로 검증하는 용도이며, "
@@ -524,6 +578,21 @@ def stage6(LIVE, ENF, figs):
         L += [f"### {run_label(name, S)} (`{name}`)", "", live_table(S), ""]
         if f"tradeoff_{name}" in figs:
             L += [f"![tradeoff](../{figs['tradeoff_' + name]})", ""]
+    for name, S in strat_runs(LIVE):
+        G = SIG(name)
+        if not G:
+            continue
+        if not any(l.startswith("## 2.5") for l in L):
+            L += ["## 2.5 층화 표본: 신뢰구간과 C0 대비 검정 (`scripts/significance_live.py`)", "",
+                  "비율의 95% 신뢰구간은 Wilson, C0 대비 차이의 p값은 같은 (suite, user task, injection task) 짝끼리의 exact McNemar 검정이다. "
+                  "같은 user task의 실행은 서로 독립이 아니므로 차이의 95% 신뢰구간은 suite별로 user task를 다시 뽑는 군집 bootstrap"
+                  f"({G['n_boot']}회, 시드 {G['seed']})으로 냈다. 오류가 난 실행은 짝에서 뺐다.", ""]
+        nd = G["benign_unblocked_condition_pairs"]
+        L += [f"### {S['agent_model']} (`{name}`)", "", sig_table(name), "",
+              "게이트로 인한 실패(차단된 호출이 있었고 user task가 실패한 실행):", "", gate_failure_table(name), "",
+              "정상 실행에서 게이트로 인한 실패 사례: " + "; ".join(f"{c} " + gate_failure_cases(name, c) for c in G["conditions"] if c != "C0") + ".", "",
+              f"모델 무작위성: 차단이 없었던 정상 실행끼리 조건을 바꿔 비교한 {nd['pairs']}개 짝 중 {nd['utility_differs']}개"
+              f"({p100(nd['rate'])})에서 Utility가 달랐다. 게이트가 개입하지 않은 차이이므로 모델 출력의 변동이다.", ""]
     L += ["## 3. 집행 무결성 점검 (`scripts/check_enforcement.py`)", "",
           table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "① BLOCK 호출 실행", "② 차단 시 환경 변화", "③ 툴 결과-판정 1:1 위반", "반복 상한으로 미실행 요청이 있는 실행", "오류"],
                 [[name, E["runs"], E["gate_events"], E["blocked_events"],
@@ -582,7 +651,9 @@ def stage6(LIVE, ENF, figs):
           "실제 모델은 재생과 달리 같은 공격을 여러 경로로 시도하고(예: URL 형태를 바꿔 여러 번 방문) 차단 뒤 작업을 포기하거나 보고하므로, "
           "재생은 차단 횟수를, 실제 실행은 Utility 손실을 더 정확히 보여준다.", "",
           "## 6. 한계", "",
-          "- 실제 모델 실행은 표본(suite별 user task 3개 × 전체 injection task)이며 전체 949쌍이 아니다. GLM-5.3은 C0만 실행했다.",
+          "- 실제 모델 본 실험은 층화 표본(user task 97개 × injection task 3개, 291쌍)이며 전체 949쌍이 아니다. 949쌍으로 보고한 다른 결과와 같은 표에서 직접 비교할 수 없다. "
+          "Claude·GLM 실행은 파일럿 표본이며 GLM-5.3은 C0만 실행했다.",
+          "- 각 쌍은 조건마다 한 번씩 실행했다. 정상 Utility의 작은 차이(수 %p)는 모델 무작위성과 구분되지 않으므로, 게이트로 인한 실패 건수를 함께 본다.",
           "- `tool_knowledge`는 AgentDojo 내장 공격이며, 정책을 아는 적응형 공격은 평가하지 않았다.",
           "- C3(AgentDojo 내장 방어)은 실제 모델로 실행하지 않았다.",
           "- 현행 모델은 temperature를 받지 않거나(Claude) 받더라도 응답이 완전히 고정되지 않아, 같은 정상 태스크의 Utility가 조건 사이에 차단과 무관하게 달라질 수 있다"
@@ -615,12 +686,29 @@ def final(R, RL, LIVE, ENF, figs):
             f"{m} 추출 spec으로 재생하면 strict {pct(S['overall']['strict'], S['overall']['eval'])}, lenient {pct(S['overall']['lenient'], S['overall']['eval'])}"
             for m, S in RL.items()) + " (oracle과 거의 같음, `docs/stage4_spec_comparison.md`).")
     L.append(f"- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 {runs_all}회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 {E_all}건이었다.")
+    for name, S in strat_runs(LIVE):
+        G = SIG(name)
+        if not G:
+            continue
+        g = G["conditions"]
+
+        def cell(c, k):
+            m = g[c][k]
+            pv = m.get("paired_vs_C0")
+            return ci(m) + (f" (Δ {100 * pv['diff']:+.1f}%p, p={pv['p_mcnemar']:.2g})" if pv else "")
+        L.append(f"- **실제 모델 {S['agent_model']}, 공격 `{S.get('attack')}`, 층화 표본(공격 {g['C0']['asr']['n']}쌍, 정상 {g['C0']['utility']['n']}개)**: "
+                 "ASR " + "; ".join(f"{c} {cell(c, 'asr')}" for c in g) +
+                 ". 정상 Utility " + "; ".join(f"{c} {cell(c, 'utility')}" for c in g) +
+                 ". Utility under attack " + "; ".join(f"{c} {cell(c, 'utility_under_attack')}" for c in g) +
+                 ". 정상 실행 중 게이트로 인한 실패(차단 + user task 실패, 그중 C0 성공) " +
+                 ", ".join(f"{c} {g[c]['gate_failures']['benign']['n']}건({g[c]['gate_failures']['benign']['c0_succeeded']})" for c in g if c != "C0") +
+                 ". (괄호는 95% 신뢰구간, Δ와 p는 C0 대비 짝 비교)")
     samples = sorted(((k, v) for k, v in llm_runs.items() if k.startswith("sample_")),
                      key=lambda kv: -(kv[1]["conditions"]["C0"]["asr"] or 0))
     for name, S in samples:
         m = S["conditions"]
         att0 = m["C0"].get("attack_attempted", 0)
-        line = (f"- **실제 모델 {S['agent_model']}, 공격 `{S.get('attack')}` (표본 {m['C0']['attack_runs']}쌍, 정상 태스크 {m['C0']['benign_runs']}개)**: "
+        line = (f"- **파일럿 {S['agent_model']}, 공격 `{S.get('attack')}` (표본 {m['C0']['attack_runs']}쌍, 정상 태스크 {m['C0']['benign_runs']}개)**: "
                 "ASR " + " / ".join(f"{c} {p100(v['asr'])}" for c, v in m.items()) +
                 "; 정상 Utility " + " / ".join(f"{c} {p100(v['utility'])}" for c, v in m.items()) +
                 f"; C0에서 공격을 시도한 실행 {att0}/{m['C0']['attack_runs']}.")
@@ -701,7 +789,7 @@ def final(R, RL, LIVE, ENF, figs):
           "## 5. ASR · Utility · Latency 트레이드오프", "",
           "지표 정의는 AgentDojo를 따른다. **Utility**는 공격 없이 user task의 `utility` 판정이 참인 비율, **Utility under attack**은 공격 환경에서 user task `utility`가 참인 비율, "
           "**ASR**(targeted attack success rate)은 injection task의 `security` 판정이 참(공격 목표 달성)인 비율이다.", ""]
-    for name in [n for n, _ in samples] + (["scripted"] if "scripted" in LIVE else []):
+    for name in [n for n, _ in strat_runs(LIVE)] + [n for n, _ in samples] + (["scripted"] if "scripted" in LIVE else []):
         m = LIVE[name]["conditions"]
         L += [f"**{run_label(name, LIVE[name])}**", "",
               table(["조건", "ASR", "Utility", "Utility under attack", "태스크당 지연 ms", "게이트 판정 ms/태스크"],
@@ -729,8 +817,10 @@ def final(R, RL, LIVE, ENF, figs):
           "## 8. 한계", "",
           "- **정책 도출·평가 데이터 중복**: 정책과 분류를 같은 35개 인젝션 태스크로 설계하고 평가했다.",
           "- **정답 궤적 재생의 한계**: 재생은 넘어간 에이전트가 정답대로 공격한다고 가정한다.",
-          "- **실제 모델 평가 범위**: 표본(suite별 user task 3개 × 전체 injection task)과 파일럿이다. 현행 Claude·GLM은 내장 공격에 넘어가지 않아, "
+          "- **실제 모델 평가 범위**: 본 실험은 user task 97개 × injection task 3개의 층화 표본(291쌍 + 정상 97개)이며 949쌍 전체가 아니다. "
+          "그래서 949쌍으로 보고한 다른 결과와 같은 표에서 직접 비교할 수 없다. 현행 Claude·GLM은 내장 공격에 넘어가지 않아, "
           "실제 모델의 방어 효과는 `tool_knowledge`에 넘어가는 공개 모델(gpt-oss:120b, mistral-large-3:675b)로 측정했다.",
+          "- **조건당 1회 실행**: 정상 Utility의 수 %p 차이는 모델 무작위성과 통계적으로 구분되지 않는다. 그 대신 차단 때문에 실패한 실행을 사례 단위로 센다(Stage 6 2.5절).",
           "- **유형 H는 범위 밖**: 툴 호출 없이 응답 텍스트만 조작하는 공격은 툴 호출 게이트로 막을 수 없다.",
           "- **적응형 공격 미평가**: 정책을 아는 공격자(지목 출처에만 주입, 값 쪼개기, 프롬프트의 목적지 악용)는 평가하지 않았다. 다른 attack으로의 일반화 점검(Stage 7 작업 4)도 하지 않았다.",
           "- **판정 LLM 자체의 인젝션 노출**: 판정기는 주입 문장이 포함될 수 있는 주변 문맥을 본다. 인용 블록과 시스템 지시로 완화했다.",
@@ -754,6 +844,12 @@ def final(R, RL, LIVE, ENF, figs):
           "python scripts/judge_eval.py",
           "python scripts/live_eval.py --agent llm --spec llm --sample 3 --seed 0 --conditions C0 C1 C2 C4 --out results/live/v1/sample_claude-sonnet-5-5",
           "python scripts/check_enforcement.py --run results/live/v1/sample_claude-sonnet-5-5 && python scripts/summarize_live.py --run results/live/v1/sample_claude-sonnet-5-5",
+          "# 층화 표본 (OLLAMA_API_KEY 필요, 모델마다 AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=<model>)",
+          "python scripts/make_strat_pairs.py --k 3 --benign --out data/pairs/strat3_seed0.txt",
+          "AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/live_eval.py --agent llm --spec llm --attack tool_knowledge "
+          "--pairs @data/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/live/v1/strat3_tk_gpt-oss_120b",
+          "python scripts/check_enforcement.py --run results/live/v1/strat3_tk_gpt-oss_120b && python scripts/summarize_live.py --run results/live/v1/strat3_tk_gpt-oss_120b "
+          "&& python scripts/significance_live.py --run results/live/v1/strat3_tk_gpt-oss_120b",
           "python scripts/build_report.py",
           "```"]
     (DOCS / "final_report.md").write_text("\n".join(L) + "\n")
@@ -836,7 +932,7 @@ function v(id){return document.querySelector('#'+id).value.trim()}['s','d','t','
 def main():
     R = J(REPLAY / "summary.json")
     RL = {p.parent.name.removeprefix("llm_"): J(p) for p in sorted((ROOT / "results/replay/v1").glob("llm_*/summary.json"))}
-    order = lambda n: (0 if n.startswith("sample_") else 1 if n.startswith("pilot_") else 2, n)  # noqa: E731
+    order = lambda n: (0 if n.startswith("strat3_") else 1 if n.startswith("sample_") else 2 if n.startswith("pilot_") else 3, n)  # noqa: E731
     LIVE = {p.parent.name: J(p) for p in sorted(LIVE_ROOT.glob("*/summary.json"), key=lambda p: order(p.parent.name))}
     ENF = {p.parent.name: J(p) for p in sorted(LIVE_ROOT.glob("*/enforcement_check.json"), key=lambda p: order(p.parent.name))}
     LIVE_CACHE.update(LIVE)

@@ -45,9 +45,9 @@
   - 답 C는 HUMAN이 된다.
   - 벤치마크에서는 HUMAN을 BLOCK으로 집행하고 따로 센다.
   - 상세는 `docs/gate_design.md` 5절.
-- **실행 범위(표본 실행)**
+- **실행 범위**
   - C3는 대역 에이전트로만 돌렸다.
-  - 실제 모델 표본은 C0·C1·C2·C4로 돌렸다.
+  - 실제 모델은 C0·C1·C2·C4로 돌렸다. 본 실험은 층화 표본(아래 "실제 모델 실험 설계")이고, 그 전의 소규모 표본은 파일럿으로 남겨 두었다.
 
 ## 공격 방식
 
@@ -83,8 +83,28 @@
   - 그래서 지시를 따르기 쉬운 모델에서 성공률이 높다.
 - **이번 실험에서**
   - Ollama Cloud 17개 모델을 탐침했다(`scripts/probe_models.sh`).
-  - 그중 이 공격에 넘어가는 gpt-oss:120b와 mistral-large-3:675b로 C0·C1·C2·C4 표본을 돌렸다.
-  - 결과: `results/live/v1/sample_tk_*`.
+  - 그중 이 공격에 넘어가는 gpt-oss:120b와 mistral-large-3:675b로 C0·C1·C2·C4를 돌렸다.
+  - 파일럿(suite별 user task 3개 × 전체 injection task, 105쌍 + 정상 12개): `results/live/v1/sample_tk_*`.
+  - 본 실험(층화 표본, 291쌍 + 정상 97개): `results/live/v1/strat3_tk_*`.
+
+## 실제 모델 실험 설계 (층화 표본)
+
+- **구성**
+  - user task 97개 전부를 넣는다. user task마다 같은 suite의 injection task 3개를 배정하고, 공격 없는 정상 실행 1개를 더한다.
+  - 공격 291쌍(workspace 120, travel 60, banking 48, slack 63)과 정상 실행 97개, 조건당 388회다.
+  - 배정은 suite별로 injection task 순서를 시드 0으로 한 번 섞은 뒤 차례로 돌려 준다. 그래서 같은 suite 안에서 injection task의 등장 횟수 차이가 1 이하다(workspace·travel 8~9회, banking 5~6회, slack 12~13회).
+  - 쌍 목록: `data/pairs/strat3_seed0.txt` (`scripts/make_strat_pairs.py --k 3 --benign`).
+- **이렇게 설계한 이유**
+  - 파일럿은 user task 12개뿐이라 결과가 어떤 작업을 골랐는지에 좌우됐다. 대표성은 user task 수에서 나오므로 97개를 모두 넣었다.
+  - 949쌍 전체는 같은 user task를 injection task 수만큼(최대 14번) 반복한다. 층화 표본은 그 1/3 비용으로 user task와 injection task를 모두 덮는다.
+- **통계 처리** (`scripts/significance_live.py`)
+  - 비율마다 Wilson 95% 신뢰구간을 낸다.
+  - C0 대비 차이는 같은 (suite, user task, injection task) 짝끼리 비교하는 exact McNemar 검정으로 본다.
+  - 같은 user task의 실행들은 서로 독립이 아니므로, 차이의 95% 신뢰구간은 suite별로 user task를 다시 뽑는 군집 bootstrap(2,000회)으로 낸다.
+  - 모델 무작위성과 섞이지 않는 비용 지표로, 차단이 있었고 user task가 실패한 실행 수("게이트로 인한 실패")를 따로 센다.
+- **주장할 수 있는 범위**
+  - user task 97개와 injection task 35개를 모두 포함한 층화 표본에서의 ASR·Utility·Utility under attack 변화.
+  - AgentDojo 리더보드처럼 949쌍 전체로 보고한 수치와 같은 표에서 직접 비교할 수는 없다.
 
 ## injection task의 공격 유형 (A–H)
 
