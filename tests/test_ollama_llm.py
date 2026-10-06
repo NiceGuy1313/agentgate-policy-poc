@@ -112,3 +112,19 @@ def test_extractor_reuses_cache_without_client(tmp_path):
     from agentgate.llm.extractor import TaskSpecExtractor
     ex = TaskSpecExtractor(cache_dir=tmp_path, model="claude-sonnet-5-5")
     assert ex._client is None and ex.model == "claude-sonnet-5-5"
+
+
+def test_retry_on_connection_error(monkeypatch):
+    calls = []
+
+    def post(url, headers=None, json=None, timeout=None):
+        calls.append(1)
+        if len(calls) < 3:
+            raise O.requests.ConnectionError("proxy closed")
+        return FakeResp(FINAL_TURN)
+
+    monkeypatch.setattr(O.requests, "post", post)
+    monkeypatch.setattr(O.time, "sleep", lambda s: None)
+    c = O.OllamaClient(host="https://ollama.com", api_key="k")
+    assert c.chat({"model": "m", "messages": []})["message"]["content"].startswith("Your balance")
+    assert len(calls) == 3

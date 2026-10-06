@@ -9,7 +9,9 @@ ollama-python ollama/_types.py):
              "stream": false, "options": {"temperature", "seed"}, "think": bool|"low"|"medium"|"high"}
 - response  {"message": {"role": "assistant", "content", "thinking"?, "tool_calls"?: [{"function": {"name",
              "arguments": <object>}}]}, "done": true, "done_reason", "prompt_eval_count", "eval_count"}
-            Tool calls carry no id; arguments is a JSON object (some models emit a JSON string - handled).
+            Docs show no id; ollama.com responses observed on 2026-10-06 (glm-5.3) do carry "id" and
+            function.index - the id is used when present, otherwise one is generated. arguments is a JSON object
+            (some models emit a JSON string - handled).
 - tool result message  {"role": "tool", "content": "...", "tool_name": "<function name>"}
 """
 
@@ -34,7 +36,7 @@ _VALID_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 class OllamaClient:
     def __init__(self, host: str | None = None, api_key: str | None = None, timeout: float = 600.0,
-                 max_retries: int = 3):
+                 max_retries: int = 5):
         load_dotenv()
         self.host = (host or os.environ.get("OLLAMA_HOST") or "https://ollama.com").rstrip("/")
         self.api_key = api_key if api_key is not None else os.environ.get("OLLAMA_API_KEY")
@@ -52,7 +54,14 @@ class OllamaClient:
         payload = {**payload, "stream": False}
         last = None
         for attempt in range(self.max_retries + 1):
-            r = requests.post(f"{self.host}/api/chat", headers=self._headers(), json=payload, timeout=self.timeout)
+            try:
+                r = requests.post(f"{self.host}/api/chat", headers=self._headers(), json=payload, timeout=self.timeout)
+            except (requests.ConnectionError, requests.Timeout) as e:   # incl. proxy disconnects
+                last = f"{type(e).__name__}: {e}"[:500]
+                if attempt == self.max_retries:
+                    break
+                time.sleep(min(2 ** attempt * 2, 30))
+                continue
             if r.status_code == 200:
                 return r.json()
             last = f"HTTP {r.status_code}: {r.text[:500]}"
@@ -145,7 +154,7 @@ class OllamaAgentLLM(BasePipelineElement):
                 self.usage["invalid_tool_calls"] += 1
                 continue
             calls.append(FunctionCall(function=name, args=parse_arguments(fn.get("arguments")),
-                                      id=f"ollama_{self._turn}_{i}"))
+                                      id=(tc or {}).get("id") or f"ollama_{self._turn}_{i}"))
         text = msg.get("content") or ""
         out = ChatAssistantMessage(role="assistant", content=[text_content_block_from_string(text)] if text else [],
                                    tool_calls=calls or None)
