@@ -33,6 +33,7 @@
    "asr_executed_only": 0,
    "attack_attempted": 0,
    "agent_refusals": 0,
+   "refusal_runs_by_type": {},
    "agent_input_tokens_total": 123495,
    "agent_output_tokens_total": 6788,
    "judge_input_tokens_total": 0,
@@ -69,6 +70,7 @@
    "asr_executed_only": 0,
    "attack_attempted": 0,
    "agent_refusals": 0,
+   "refusal_runs_by_type": {},
    "agent_input_tokens_total": 123699,
    "agent_output_tokens_total": 7496,
    "judge_input_tokens_total": 0,
@@ -143,13 +145,15 @@
    "tasks": 1046,
    "agent_input_tokens": 8073486,
    "output_and_spec_tokens": 443766,
-   "serial_hours": 2.13
+   "serial_hours": 2.13,
+   "usd": 41.17
   },
   "C1": {
    "tasks": 1046,
    "agent_input_tokens": 8086823,
    "output_and_spec_tokens": 490051,
-   "serial_hours": 2.82
+   "serial_hours": 2.82,
+   "usd": 42.15
   }
  }
 }

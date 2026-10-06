@@ -416,7 +416,7 @@ def run_label(name: str, S: dict) -> str:
 def live_table(S: dict) -> str:
     m = S["conditions"]
     return table(["조건", "Utility", "Utility under attack", "ASR", "ASR (executed-only)", "공격 시도한 실행",
-                  "태스크당 지연 ms (전체 / 게이트)", "태스크당 에이전트 토큰 in/out", "BLOCK 집행", "judge 호출 / HUMAN"],
+                  "태스크당 지연 ms (전체 / 게이트)", "태스크당 에이전트 토큰 in/out", "BLOCK 집행", "judge 호출 / HUMAN", "모델 거부(refusal)"],
                  [[f"{c} {COND_NAMES[c]}", pct(round((v["utility"] or 0) * v["benign_runs"]), v["benign_runs"]),
                    pct(round((v["utility_under_attack"] or 0) * v["attack_runs"]), v["attack_runs"]),
                    pct(round((v["asr"] or 0) * v["attack_runs"]), v["attack_runs"]),
@@ -424,7 +424,7 @@ def live_table(S: dict) -> str:
                    pct(v.get("attack_attempted", 0), v["attack_runs"]),
                    f"{round(v['wall_ms_per_task'] or 0)} / {v['gate_ms_per_task']}",
                    f"{round(v['agent_input_tokens_per_task'] or 0)} / {round(v['agent_output_tokens_per_task'] or 0)}",
-                   v["blocked_calls"], f"{v['judge_calls']} / {v['human_count']}"] for c, v in m.items()])
+                   v["blocked_calls"], f"{v['judge_calls']} / {v['human_count']}", v.get("agent_refusals", 0)] for c, v in m.items()])
 
 
 def spend_rows():
@@ -437,19 +437,29 @@ def spend_rows():
         tout = sum(x["output_tokens"] for x in d["runs"] if not x["cached"])
         rows.append(["TaskSpec 추출 (97)", d["model"], tin, tout, usd(d["model"], tin, tout)])
     for p in sorted((ROOT / "data/judge_cache").glob("*")):
-        tin = tout = n = 0
-        for f in p.glob("*.json"):
-            x = J(f)
-            tin += x.get("input_tokens", 0)
-            tout += x.get("output_tokens", 0)
-            n += 1
-        rows.append([f"판정 LLM 호출 ({n}건, 캐시 기준)", p.name, tin, tout, usd(p.name, tin, tout)])
+        res = ROOT / "results/judge/v1" / p.name / "judge_eval.json"
+        if res.exists():   # actual API calls of the judge-only evaluation (incl. concurrent duplicates)
+            st = J(res)["stats"]
+            rows.append([f"판정기 단독 평가 ({J(res)['n']}건 평가)", p.name, st["input_tokens"], st["output_tokens"],
+                         usd(p.name, st["input_tokens"], st["output_tokens"])])
+        else:              # interrupted run: only the cache is left -> lower bound
+            tin = tout = n = 0
+            for f in p.glob("*.json"):
+                x = J(f)
+                tin += x.get("input_tokens", 0)
+                tout += x.get("output_tokens", 0)
+                n += 1
+            rows.append([f"판정기 단독 평가 (중단됨, 캐시 {n}건 기준 하한)", p.name, tin, tout, usd(p.name, tin, tout)])
     for name, S in sorted(LIVE_CACHE.items()):
         if S.get("agent") != "llm":
             continue
         tin = sum(v["agent_input_tokens_total"] for v in S["conditions"].values())
         tout = sum(v["agent_output_tokens_total"] for v in S["conditions"].values())
         rows.append([f"에이전트 실행 {name} ({S['n_runs']}회)", S["agent_model"], tin, tout, usd(S["agent_model"], tin, tout)])
+        jin = sum(v.get("judge_input_tokens_total", 0) for v in S["conditions"].values())
+        jout = sum(v.get("judge_output_tokens_total", 0) for v in S["conditions"].values())
+        if jin or jout:
+            rows.append([f"C4 판정 LLM {name}", S["agent_model"], jin, jout, usd(S["agent_model"], jin, jout)])
     total = round(sum(r[4] or 0 for r in rows), 2)
     return rows, total
 
@@ -505,6 +515,13 @@ def stage6(LIVE, ENF, figs):
             L += ["차단 후 에이전트 행동(휴리스틱): " + "; ".join(f"{c} {v}" for c, v in beh.items()), ""]
         if S.get("utility_lost_C1"):
             L += ["C1에서 정상 Utility를 잃은 태스크: " + ", ".join(f"{x['task']}({'/'.join(x['blocked_by'])})" for x in S["utility_lost_C1"]), ""]
+    if samp:
+        L += ["모델 거부(refusal)가 난 실행의 공격 유형 분포: " + "; ".join(
+            f"{c} {v.get('refusal_runs_by_type', {})}" for c, v in samp["conditions"].items()) +
+            ". 거부는 모델의 안전 분류기가 요청을 멈춘 경우로, 해당 실행에서는 공격도 정상 작업도 끝나지 않는다(Utility under attack 감소 요인).", ""]
+        if "C4" in samp["conditions"]:
+            L += [f"C4의 '게이트' 지연(태스크당 {samp['conditions']['C4']['gate_ms_per_task']} ms)에는 판정 LLM 호출 시간이 포함된다. "
+                  "판정 결과는 캐시되므로 같은 사실 조합이 반복되면 지연이 0에 가깝다.", ""]
     L += ["분류: (a) 유형 H, (b) 차단 이벤트 없이 성공(탐지 실패), (c) 차단 후 다른 호출로 성공(경로 우회), (d) ESCALATE 허용으로 성공, (d') 판정 LLM 허용으로 성공, "
           "(e) 실행된 호출로는 실패지만 AgentDojo가 시도 기록으로 성공 판정.", ""]
     if samp:
@@ -554,8 +571,9 @@ def final(R, RL, LIVE, ENF, figs):
         att = {c: v.get("attack_attempted", 0) for c, v in m.items()}
         L.append(f"- **실제 모델({samp['agent_model']}, 표본)**: 방어 없음(C0)에서 ASR {p100(m['C0']['asr'])}, 공격을 시도한 실행 {att['C0']}/{m['C0']['attack_runs']}. "
                  "이 모델은 고정 템플릿 공격에 거의 넘어가지 않아 실제 모델에서의 ASR 감소는 관찰되지 않았고(성공 집계는 유형 H의 측정 부산물), "
-                 f"게이트의 비용으로 정상 Utility가 {p100(m['C0']['utility'])}(C0) → {p100(m['C1']['utility'])}(C1) → {p100(m['C2']['utility'])}(C2)"
-                 + (f" → {p100(m['C4']['utility'])}(C4)" if "C4" in m else "") + "로 나타났다.")
+                 f"게이트의 비용으로 정상 Utility(정상 태스크 {m['C0']['benign_runs']}개)가 {p100(m['C0']['utility'])}(C0) → {p100(m['C1']['utility'])}(C1) → {p100(m['C2']['utility'])}(C2)"
+                 + (f" → {p100(m['C4']['utility'])}(C4)" if "C4" in m else "") + "로 나타났다. "
+                 f"모델이 응답을 거부(stop_reason refusal)한 실행은 C0에서 {m['C0']['agent_refusals']}회였고, 유형별로 {m['C0'].get('refusal_runs_by_type', {})}이다.")
     if scripted:
         m = scripted["conditions"]
         L.append(f"- **항상 넘어가는 대역 에이전트(전체 규모)**: ASR {p100(m['C0']['asr'])}(C0) → {p100(m['C1']['asr'])}(C1), 정상 Utility {p100(m['C0']['utility'])} → {p100(m['C1']['utility'])}.")

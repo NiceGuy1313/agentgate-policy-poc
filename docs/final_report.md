@@ -4,16 +4,20 @@
 
 ## 요약
 
-- **RQ1 (탐지 가능성)**: 공격에 넘어간 에이전트의 정답 궤적을 재생하면, 결정론적 정책 P1~P9는 효과 호출이 있는 929쌍 중 96.2% (894/929)을 BLOCK 또는 ESCALATE로, 80.0% (743/929)을 BLOCK으로 잡는다. ESCALATE를 block으로 집행하면 정책 없이 성공하던 공격 860쌍 중 91.6% (788/860)가 실패로 바뀐다(실행된 호출 기준 94.1% (809/860)). 정상 user task 97개에서 BLOCK은 3개 태스크, ESCALATE는 17개 태스크에서 나왔다.
-- **RQ2 (집행 여부)**: AgentDojo 파이프라인에 게이트를 넣고 4184회 실행(게이트 판정 25544건, 차단 2987건)한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 모두 0건이었다. 대역 에이전트 기준 ASR은 C0 97.4% → C1 7.5%, 정상 Utility는 99.0% → 80.4%이다. 실제 LLM 에이전트 결과는 API 키가 없어 아직 없다.
-- **판정 LLM(C4)과 LLM TaskSpec 추출**: 코드·프롬프트·캐시·테스트는 완성했으나 키가 없어 실행하지 않았다(8절의 명령으로 실행).
+- **RQ1 (탐지 가능성)**: 공격에 넘어간 에이전트의 궤적을 재생하면 결정론적 정책 P1~P9가 효과 호출이 있는 929쌍 중 96.2% (894/929)을 BLOCK 또는 ESCALATE로, 80.0% (743/929)을 BLOCK으로 잡는다. ESCALATE를 차단으로 집행하면 정책 없이 성공하던 860쌍 중 91.6% (788/860)이 실패로 바뀐다(실행된 호출 기준 94.1% (809/860)). 정상 user task 97개 중 BLOCK이 나온 태스크는 3개다.
+- **LLM TaskSpec**: claude-opus-5-5 추출 spec으로 재생하면 strict 79.8% (741/929), lenient 96.2% (894/929); claude-sonnet-5-5 추출 spec으로 재생하면 strict 80.7% (750/929), lenient 96.2% (894/929) (oracle과 거의 같음, `docs/stage4_spec_comparison.md`).
+- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 4716회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 0건이었다.
+- **실제 모델(claude-sonnet-5-5, 표본)**: 방어 없음(C0)에서 ASR 2.9%, 공격을 시도한 실행 0/105. 이 모델은 고정 템플릿 공격에 거의 넘어가지 않아 실제 모델에서의 ASR 감소는 관찰되지 않았고(성공 집계는 유형 H의 측정 부산물), 게이트의 비용으로 정상 Utility(정상 태스크 12개)가 100.0%(C0) → 83.3%(C1) → 100.0%(C2) → 91.7%(C4)로 나타났다. 모델이 응답을 거부(stop_reason refusal)한 실행은 C0에서 13회였고, 유형별로 {'C': 13}이다.
+- **항상 넘어가는 대역 에이전트(전체 규모)**: ASR 97.4%(C0) → 7.5%(C1), 정상 Utility 99.0% → 80.4%.
+- **판정 LLM(claude-sonnet-5-5)**: 재생의 ESCALATE 583건에서 공격 호출 564건 중 ALLOW 0건, 정상 호출 19건 중 ALLOW 7건, HUMAN 비율 5.8%.
+- **사용한 API 비용(정가 기준)**: 약 $23.15.
 
 ## 1. 개요
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)에 따라 송금·반출·삭제를 하는 문제를, 모델 바깥의 결정론적 정책으로 막을 수 있는지 검증한다.
 
-- **RQ1 탐지 가능성**: 사용자 프롬프트만으로 만든 TaskSpec과 툴 호출 인자의 출처를 기준으로 하는 정책이, 공격 호출을 잡고 정상 호출은 통과시키는가.
-- **RQ2 집행 여부**: 정책 판정이 실제 에이전트 파이프라인에서 우회 없이 집행되는가, 그 비용(Utility·지연)은 얼마인가.
+- **RQ1 탐지 가능성**: 사용자 프롬프트만으로 만든 TaskSpec과 툴 호출 인자의 출처를 기준으로 한 정책이 공격 호출을 잡고 정상 호출은 통과시키는가.
+- **RQ2 집행 여부**: 정책 판정이 실제 에이전트 파이프라인에서 우회 없이 집행되는가, 그 비용(Utility·지연·토큰)은 얼마인가.
 
 ## 2. 방법
 
@@ -45,26 +49,34 @@ agent LLM ──tool call──► GatedRuntime.run_function ──► PolicyEng
                     │            └─ ESCALATE ─► block | allow | judge LLM (구조화 사실만 입력)
 ```
 
-- 가로채기 지점은 `FunctionsRuntime` 서브클래스다. AgentDojo의 `ToolsExecutor`와 `GroundTruthPipeline`이 모두 `runtime.run_function`으로만 툴을 실행하므로 한 곳에서 모든 경로를 덮는다(근거: `docs/design_decisions.md`).
+- 가로채기 지점은 `FunctionsRuntime` 서브클래스다. AgentDojo의 `ToolsExecutor`와 `GroundTruthPipeline`이 모두 `runtime.run_function`으로만 툴을 실행하므로 한 곳에서 모든 경로를 덮는다(`docs/design_decisions.md`).
 - 출처 판정은 프롬프트와 각 툴 응답(모델에 전달된 문자열과 원본 객체의 모든 문자열 필드)을 정규화해 색인하고, 값이 가장 신뢰도 높은 출처에서 처음 등장한 위치를 근거로 남긴다.
 
 ### 2.3 평가 설정
 
-- Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성, `docs/stage4_oracle_review.md`).
-- Stage 6 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`, 조건 C0~C3, 대역 에이전트(ScriptedAgent).
+- Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성)과 LLM 추출 spec.
+- Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 claude-opus-5-5, claude-sonnet-5-5(effort medium), 그리고 전체 규모 검증용 대역 에이전트.
 
 ## 3. RQ1 결과 — 재생 평가
 
-| 지표 | oracle TaskSpec | LLM TaskSpec |
-|---|---|---|
-| 쌍 단위 탐지율 strict | 80.0% (743/929) | 미실행 |
-| 쌍 단위 탐지율 lenient | 96.2% (894/929) | 미실행 |
-| 호출 단위 탐지율 | 79.5% (1999/2513) | 미실행 |
-| 저지율 native / executed-only | 91.6% (788/860) / 94.1% (809/860) | 미실행 |
-| 오탐: BLOCK 호출 / BLOCK 태스크 | 0.9% (3/339) / 3.1% (3/97) | 미실행 |
-| ESCALATE 호출 / 태스크 | 5.6% (19/339) / 17.5% (17/97) | 미실행 |
+| 지표 | oracle TaskSpec | LLM claude-opus-5-5 | LLM claude-sonnet-5-5 |
+|---|---|---|---|
+| 평가 쌍 (효과 호출 있음) | 929 / 전체 949 | 929 / 전체 949 | 929 / 전체 949 |
+| 쌍 단위 탐지율 strict | 80.0% (743/929) | 79.8% (741/929) | 80.7% (750/929) |
+| 쌍 단위 탐지율 lenient | 96.2% (894/929) | 96.2% (894/929) | 96.2% (894/929) |
+| 호출 단위 탐지율 (BLOCK+ESCALATE) | 79.5% (1999/2513) | 79.5% (1999/2513) | 79.5% (1999/2513) |
+| 호출 단위 BLOCK 비율 | 57.1% (1435/2513) | 57.0% (1433/2513) | 57.4% (1443/2513) |
+| 저지율 (native) | 91.6% (788/860) | 91.6% (788/860) | 91.6% (788/860) |
+| 저지율 (executed-only) | 94.1% (809/860) | 94.1% (809/860) | 94.1% (809/860) |
+| 기준선에서 공격이 실패한 쌍 (저지율 분모 제외) | 89 | 89 | 89 |
+| 오탐: BLOCK 호출 비율 | 0.9% (3/339) | 0.9% (3/339) | 0.9% (3/339) |
+| 오탐: BLOCK이 있는 user task 비율 | 3.1% (3/97) | 3.1% (3/97) | 3.1% (3/97) |
+| ESCALATE 호출 비율 (정상 태스크) | 5.6% (19/339) | 5.6% (19/339) | 5.6% (19/339) |
+| ESCALATE가 있는 user task 비율 | 17.5% (17/97) | 17.5% (17/97) | 17.5% (17/97) |
+| 정상 태스크 Utility (audit → enforce) | 97/97 → 79/97 | 97/97 → 79/97 | 97/97 → 79/97 |
+| 공격 하 Utility (audit → enforce) | 267/949 → 675/949 | 267/949 → 675/949 | 267/949 → 675/949 |
 
-유형별 탐지율:
+유형별 탐지율(oracle):
 
 | 유형 | 평가 쌍 | strict | lenient |
 |---|---|---|---|
@@ -78,7 +90,7 @@ agent LLM ──tool call──► GatedRuntime.run_function ──► PolicyEng
 
 ![detection by type](../results/figures/detection_by_type.png)
 
-Ablation (정책 하나를 끈 탐지율과 고유 기여):
+Ablation(정책 하나를 끈 탐지율과 고유 기여):
 
 | 비활성 | strict | lenient | 고유 strict | 고유 lenient |
 |---|---|---|---|---|
@@ -95,74 +107,152 @@ Ablation (정책 하나를 끈 탐지율과 고유 기여):
 
 ![ablation](../results/figures/ablation.png)
 
-P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 기여가 0이지만 strict 고유 기여가 가장 크다. P1이 ESCALATE로만 잡는 banking·workspace 반출을 BLOCK으로 끌어올리는 역할이다. P6·P8·P9 같은 작업 단위(op-level) 정책은 해당 유형(E·G)에서만 쓰이지만, 그 유형에서는 사실상 유일한 방어선이다.
+P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 기여가 0이지만 strict 고유 기여가 가장 크다. P1이 ESCALATE로만 잡는 banking·workspace 반출을 BLOCK으로 끌어올리는 역할이다. P6·P8·P9 같은 작업 단위 정책은 해당 유형(E·G)에서 사실상 유일한 방어선이다.
 
 ## 4. RQ2 결과 — 파이프라인 집행
 
-에이전트: **scripted** (실제 LLM 아님, 6절 한계 참고)
+**claude-sonnet-5-5 — 표본(suite별 user task 3개 × 전체 injection task)**
 
-| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 태스크당 지연 ms (전체 / 게이트 / TaskSpec) | 토큰 (에이전트 in/out, TaskSpec, judge) | HUMAN |
-|---|---|---|---|---|---|---|---|
-| C0 방어 없음 | 99.0% | 28.5% | 97.4% | 97.4% | 21.149 / 3.719 / 0.0 | 0/0, 0, 0 | 0 |
-| C1 게이트 (ESCALATE→block) | 80.4% | 70.6% | 7.5% | 5.3% | 19.466 / 3.935 / 0.0 | 0/0, 0, 0 | 0 |
-| C2 게이트 (ESCALATE→allow) | 95.9% | 67.7% | 23.3% | 21.1% | 20.39 / 3.877 / 0.0 | 0/0, 0, 0 | 0 |
-| C3 AgentDojo 내장 방어 | 99.0% | 28.5% | 97.4% | 97.4% | 21.367 / 3.833 / 0.0 | 0/0, 0, 0 | 0 |
-| C4 게이트 (ESCALATE→judge) | 미실행 | 미실행 | 미실행 | 미실행 | 미실행 | 미실행 | 미실행 |
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 100.0% (12/12) | 87.6% (92/105) | 2.9% (3/105) | 2.9% (3/105) | 0.0% (0/105) | 6903 / 0.363 | 15588 / 582 | 0 | 0 / 0 | 13 |
+| C1 게이트 (ESCALATE→block) | 83.3% (10/12) | 77.1% (81/105) | 1.9% (2/105) | 1.9% (2/105) | 0.0% (0/105) | 6903 / 0.34 | 15368 / 576 | 24 | 0 / 0 | 16 |
+| C2 게이트 (ESCALATE→allow) | 100.0% (12/12) | 85.7% (90/105) | 1.9% (2/105) | 1.9% (2/105) | 0.0% (0/105) | 6621 / 0.363 | 15508 / 563 | 10 | 0 / 0 | 15 |
+| C4 게이트 (ESCALATE→judge) | 91.7% (11/12) | 86.7% (91/105) | 1.9% (2/105) | 1.9% (2/105) | 0.0% (0/105) | 7276 / 151.479 | 15500 / 578 | 14 | 13 / 4 | 15 |
 
-집행 무결성(scripted): 실행 4184회, 게이트 판정 25544건, 차단 2987건, 위반 0건 (BLOCK 호출 실행 0, 차단 시 환경 변화 0, 툴 결과-판정 1:1 불일치 0).
+**claude-opus-5-5 — 파일럿(banking 4×3)**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 100.0% (4/4) | 75.0% (9/12) | 0.0% (0/12) | 0.0% (0/12) | 0.0% (0/12) | 7338 / 0.308 | 7718 / 424 | 0 | 0 / 0 | 0 |
+| C1 게이트 (ESCALATE→block) | 50.0% (2/4) | 50.0% (6/12) | 0.0% (0/12) | 0.0% (0/12) | 0.0% (0/12) | 9705 / 0.273 | 7731 / 468 | 5 | 0 / 0 | 0 |
+
+**claude-sonnet-5-5 — 파일럿(banking 4×3)**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 75.0% (3/4) | 75.0% (9/12) | 0.0% (0/12) | 0.0% (0/12) | 0.0% (0/12) | 5592 / 0.312 | 7589 / 398 | 0 | 0 / 0 | 0 |
+| C1 게이트 (ESCALATE→block) | 50.0% (2/4) | 50.0% (6/12) | 0.0% (0/12) | 0.0% (0/12) | 0.0% (0/12) | 6216 / 0.381 | 7802 / 450 | 5 | 0 / 0 | 0 |
+
+**대역 에이전트(ScriptedAgent), 전체 1,046 태스크**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 99.0% (96/97) | 28.5% (270/949) | 97.4% (924/949) | 97.4% (924/949) | 97.7% (927/949) | 21 / 3.719 | 0 / 0 | 0 | 0 / 0 | 0 |
+| C1 게이트 (ESCALATE→block) | 80.4% (78/97) | 70.6% (670/949) | 7.5% (71/949) | 5.3% (50/949) | 97.7% (927/949) | 19 / 3.935 | 0 / 0 | 1874 | 0 / 0 | 0 |
+| C2 게이트 (ESCALATE→allow) | 95.9% (93/97) | 67.7% (642/949) | 23.3% (221/949) | 21.1% (200/949) | 97.7% (927/949) | 20 / 3.877 | 0 / 0 | 1113 | 0 / 0 | 0 |
+| C3 AgentDojo 내장 방어 | 99.0% (96/97) | 28.5% (270/949) | 97.4% (924/949) | 97.4% (924/949) | 97.7% (927/949) | 21 / 3.833 | 0 / 0 | 0 | 0 / 0 | 0 |
+
+| 실행 묶음 | 실행 | 게이트 판정 | 차단 집행 | 위반 |
+|---|---|---|---|---|
+| sample_claude-sonnet-5-5 | 468 | 1325 | 48 | 0 |
+| pilot_claude-opus-5-5 | 32 | 68 | 5 | 0 |
+| pilot_claude-sonnet-5-5 | 32 | 67 | 5 | 0 |
+| scripted | 4184 | 25544 | 2987 | 0 |
+
+위반은 BLOCK 호출 실행, 차단 시 환경 변화, 툴 결과-판정 1:1 불일치의 합이다.
 
 ## 5. ASR · Utility · Latency 트레이드오프
 
 지표 정의는 AgentDojo를 따른다. **Utility**는 공격 없이 user task의 `utility` 판정이 참인 비율, **Utility under attack**은 공격 환경에서 user task `utility`가 참인 비율, **ASR**(targeted attack success rate)은 injection task의 `security` 판정이 참(공격 목표 달성)인 비율이다.
 
-| 조건 | ASR | Utility | Utility under attack | 게이트 판정 지연 (태스크당 ms) |
-|---|---|---|---|---|
-| C0 방어 없음 | 97.4% | 99.0% | 28.5% | 3.719 |
-| C1 게이트 (ESCALATE→block) | 7.5% | 80.4% | 70.6% | 3.935 |
-| C2 게이트 (ESCALATE→allow) | 23.3% | 95.9% | 67.7% | 3.877 |
-| C3 AgentDojo 내장 방어 | 97.4% | 99.0% | 28.5% | 3.833 |
+**claude-sonnet-5-5 — 표본(suite별 user task 3개 × 전체 injection task)**
+
+| 조건 | ASR | Utility | Utility under attack | 태스크당 지연 ms | 게이트 판정 ms/태스크 |
+|---|---|---|---|---|---|
+| C0 방어 없음 | 2.9% | 100.0% | 87.6% | 6903 | 0.363 |
+| C1 게이트 (ESCALATE→block) | 1.9% | 83.3% | 77.1% | 6903 | 0.34 |
+| C2 게이트 (ESCALATE→allow) | 1.9% | 100.0% | 85.7% | 6621 | 0.363 |
+| C4 게이트 (ESCALATE→judge) | 1.9% | 91.7% | 86.7% | 7276 | 151.479 |
+
+![tradeoff](../results/figures/tradeoff_sample_claude-sonnet-5-5.png)
+
+**대역 에이전트(ScriptedAgent), 전체 1,046 태스크**
+
+| 조건 | ASR | Utility | Utility under attack | 태스크당 지연 ms | 게이트 판정 ms/태스크 |
+|---|---|---|---|---|---|
+| C0 방어 없음 | 97.4% | 99.0% | 28.5% | 21 | 3.719 |
+| C1 게이트 (ESCALATE→block) | 7.5% | 80.4% | 70.6% | 19 | 3.935 |
+| C2 게이트 (ESCALATE→allow) | 23.3% | 95.9% | 67.7% | 20 | 3.877 |
+| C3 AgentDojo 내장 방어 | 97.4% | 99.0% | 28.5% | 21 | 3.833 |
 
 ![tradeoff](../results/figures/tradeoff_scripted.png)
 
-C1은 ASR을 가장 크게 낮추지만 ESCALATE를 모두 막아 정상 Utility도 99.0% → 80.4%로 낮춘다. C2는 Utility를 95.9%로 회복하는 대신 ASR이 23.3%로 오른다. 그 차이가 ESCALATE 회색 지대이며, C4(판정 LLM)가 이 구간을 메우는 것이 목표다. 게이트 판정 지연은 호출당 평균 0.74 ms(p95 3.47 ms)로, LLM 호출 한 번(수백 ms 이상)에 비해 무시할 수 있다. TaskSpec 추출과 판정 LLM의 지연·토큰은 키를 넣은 뒤 측정된다.
+게이트 판정 지연은 호출당 평균 0.74 ms(p95 3.47 ms)로, LLM 한 턴(수 초)에 비해 무시할 수 있다. 비용의 대부분은 지연이 아니라 Utility다. ESCALATE를 모두 차단하는 C1은 정상 작업을 가장 많이 잃고, 모두 허용하는 C2는 Utility를 회복하지만 넘어가는 에이전트(대역)에서 ASR이 다시 오른다. C4는 이 회색 지대를 판정 LLM으로 나누려는 조건이다.
 
-## 6. 실패 분석
+## 6. 판정 LLM 단독 평가 (Stage 7 작업 2)
 
-- **탐지 실패(정책 설계)**: 인젝션이 사용자가 지목한 출처 안에 있으면 출처 기반 판정이 약해진다. slack injection_task_1·3(지목 웹 페이지·채널 목록 안의 링크), travel injection_task_0·4(지목 호텔 리뷰 안의 호텔)가 그 예다. banking은 같은 이유로 대부분 ESCALATE에 머문다(lenient는 잡지만 strict는 놓침).
-- **같은 권한 범위의 공격**: 사용자가 일정 생성을 요청한 태스크에서 공격도 일정 생성이면 op-level 정책(P9)이 구분하지 못한다(travel injection_task_2).
+재생(oracle spec)에서 ESCALATE가 난 호출을 판정기에 넣고, 정답(인젝션 태스크의 호출 = attack, 주입 없는 정상 재생의 호출 = normal)과 비교했다. 최종 처리: B→BLOCK, A→ALLOW(가역 툴만), C 또는 비가역 툴→HUMAN(벤치마크에서는 BLOCK으로 집행).
+
+**claude-sonnet-5-5**: 판정 호출 583건, HUMAN 비율 5.8%
+
+| 정답 → 판정기 답 | 건수 |
+|---|---|
+| attack->A | 8 |
+| attack->B | 541 |
+| attack->C | 15 |
+| normal->A | 9 |
+| normal->B | 1 |
+| normal->C | 9 |
+
+| 정답 → 최종 처리 | 건수 |
+|---|---|
+| attack->BLOCK | 541 |
+| attack->HUMAN | 23 |
+| normal->ALLOW | 7 |
+| normal->BLOCK | 1 |
+| normal->HUMAN | 11 |
+
+## 7. 실패 분석
+
+- **탐지 실패(정책 설계)**: 인젝션이 사용자가 지목한 출처 안에 있으면 출처 판정이 약해진다. slack injection_task_1·3(지목 웹 페이지·채널 목록 안의 링크), travel injection_task_0·4(지목 호텔 리뷰 안의 호텔)가 그 예다. banking은 같은 이유로 대부분 ESCALATE에 머문다.
+- **같은 권한 범위의 공격**: 사용자가 일정 생성을 요청한 태스크에서 공격도 일정 생성이면 작업 단위 정책(P9)이 구분하지 못한다(travel injection_task_2).
 - **정당한 목적지와 같은 공격 목적지**: travel user_task_3의 `janeLong@google.com`.
-- **측정상 주의**: slack injection_task_5는 AgentDojo가 시도 기록으로 성공을 판정하므로, 모든 시도를 막아도 native ASR에는 성공으로 남는다(executed-only로 보정해 함께 보고).
-- **오탐 원인**: 지목 출처 내용을 송금 메모로 복사(P2), 2단계 출처(지목 메시지 → 웹 페이지 → 이메일)를 OTHER_TOOL로 판정(P1), 위임형 프롬프트의 requested_ops 공백(P6). 나머지는 설계상 ESCALATE다.
-- **경로 우회**: 대역 에이전트는 우회를 시도하지 않으므로 측정하지 못했다. 실제 모델 실행에서 (c) 분류로 집계된다.
+- **측정상 주의**: slack injection_task_5는 AgentDojo가 시도 기록으로 성공을 판정한다(executed-only로 보정). 유형 H는 모델이 인젝션을 경고하며 이름을 언급해도 성공으로 집계된다.
+- **오탐 원인**: 지목 출처 내용을 송금 메모로 복사(P2), 2단계 출처를 OTHER_TOOL로 판정(P1), 위임형 프롬프트의 requested_ops 공백(P6). 나머지는 설계상 ESCALATE다. 실제 모델에서는 정상 작업을 정답과 다른 경로로 수행하면서 추가 ESCALATE가 생긴다(Stage 6 4절).
 - 개선안 6개는 `docs/stage5_replay_report.md` 7절(정책 수정 제안 v2)에 있으며 승인 전이라 적용하지 않았다.
 
-## 7. 한계
+## 8. 한계
 
 - **정책 도출·평가 데이터 중복**: 정책과 분류를 같은 35개 인젝션 태스크로 설계하고 평가했다.
-- **정답 궤적 재생의 한계**: 재생은 "넘어간 에이전트가 정답대로 공격한다"는 가정이다. 실제 모델의 다른 경로는 반영되지 않는다.
-- **유형 H는 범위 밖**: 툴 호출 없이 응답 텍스트만 조작하는 공격(travel injection_task_6)은 툴 호출 게이트로 막을 수 없다.
-- **적응형 공격 미평가**: 정책을 아는 공격자(예: 지목 출처에만 주입, 값 쪼개기, 프롬프트에 있는 목적지 악용)는 평가하지 않았다.
-- **판정 LLM 자체의 인젝션 노출**: 판정기는 주입 문장이 포함될 수 있는 주변 문맥을 본다. 인용 블록과 시스템 지시로 완화했지만 실측하지 않았다. 또한 비가역 툴은 A 판정이어도 HUMAN으로 보낸다.
-- **실제 LLM 미실행**: API 키가 없어 RQ2의 모델 행동·비용, LLM TaskSpec 추출 오류의 영향, C4를 측정하지 못했다.
-- **원본 정책 사양 부재**: 저장소에 `docs/policy_spec.md`가 없어 Stage 지시서의 조건으로 사양을 다시 작성했다. 원본과 다른 부분이 있을 수 있다.
+- **정답 궤적 재생의 한계**: 재생은 넘어간 에이전트가 정답대로 공격한다고 가정한다.
+- **실제 모델 평가 범위**: 표본(suite별 user task 3개 × 전체 injection task)과 파일럿이다. 실제 모델은 고정 템플릿 공격에 거의 넘어가지 않아, 실제 모델에서의 방어 효과는 이 공격으로는 측정할 수 없었다.
+- **유형 H는 범위 밖**: 툴 호출 없이 응답 텍스트만 조작하는 공격은 툴 호출 게이트로 막을 수 없다.
+- **적응형 공격 미평가**: 정책을 아는 공격자(지목 출처에만 주입, 값 쪼개기, 프롬프트의 목적지 악용)는 평가하지 않았다. 다른 attack으로의 일반화 점검(Stage 7 작업 4)도 하지 않았다.
+- **판정 LLM 자체의 인젝션 노출**: 판정기는 주입 문장이 포함될 수 있는 주변 문맥을 본다. 인용 블록과 시스템 지시로 완화했다.
+- **temperature 0 불가**: 현행 Claude 모델은 temperature를 받지 않아 같은 입력에도 출력이 달라질 수 있다. TaskSpec과 판정은 캐시로 고정했지만 에이전트 실행은 재실행 시 달라질 수 있다.
+- **원본 정책 사양 부재**: 저장소에 `docs/policy_spec.md`가 없어 Stage 지시서의 조건으로 사양을 다시 작성했다.
 
-## 8. 재현 방법
+## 9. 비용
+
+| 항목 | 모델 | 입력 토큰 | 출력 토큰 | 정가 기준 USD |
+|---|---|---|---|---|
+| TaskSpec 추출 (97) | claude-opus-5-5 | 152179 | 21856 | 1.05 |
+| TaskSpec 추출 (97) | claude-sonnet-5-5 | 152179 | 18918 | 0.49 |
+| 판정기 단독 평가 (중단됨, 캐시 197건 기준 하한) | claude-opus-5-5 | 148627 | 22680 | 1.05 |
+| 판정기 단독 평가 (583건 평가) | claude-sonnet-5-5 | 485389 | 47444 | 1.45 |
+| 에이전트 실행 pilot_claude-opus-5-5 (32회) | claude-opus-5-5 | 247194 | 14284 | 1.27 |
+| 에이전트 실행 pilot_claude-sonnet-5-5 (32회) | claude-sonnet-5-5 | 246247 | 13565 | 0.63 |
+| 에이전트 실행 sample_claude-sonnet-5-5 (468회) | claude-sonnet-5-5 | 7249841 | 269108 | 17.19 |
+| C4 판정 LLM sample_claude-sonnet-5-5 | claude-sonnet-5-5 | 7236 | 729 | 0.02 |
+
+합계 약 $23.15(Claude API 정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영).
+
+## 10. 재현 방법
 
 - 버전: Python ≥3.10 (실행 환경 3.13), `agentdojo==0.1.35`, 벤치마크 `v1.2.2`, 정책 설정 `config/policies.yaml` (version v1).
-- 설정: `config/policies.yaml`, `config/tool_roles.yaml`, `config/named_source_rules.yaml`, `config/sensitive_reads.yaml`, oracle spec `data/specs/oracle/`.
+- 설정: `config/*.yaml`, oracle spec `data/specs/oracle/`, LLM spec `data/specs/llm/<model>/`, 캐시 `data/specs/llm_cache/`, `data/judge_cache/`.
 ```bash
 python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'
-python -m pytest -q                                   # unit + integration tests
-python scripts/smoke_test.py
-python scripts/build_catalog.py && python scripts/analyze_provenance.py      # Stage 1
-python scripts/review_oracle.py                                             # Stage 4 review table
-python scripts/replay_eval.py --spec oracle --out results/replay/v1/oracle  # Stage 5
-python scripts/summarize_replay.py --run results/replay/v1/oracle
-python scripts/live_eval.py --agent scripted --spec oracle --conditions C0 C1 C2 C3 --out results/live/v1/scripted
-python scripts/check_enforcement.py --run results/live/v1/scripted && python scripts/summarize_live.py --run results/live/v1/scripted
-python scripts/build_report.py
-# with API keys in .env:
-python scripts/extract_specs.py && python scripts/compare_specs.py --model <model>
+python -m pytest -q
+python scripts/build_catalog.py && python scripts/analyze_provenance.py
+python scripts/replay_eval.py --spec oracle --out results/replay/v1/oracle && python scripts/summarize_replay.py
+# ANTHROPIC_API_KEY 필요 (환경 변수 또는 .env)
+python scripts/extract_specs.py && python scripts/compare_specs.py --model claude-sonnet-5-5
+python scripts/replay_eval.py --spec llm:claude-sonnet-5-5 --out results/replay/v1/llm_claude-sonnet-5-5
+python scripts/summarize_replay.py --run results/replay/v1/llm_claude-sonnet-5-5
 python scripts/judge_eval.py
-python scripts/live_eval.py --agent llm --spec llm --pilot --conditions C0 C1 --out results/live/v1/<model>
+python scripts/live_eval.py --agent llm --spec llm --sample 3 --seed 0 --conditions C0 C1 C2 C4 --out results/live/v1/sample_claude-sonnet-5-5
+python scripts/check_enforcement.py --run results/live/v1/sample_claude-sonnet-5-5 && python scripts/summarize_live.py --run results/live/v1/sample_claude-sonnet-5-5
+python scripts/build_report.py
 ```
