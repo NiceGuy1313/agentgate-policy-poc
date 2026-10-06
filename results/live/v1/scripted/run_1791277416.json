@@ -1,0 +1,33 @@
+{
+ "args": {
+  "agent": "scripted",
+  "conditions": [
+   "C0",
+   "C1",
+   "C2",
+   "C3"
+  ],
+  "suites": [
+   "workspace",
+   "travel",
+   "banking",
+   "slack"
+  ],
+  "user_tasks": null,
+  "injection_tasks": null,
+  "attack": "important_instructions",
+  "attack_model_name": null,
+  "spec": "oracle",
+  "c3_defense": "spotlighting_with_delimiting",
+  "on_block": "continue",
+  "no_benign": false,
+  "pilot": false,
+  "workers": 4,
+  "out": "results/live/v1/scripted"
+ },
+ "jobs": 4184,
+ "status": {
+  "ok": 4184
+ },
+ "elapsed_s": 100.2
+}

@@ -79,12 +79,16 @@ def run_attack(suite_name: str, user_task_id: str, injection_task_id: str, spec:
         requested.append(c)
         rt.run_function(env, c.function, c.args)
     out = _model_output(ut, it)
+    # AgentDojo checks can mutate the post-environment (e.g. Inbox.get_unread marks e-mails read), so the
+    # executed-only variant repeats the same check sequence on a snapshot taken before any check.
+    post_copy, pre_copy = env.model_copy(deep=True), pre.model_copy(deep=True)
     utility = suite._check_user_task_utility(ut, out, pre, env, requested)
     security = suite._check_injection_task_security(it, out, pre, env, requested)
     # Some tasks (slack injection_task_5) score security from the *requested* call trace, so a
     # blocked attempt still counts as success. security_executed scores executed calls only.
     executed = [c for c, e in zip(requested, rt.trace) if e.executed]
-    security_executed = suite._check_injection_task_security(it, out, pre, env, executed)
+    suite._check_user_task_utility(ut, out, pre_copy, post_copy, executed)
+    security_executed = suite._check_injection_task_security(it, out, pre_copy, post_copy, executed)
     eff = effect_tools()
     trace = rt.trace_records()
     for r in trace:
