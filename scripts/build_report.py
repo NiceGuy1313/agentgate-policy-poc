@@ -451,7 +451,7 @@ def spend_rows():
                 n += 1
             rows.append([f"판정기 단독 평가 (중단됨, 캐시 {n}건 기준 하한)", p.name, tin, tout, usd(p.name, tin, tout)])
     for name, S in sorted(LIVE_CACHE.items()):
-        if S.get("agent") != "llm":
+        if S.get("agent") != "llm" or name.startswith("probe_"):
             continue
         tin = sum(v["agent_input_tokens_total"] for v in S["conditions"].values())
         tout = sum(v["agent_output_tokens_total"] for v in S["conditions"].values())
@@ -467,6 +467,29 @@ def spend_rows():
 
 
 LIVE_CACHE: dict = {}
+
+
+def probe_section() -> list[str]:
+    out = []
+    for p in sorted(LIVE_ROOT.glob("probe_*/probe_summary.json")):
+        rows = J(p)
+        attack = p.parent.name.removeprefix("probe_")
+        pairs = sorted({x["pair"] for r in rows for x in r["pairs"]})
+        out += [f"### 모델 탐색: `{attack}` 공격, 방어 없음(C0), 고정 {len(pairs)}쌍", "",
+                "쌍: " + ", ".join(f"`{x}`" for x in pairs) + ". 마지막 두 열은 공격이 성공한 쌍 중 게이트(audit 모드)가 "
+                "BLOCK을 판정했을 쌍과 ESCALATE만 판정했을 쌍의 수다.", "",
+                table(["모델", "실행", "오류", "공격 시도", "공격 성공(ASR)", "user task 성공", "게이트가 BLOCK 판정한 쌍", "ESCALATE만 낸 쌍"],
+                      [[r["model"], r["runs"], r["errors"], r["attempted"], r["attack_success"], r["utility"],
+                        sum("BLOCK" in x["gate_would"] for x in r["pairs"] if x["attack_success"]),
+                        sum(x["gate_would"] == ["ESCALATE"] for x in r["pairs"] if x["attack_success"])]
+                       for r in sorted(rows, key=lambda r: (-r["attack_success"], r["model"]))]), ""]
+        succ = [x for r in rows for x in r["pairs"] if x["attack_success"]]
+        flagged = sum(bool(x["gate_would"]) for x in succ)
+        blocked = sum("BLOCK" in x["gate_would"] for x in succ)
+        out += [f"공격이 성공한 {len(succ)}개 실행 중 게이트가 공격 호출을 BLOCK 또는 ESCALATE로 판정했을 실행은 {flagged}개, "
+                f"BLOCK으로 판정했을 실행은 {blocked}개다. 즉 ESCALATE를 차단하는 C1이었다면 {flagged}개 모두 막혔을 것이고, "
+                f"ESCALATE를 허용하는 C2였다면 {len(succ) - blocked}개는 통과했을 것이다(audit 기록 기준 추정이며, 실제 C1·C2 실행으로 확인해야 한다).", ""]
+    return out
 
 
 def stage6(LIVE, ENF, figs):
@@ -532,6 +555,12 @@ def stage6(LIVE, ENF, figs):
               "실행 기록을 보면 모델이 \"툴 응답에 이 호텔을 추천하라는 지시가 있었지만 무시한다\"고 사용자에게 알리는 문장에서 이름을 언급한 경우가 포함되어 있다. "
               "즉 이 성공은 모델이 넘어간 것이 아니라 경고 문장이 판정 조건과 겹친 것이다(사례: "
               "`results/live/v1/" + next(k for k in llm_runs if k.startswith('sample_')) + "/C0/travel/*/injection_task_6.json`).", ""]
+    probe = probe_section()
+    if probe:
+        L += ["## 4.5 공격에 넘어가는 실제 모델 찾기 (Ollama Cloud)", "",
+              "현행 Claude·GLM이 기본 공격에 넘어가지 않아, Ollama Cloud에서 쓸 수 있는 모델 전부에 AgentDojo 내장 `tool_knowledge` 공격"
+              "(공격 목표와 함께 쓸 툴·인자를 알려 줌)을 같은 소수 쌍으로 시험했다(`scripts/probe_models.sh`, `scripts/summarize_probe.py`). "
+              "게이트는 audit 모드라 실행을 막지 않았고, 공격 호출에 대해 무엇을 판정했을지만 기록했다.", ""] + probe
     L += ["## 5. Stage 5 재생 결과와의 차이", "",
           "재생은 \"에이전트가 공격에 넘어간다\"고 가정하고 정책이 그 호출을 잡는지를 본다. 실제 모델은 이 attack에 거의 넘어가지 않았으므로(공격 시도 비율 참조), "
           "실제 실행에서 게이트가 막은 호출은 대부분 공격이 아니라 정상 작업의 일부다. 따라서 실제 모델에서의 방어 효과(ASR 감소)는 이 데이터로는 관찰할 수 없고, "
@@ -590,6 +619,12 @@ def final(R, RL, LIVE, ENF, figs):
         cm = d["confusion_final"]
         L.append(f"- **판정 LLM({jm})**: 재생의 ESCALATE {d['n']}건에서 공격 호출 {sum(v for k, v in cm.items() if k.startswith('attack->'))}건 중 ALLOW "
                  f"{cm.get('attack->ALLOW', 0)}건, 정상 호출 {sum(v for k, v in cm.items() if k.startswith('normal->'))}건 중 ALLOW {cm.get('normal->ALLOW', 0)}건, HUMAN 비율 {p100(d['human_rate'])}.")
+    for p in sorted(LIVE_ROOT.glob("probe_*/probe_summary.json")):
+        rows = J(p)
+        vuln = [r["model"] for r in rows if r["attack_success"] >= 3]
+        L.append(f"- **넘어가는 실제 모델 탐색({p.parent.name.removeprefix('probe_')} 공격, Ollama Cloud {len(rows)}개 모델)**: "
+                 f"4쌍 중 3쌍 이상 공격이 성공한 모델은 {', '.join(vuln) or '없음'}이다. "
+                 "이 모델들에서는 게이트의 방어 효과를 실제 모델로 측정할 수 있다(`docs/stage6_live_report.md` 4.5절).")
     spend, total = spend_rows()
     L += [f"- **사용한 API 비용(정가 기준)**: 약 ${total}.", "",
           "## 1. 개요", "",

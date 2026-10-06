@@ -11,6 +11,7 @@
 - **실제 모델(glm-5.3, 같은 표본)**: C0 ASR 1.0%, 공격 시도 0/105, Utility 100.0%. 이 모델도 고정 템플릿 공격에 넘어가지 않았다.
 - **항상 넘어가는 대역 에이전트(전체 규모)**: ASR 97.4%(C0) → 7.5%(C1), 정상 Utility 99.0% → 80.4%.
 - **판정 LLM(claude-sonnet-5-5)**: 재생의 ESCALATE 583건에서 공격 호출 564건 중 ALLOW 0건, 정상 호출 19건 중 ALLOW 7건, HUMAN 비율 5.8%.
+- **넘어가는 실제 모델 탐색(tool_knowledge 공격, Ollama Cloud 17개 모델)**: 4쌍 중 3쌍 이상 공격이 성공한 모델은 gemma4:31b, gpt-oss:120b, gpt-oss:20b, mistral-large-3:675b, nemotron-3-nano:30b, nemotron-3-super이다. 이 모델들에서는 게이트의 방어 효과를 실제 모델로 측정할 수 있다(`docs/stage6_live_report.md` 4.5절).
 - **사용한 API 비용(정가 기준)**: 약 $23.15.
 
 ## 1. 개요

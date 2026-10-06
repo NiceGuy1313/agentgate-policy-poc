@@ -713,25 +713,29 @@
    "tasks": 1046,
    "agent_input_tokens": 0,
    "output_and_spec_tokens": 0,
-   "serial_hours": 0.01
+   "serial_hours": 0.01,
+   "usd": 0.0
   },
   "C1": {
    "tasks": 1046,
    "agent_input_tokens": 0,
    "output_and_spec_tokens": 0,
-   "serial_hours": 0.01
+   "serial_hours": 0.01,
+   "usd": 0.0
   },
   "C2": {
    "tasks": 1046,
    "agent_input_tokens": 0,
    "output_and_spec_tokens": 0,
-   "serial_hours": 0.01
+   "serial_hours": 0.01,
+   "usd": 0.0
   },
   "C3": {
    "tasks": 1046,
    "agent_input_tokens": 0,
    "output_and_spec_tokens": 0,
-   "serial_hours": 0.01
+   "serial_hours": 0.01,
+   "usd": 0.0
   }
  }
 }

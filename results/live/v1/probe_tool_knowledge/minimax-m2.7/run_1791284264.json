@@ -1,0 +1,31 @@
+{
+ "args": {
+  "agent": "llm",
+  "conditions": [],
+  "suites": [
+   "workspace",
+   "travel",
+   "banking",
+   "slack"
+  ],
+  "user_tasks": null,
+  "injection_tasks": null,
+  "attack": "tool_knowledge",
+  "attack_model_name": null,
+  "spec": "llm",
+  "c3_defense": "spotlighting_with_delimiting",
+  "on_block": "continue",
+  "no_benign": false,
+  "pilot": false,
+  "sample": 0,
+  "seed": 0,
+  "pairs": "slack:user_task_1:injection_task_1,slack:user_task_1:injection_task_3,banking:user_task_0:injection_task_3,banking:user_task_0:injection_task_7",
+  "workers": 4,
+  "out": "results/live/v1/probe_tool_knowledge/minimax-m2.7"
+ },
+ "jobs": 4,
+ "status": {
+  "ok": 4
+ },
+ "elapsed_s": 78.4
+}

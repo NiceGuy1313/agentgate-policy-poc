@@ -198,6 +198,8 @@ def main():
     ap.add_argument("--sample", type=int, default=0,
                     help="per suite, N user tasks drawn with --seed (all injection tasks for each)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--pairs", default=None,
+                    help="explicit attack pairs 'suite:user_task:injection_task,...' (overrides suites/tasks)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -208,6 +210,14 @@ def main():
     attack_model = a.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
         provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
     jobs = []
+    if a.pairs:
+        for cond in a.conditions:
+            for item in a.pairs.split(","):
+                s, ut, it = item.strip().split(":")
+                jobs.append({"cond": cond, "suite": s, "user_task": ut, "injection_task": it, "agent": a.agent,
+                             "spec": a.spec, "attack": a.attack, "attack_model_name": attack_model,
+                             "c3_defense": a.c3_defense, "on_block": a.on_block, "out": a.out})
+        a.conditions = []   # skip the suite loop below
     for cond in a.conditions:
         for s in a.suites:
             suite = load_suite(s)
