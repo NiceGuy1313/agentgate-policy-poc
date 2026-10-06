@@ -55,6 +55,14 @@ python scripts/inspect_trace.py call --prompt "Pay the bill 'bill-december-2023.
   --read "read_file=IBAN: US133000000121212121212"
 ```
 
+### Ollama 모델로 에이전트 실행
+
+환경 변수에 `AGENTGATE_AGENT_PROVIDER=ollama`, `AGENTGATE_AGENT_MODEL=<GET https://ollama.com/api/tags의 이름>`, `OLLAMA_API_KEY`를 넣는다(클라우드 환경이면 네트워크 허용 목록에 `ollama.com` 추가). TaskSpec은 기존 Sonnet 캐시를 키 없이 재사용하고, C4 판정기는 `AGENTGATE_JUDGE_PROVIDER=ollama`, `AGENTGATE_JUDGE_MODEL=<모델>`로 Ollama를 쓸 수 있다.
+
+```bash
+python scripts/live_eval.py --agent llm --spec llm --sample 3 --seed 0 --conditions C0 --out results/live/v1/sample_<model>
+```
+
 ### LLM이 필요한 단계 (API 키)
 
 `ANTHROPIC_API_KEY`만 있으면 된다. 클라우드에서는 환경 설정의 환경 변수로, 로컬에서는 `.env.example`을 `.env`로 복사해 넣는다(`.env`는 git에서 제외). 모델 기본값은 추출기·판정기·에이전트 모두 `claude-opus-5-5`이며 `AGENTGATE_*_MODEL`로 바꿀 수 있다(`docs/design_decisions.md` 4절).

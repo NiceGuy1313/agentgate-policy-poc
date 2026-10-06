@@ -53,16 +53,28 @@ def render(f: dict) -> str:
 
 
 class EscalationJudge:
-    def __init__(self, client: LLMClient | None = None, context_width: int = 120):
-        self.client = client or LLMClient(model=os.environ.get("AGENTGATE_JUDGE_MODEL") or None)
+    def __init__(self, client: LLMClient | None = None, context_width: int = 120, model: str | None = None):
+        from agentgate.env import load_dotenv
+        from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
+        load_dotenv()
+        self._client = client
+        self.model = client.model if client else (model or os.environ.get("AGENTGATE_JUDGE_MODEL")
+                                                  or os.environ.get("AGENTGATE_LLM_MODEL") or DEFAULT_ANTHROPIC_MODEL)
+        self.provider = os.environ.get("AGENTGATE_JUDGE_PROVIDER") or os.environ.get("AGENTGATE_LLM_PROVIDER") or None
         self.width = context_width
         self.stats = {"calls": 0, "human": 0, "input_tokens": 0, "output_tokens": 0, "latency_ms": 0.0}
+
+    @property
+    def client(self) -> LLMClient:
+        if self._client is None:
+            self._client = LLMClient(provider=self.provider, model=self.model)
+        return self._client
 
     def __call__(self, call: Call, result: EngineResult, ctx: Context, prompt: str) -> dict:
         facts = build_facts(call, result, ctx, prompt, self.width)
         user = render(facts)
-        key = hashlib.sha256((self.client.model + user).encode()).hexdigest()[:24]
-        path = CACHE / self.client.model.replace("/", "_") / f"{key}.json"
+        key = hashlib.sha256((self.model + user).encode()).hexdigest()[:24]
+        path = CACHE / self.model.replace("/", "_").replace(":", "_") / f"{key}.json"
         if path.exists():
             out = json.loads(path.read_text())
             out["cached"] = True

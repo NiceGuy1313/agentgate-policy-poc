@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from agentgate.env import load_dotenv, require
 
-KEY_OF = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+KEY_OF = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "ollama": None}
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5"
 # models that still accept `temperature` (everything newer rejects sampling parameters)
 _TEMPERATURE_OK = ("claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5", "claude-opus-4-5",
@@ -51,7 +51,8 @@ class LLMClient:
             raise RuntimeError("AGENTGATE_LLM_MODEL is not set (see .env.example)")
         if self.provider not in KEY_OF:
             raise ValueError(f"unsupported provider {self.provider}")
-        require(KEY_OF[self.provider])
+        if KEY_OF[self.provider]:
+            require(KEY_OF[self.provider])
         self.temperature = temperature
         self.effort = effort or os.environ.get("AGENTGATE_LLM_EFFORT") or "medium"
         # server-side refusal fallback ("default" routing by refusal category); "off" disables it
@@ -59,6 +60,9 @@ class LLMClient:
         if self.provider == "anthropic":
             import anthropic
             self._client = anthropic.Anthropic()
+        elif self.provider == "ollama":
+            from agentgate.ollama_llm import OllamaClient
+            self._client = OllamaClient()
         else:
             import openai
             self._client = openai.OpenAI()
@@ -79,6 +83,13 @@ class LLMClient:
             text = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
             it, ot = r.usage.input_tokens, r.usage.output_tokens
             stop, served = r.stop_reason, getattr(r, "model", self.model)
+        elif self.provider == "ollama":
+            d = self._client.chat({"model": self.model, "options": {"temperature": self.temperature, "seed": 0},
+                                   "messages": [{"role": "system", "content": system},
+                                                {"role": "user", "content": user}]})
+            text = (d.get("message") or {}).get("content") or ""
+            it, ot = d.get("prompt_eval_count") or 0, d.get("eval_count") or 0
+            stop, served = d.get("done_reason"), d.get("model", self.model)
         else:
             r = self._client.chat.completions.create(model=self.model, temperature=self.temperature,
                                                      max_tokens=max_tokens,

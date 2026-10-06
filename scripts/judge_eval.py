@@ -82,12 +82,12 @@ def main():
             collect(run, label_fn)
     cm = Counter((x["label"], x["answer"]) for x in records)
     finals = Counter((x["label"], x["final"]) for x in records)
-    out = {"model": judge.client.model, "n": len(records),
+    out = {"model": judge.model, "n": len(records),
            "confusion_answer": {f"{k[0]}->{k[1]}": v for k, v in sorted(cm.items())},
            "confusion_final": {f"{k[0]}->{k[1]}": v for k, v in sorted(finals.items())},
            "human_rate": sum(x["human"] for x in records) / len(records) if records else None,
            "stats": judge.stats, "records": records}
-    d = ROOT / "results/judge/v1" / judge.client.model.replace("/", "_")
+    d = ROOT / "results/judge/v1" / judge.model.replace("/", "_")
     d.mkdir(parents=True, exist_ok=True)
     (d / "judge_eval.json").write_text(json.dumps(out, indent=1, ensure_ascii=False, default=str))
     print(json.dumps({k: v for k, v in out.items() if k != "records"}, indent=1))

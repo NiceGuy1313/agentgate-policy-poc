@@ -41,3 +41,13 @@
 - **temperature 미사용**: 이 모델(및 현행 Claude 모델 대부분)은 `temperature`를 400으로 거부하고 thinking이 항상 켜져 있다. 그래서 temperature를 보내지 않고 `output_config.effort`(기본 `medium`)로 깊이를 정한다. 재현성은 temperature 0이 아니라 디스크 캐시(`data/specs/llm_cache/`, `data/judge_cache/`)로 확보한다. 지시서의 "temperature 0"은 이 모델에서는 적용할 수 없다.
 - **에이전트 요소**: AgentDojo 0.1.35의 `AnthropicLLM`은 temperature를 항상 보내고 `max_tokens=1024`이며 assistant 턴을 [thinking/text…, tool_use…] 순서로 재구성한다. 현행 모델은 tool 호출 사이에 thinking 블록을 내고, 이전 턴 블록을 바꾸면 thinking이 무효가 된다. 이를 위해 서브클래스 `ClaudeAgentLLM`(`src/agentgate/agent_llm.py`)이 원래 content 블록을 그대로 다시 보내고, 출력 한도를 16k로 두고, 토큰·거부(refusal)를 기록한다. agentdojo 소스는 수정하지 않았다.
 - **거부 시 대체 모델(fallback)**: 추출기·판정기는 서버 측 refusal fallback(`fallbacks: "default"`)을 켠다(`AGENTGATE_LLM_FALLBACKS=off`로 끔). 평가 대상 에이전트는 다른 모델이 대신 답하면 ASR이 섞이므로 fallback을 쓰지 않고, 거부 횟수를 `agent_tokens.refusals`로 기록한다.
+
+## 5. Ollama 에이전트 (`src/agentgate/ollama_llm.py`)
+
+AgentDojo 0.1.35에는 Ollama 요소가 없어 `BasePipelineElement`를 직접 구현했다. 근거로 삼은 API 사실(Ollama 저장소 `docs/api.md`, `docs/cloud.mdx`, `ollama-python` `_types.py`):
+
+- `POST {host}/api/chat`, `stream: false`. 클라우드는 `host=https://ollama.com`이고 `Authorization: Bearer $OLLAMA_API_KEY` 헤더를 쓴다. 모델 이름은 `GET /api/tags`가 주는 이름을 `:cloud` 접미사 없이 쓴다.
+- 응답 `message.tool_calls[].function.{name, arguments}`: arguments는 JSON 객체다. 호출 ID가 없으므로 `ollama_<턴>_<순번>`을 붙인다. 문자열로 오는 모델에 대비해 JSON 파싱도 한다. 이름이 AgentDojo 규칙(`^[a-zA-Z0-9_-]{1,64}$`)에 맞지 않는 호출은 버리고 집계한다.
+- 도구 결과는 호출마다 `{"role": "tool", "content", "tool_name"}` 메시지로 돌려준다. assistant 턴은 모델이 준 `content`·`thinking`·`tool_calls`를 그대로 재전송하되, 실제로 실행한 호출만 남긴다.
+- 토큰은 `prompt_eval_count`·`eval_count`로 센다. `options.temperature=0`, `seed=0`을 보내 재현성을 높인다.
+- TaskSpec 추출기와 판정기는 캐시 적중 시 API 클라이언트를 만들지 않는다. 그래서 Anthropic 키 없이도 기존 Sonnet TaskSpec 캐시를 그대로 쓸 수 있다. 판정기 공급자는 `AGENTGATE_JUDGE_PROVIDER`로 따로 정한다(예: `ollama`).

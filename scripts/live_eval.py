@@ -23,6 +23,7 @@ import argparse
 import json
 import multiprocessing as mp
 import random
+import re
 import os
 import time
 import traceback
@@ -87,6 +88,12 @@ def make_llm(meter: UsageMeter):
 
         from agentgate.agent_llm import ClaudeAgentLLM
         llm = ClaudeAgentLLM(anthropic.Anthropic(), model)
+        meter.llm = llm
+    elif provider == "ollama":
+        from agentgate.ollama_llm import OllamaAgentLLM
+        if not model:
+            raise RuntimeError("AGENTGATE_AGENT_MODEL is not set (an Ollama model name, e.g. from GET /api/tags)")
+        llm = OllamaAgentLLM(model)
         meter.llm = llm
     elif provider == "openai":
         import openai
@@ -196,8 +203,10 @@ def main():
     a = ap.parse_args()
     if a.pilot:
         a.suites, a.user_tasks, a.injection_tasks = PILOT["suites"], PILOT["user_tasks"], PILOT["injection_tasks"]
-    attack_model = a.attack_model_name or ("Claude" if (os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic") ==
-                                          "anthropic" else "GPT-4")
+    provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
+    agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
+    attack_model = a.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
+        provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
     jobs = []
     for cond in a.conditions:
         for s in a.suites:

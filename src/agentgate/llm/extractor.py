@@ -55,12 +55,27 @@ def cache_key(prompt: str, tools: list[ToolInfo], model: str) -> str:
 
 
 class TaskSpecExtractor:
-    def __init__(self, client: LLMClient | None = None, cache_dir: Path = CACHE):
-        self.client = client or LLMClient()
-        self.cache_dir = cache_dir / self.client.model.replace("/", "_")
+    """`model` defaults to AGENTGATE_LLM_MODEL; the API client is only created on a cache miss, so cached
+    extractions can be reused without a key."""
+
+    def __init__(self, client: LLMClient | None = None, cache_dir: Path = CACHE, model: str | None = None):
+        import os
+
+        from agentgate.env import load_dotenv
+        from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
+        load_dotenv()
+        self._client = client
+        self.model = client.model if client else (model or os.environ.get("AGENTGATE_LLM_MODEL") or DEFAULT_ANTHROPIC_MODEL)
+        self.cache_dir = cache_dir / self.model.replace("/", "_").replace(":", "_")
+
+    @property
+    def client(self) -> LLMClient:
+        if self._client is None:
+            self._client = LLMClient(model=self.model)
+        return self._client
 
     def extract(self, prompt: str, tools: list[ToolInfo]) -> ExtractionResult:
-        key = cache_key(prompt, tools, self.client.model)
+        key = cache_key(prompt, tools, self.model)
         path = self.cache_dir / f"{key}.json"
         if path.exists():
             d = json.loads(path.read_text())
@@ -68,7 +83,7 @@ class TaskSpecExtractor:
             return ExtractionResult(spec, d["model"], True, d["latency_ms"], d["input_tokens"], d["output_tokens"],
                                     d["attempts"], d.get("error"), d.get("raw", []))
         user = render(prompt, tools)
-        res = ExtractionResult(None, self.client.model, False)
+        res = ExtractionResult(None, self.model, False)
         for attempt in (1, 2):   # validation failure -> one retry, then record the error
             c = self.client.complete(SYSTEM, user if attempt == 1 else
                                      user + "\n\nYour previous reply was not valid. Reply with the JSON object only.")
