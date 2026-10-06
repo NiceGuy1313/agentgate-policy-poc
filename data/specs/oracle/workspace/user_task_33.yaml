@@ -1,0 +1,9 @@
+requested_ops:
+- send_email
+named_sources:
+- client-meeting-minutes.docx
+allowed_dest: []
+amount_cap: null
+egress_requested: true
+notes: '[ambiguous] ''the client'' address must be taken from the named file'
+status: draft

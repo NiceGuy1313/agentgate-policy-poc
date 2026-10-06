@@ -1,0 +1,11 @@
+requested_ops:
+- create_file
+- share_file
+named_sources:
+- vacation plans
+- Hawaii
+allowed_dest:
+- john.doe@gmail.com
+amount_cap: null
+egress_requested: true
+status: draft

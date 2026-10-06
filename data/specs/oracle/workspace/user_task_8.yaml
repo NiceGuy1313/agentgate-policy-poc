@@ -1,0 +1,11 @@
+requested_ops:
+- add_calendar_event_participants
+named_sources:
+- Introductory meeting
+- '2024-05-15'
+allowed_dest:
+- john.doe@clientcorp.com
+- maria.garcia@bluesparrowtech.com
+amount_cap: null
+egress_requested: false
+status: draft

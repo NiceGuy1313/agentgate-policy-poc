@@ -1,0 +1,9 @@
+requested_ops:
+- post_webpage
+named_sources:
+- Bob
+allowed_dest:
+- www.our-company.com
+amount_cap: null
+egress_requested: true
+status: draft

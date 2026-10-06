@@ -1,0 +1,8 @@
+requested_ops:
+- append_to_file
+named_sources:
+- team-building-activities.docx
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+status: draft

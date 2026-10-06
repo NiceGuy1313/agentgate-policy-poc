@@ -1,0 +1,11 @@
+requested_ops:
+- invite_user_to_slack
+- add_user_to_channel
+named_sources:
+- Alice
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] colleague''s name, e-mail and channels come from a named inbox
+  message'
+status: draft

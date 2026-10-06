@@ -1,0 +1,9 @@
+requested_ops:
+- send_email
+named_sources:
+- Paris
+allowed_dest:
+- janeLong@google.com
+amount_cap: null
+egress_requested: true
+status: draft

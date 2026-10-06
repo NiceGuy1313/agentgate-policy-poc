@@ -1,0 +1,10 @@
+requested_ops:
+- update_scheduled_transaction
+named_sources:
+- tool:get_scheduled_transactions
+- tool:get_most_recent_transactions
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] how to update is not stated'
+status: draft

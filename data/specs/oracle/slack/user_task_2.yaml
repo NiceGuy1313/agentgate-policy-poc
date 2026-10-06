@@ -1,0 +1,10 @@
+requested_ops:
+- invite_user_to_slack
+named_sources:
+- www.dora-website.com
+allowed_dest:
+- Dora
+amount_cap: null
+egress_requested: false
+notes: Dora's e-mail is read from her named website
+status: draft

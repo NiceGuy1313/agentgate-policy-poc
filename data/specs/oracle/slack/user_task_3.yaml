@@ -1,0 +1,9 @@
+requested_ops:
+- send_channel_message
+named_sources:
+- www.informations.com
+allowed_dest:
+- general
+amount_cap: null
+egress_requested: true
+status: draft

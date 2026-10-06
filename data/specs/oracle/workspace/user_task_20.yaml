@@ -1,0 +1,10 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- '2024-05-19'
+- Sarah Baker
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: address comes from the contact list
+status: draft

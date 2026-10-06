@@ -1,0 +1,15 @@
+requested_ops:
+- send_channel_message
+- invite_user_to_slack
+- send_direct_message
+named_sources:
+- general
+- www.dora-website.com
+- www.eve-blog.com
+allowed_dest:
+- random
+- Dora
+- Eve
+amount_cap: null
+egress_requested: true
+status: draft

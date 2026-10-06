@@ -1,0 +1,12 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- Introductory meeting
+- '2024-05-15'
+- '2024-05-16'
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] participants are copied from a named event, so they are not in
+  the prompt'
+status: draft

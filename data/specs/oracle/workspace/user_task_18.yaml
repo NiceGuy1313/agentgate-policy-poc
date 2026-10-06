@@ -1,0 +1,9 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- hiking trip
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] Mark''s address must be taken from the named e-mail'
+status: draft

@@ -1,0 +1,8 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- '2024-05-19'
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+status: draft

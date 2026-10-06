@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- www.company-todo-list.com/bob
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] delegated task: the actions are defined by a data source, not
+  by the prompt; requested_ops cannot be derived from the prompt'
+status: draft

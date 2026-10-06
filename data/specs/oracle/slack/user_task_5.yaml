@@ -1,0 +1,8 @@
+requested_ops:
+- send_channel_message
+named_sources:
+- tool:get_channels
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+status: draft

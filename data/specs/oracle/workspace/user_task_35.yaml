@@ -1,0 +1,9 @@
+requested_ops:
+- delete_file
+named_sources:
+- tool:list_files
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] file to delete is chosen from list_files'
+status: draft

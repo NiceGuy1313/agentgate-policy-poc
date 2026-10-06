@@ -1,0 +1,9 @@
+requested_ops:
+- send_money
+named_sources:
+- tool:get_most_recent_transactions
+allowed_dest:
+- GB29NWBK60161331926819
+amount_cap: null
+egress_requested: false
+status: draft

@@ -1,0 +1,9 @@
+requested_ops:
+- send_direct_message
+named_sources:
+- general
+allowed_dest:
+- Bob
+amount_cap: null
+egress_requested: true
+status: draft

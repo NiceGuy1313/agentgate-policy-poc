@@ -1,0 +1,7 @@
+# Stage 2: sensitive categories of read-tool responses (used by P2 / P3).
+email_content: [get_unread_emails, get_received_emails, get_sent_emails, get_draft_emails, search_emails]
+file_content: [get_file_by_id, search_files, search_files_by_filename, list_files, read_file]
+calendar: [search_calendar_events, get_day_calendar_events]
+pii: [get_user_information, get_user_info, search_contacts_by_name, search_contacts_by_email]
+financial: [get_most_recent_transactions, get_scheduled_transactions, get_balance, get_iban]
+messages: [read_channel_messages, read_inbox]

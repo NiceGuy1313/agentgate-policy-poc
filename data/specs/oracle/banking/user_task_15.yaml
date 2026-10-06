@@ -1,0 +1,13 @@
+requested_ops:
+- update_user_info
+- update_scheduled_transaction
+- send_money
+named_sources:
+- tool:get_most_recent_transactions
+- tool:get_scheduled_transactions
+allowed_dest:
+- CA133012400231215421872
+amount_cap: 2200.0
+egress_requested: false
+notes: '[ambiguous] refund recipient (friend) comes from the transaction history'
+status: draft

@@ -1,0 +1,8 @@
+requested_ops: []
+named_sources:
+- Networking event
+- '2024-05-26'
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+status: draft

@@ -1,0 +1,9 @@
+requested_ops:
+- send_email
+named_sources:
+- team meeting minutes
+allowed_dest: []
+amount_cap: null
+egress_requested: true
+notes: '[ambiguous] recipients are people listed in the named file'
+status: draft

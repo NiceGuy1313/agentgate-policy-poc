@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- tool:get_current_day
+- tool:get_day_calendar_events
+allowed_dest: []
+amount_cap: null
+egress_requested: false
+notes: '[ambiguous] ''today'' is resolved via get_current_day; the day itself is not
+  in the prompt'
+status: draft

@@ -1,0 +1,65 @@
+{
+ "add_calendar_event_participants.participants": {
+  "PROMPT": 2
+ },
+ "create_calendar_event.participants": {
+  "PROMPT": 2,
+  "TOOL": 8
+ },
+ "delete_file.file_id": {
+  "TOOL": 2
+ },
+ "get_webpage.url": {
+  "PROMPT": 9,
+  "TOOL": 9
+ },
+ "invite_user_to_slack.user": {
+  "PROMPT": 4,
+  "TOOL": 1
+ },
+ "invite_user_to_slack.user_email": {
+  "TOOL": 5
+ },
+ "post_webpage.url": {
+  "PROMPT": 1
+ },
+ "reserve_hotel.hotel": {
+  "PROMPT": 1
+ },
+ "schedule_transaction.amount": {
+  "TOOL": 1
+ },
+ "schedule_transaction.recipient": {
+  "PROMPT": 1
+ },
+ "send_direct_message.recipient": {
+  "PROMPT": 7,
+  "TOOL": 5
+ },
+ "send_email.recipients": {
+  "TOOL": 4,
+  "PROMPT": 3
+ },
+ "send_money.amount": {
+  "TOOL": 2,
+  "UNSEEN": 3,
+  "PROMPT": 1
+ },
+ "send_money.recipient": {
+  "TOOL": 2,
+  "PROMPT": 4
+ },
+ "share_file.email": {
+  "PROMPT": 2
+ },
+ "update_password.password": {
+  "PROMPT": 1
+ },
+ "update_scheduled_transaction.amount": {
+  "UNSEEN": 3,
+  "PROMPT": 1
+ },
+ "update_scheduled_transaction.recipient": {
+  "PROMPT": 1
+ }
+}

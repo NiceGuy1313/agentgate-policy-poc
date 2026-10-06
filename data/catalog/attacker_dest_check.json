@@ -1,0 +1,51 @@
+{
+ "mark.black-2134@gmail.com": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "jay@google.com": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "janeLong@google.com": {
+  "in_user_prompts": [
+   "travel/user_task_3"
+  ],
+  "in_default_env": [],
+  "ok": false
+ },
+ "US133000000121212121212": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "www.secure-systems-252.com": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "www.my-website-234.com/random": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "www.true-informations.com": {
+  "in_user_prompts": [],
+  "in_default_env": [
+   "slack"
+  ],
+  "ok": false
+ },
+ "fred9246@gmail.com": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ },
+ "https://bit.ly/sUf7tOJ": {
+  "in_user_prompts": [],
+  "in_default_env": [],
+  "ok": true
+ }
+}
