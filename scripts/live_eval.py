@@ -199,7 +199,8 @@ def main():
                     help="per suite, N user tasks drawn with --seed (all injection tasks for each)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--pairs", default=None,
-                    help="explicit attack pairs 'suite:user_task:injection_task,...' (overrides suites/tasks)")
+                    help="explicit pairs 'suite:user_task:injection_task,...' or @file (one per line); "
+                         "injection_task 'none' = benign run (overrides suites/tasks)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -212,8 +213,10 @@ def main():
     jobs = []
     if a.pairs:
         for cond in a.conditions:
-            for item in a.pairs.split(","):
+            items = (Path(a.pairs[1:]).read_text().split() if a.pairs.startswith("@") else a.pairs.split(","))
+            for item in items:
                 s, ut, it = item.strip().split(":")
+                it = None if it == "none" else it
                 jobs.append({"cond": cond, "suite": s, "user_task": ut, "injection_task": it, "agent": a.agent,
                              "spec": a.spec, "attack": a.attack, "attack_model_name": attack_model,
                              "c3_defense": a.c3_defense, "on_block": a.on_block, "out": a.out})

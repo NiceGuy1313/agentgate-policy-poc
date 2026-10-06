@@ -5,3 +5,4 @@ __pycache__/
 *.egg-info/
 .env
 results/live/*/*/C[0-9]/
+logs/
