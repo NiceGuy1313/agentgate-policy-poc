@@ -427,7 +427,7 @@ def SIG(name: str) -> dict | None:
 
 def ci(m: dict) -> str:
     lo, hi = m["ci95"]
-    return f"{100 * m['rate']:.1f}% [{100 * lo:.1f}, {100 * hi:.1f}]"
+    return f"{100 * m['k'] / m['n']:.1f}% [{100 * lo:.1f}, {100 * hi:.1f}]"
 
 
 def sig_table(name: str) -> str:
@@ -439,7 +439,7 @@ def sig_table(name: str) -> str:
             m = M[key]
             pv = m.get("paired_vs_C0")
             rows.append([f"{c} {COND_NAMES[c]}", label, f"{m['k']}/{m['n']}", ci(m)] + (
-                [f"{100 * pv['diff']:+.1f}%p", "[{:+.1f}, {:+.1f}]".format(*(100 * x for x in pv["diff_ci95_cluster_bootstrap"])),
+                [f"{100 * (pv['cond_only'] - pv['c0_only']) / pv['n_pairs']:+.1f}%p", "[{:+.1f}, {:+.1f}]".format(*(100 * x for x in pv["diff_ci95_cluster_bootstrap"])),
                  f"{pv['c0_only']} / {pv['cond_only']}", f"{pv['p_mcnemar']:.2g}"] if pv else ["-", "-", "-", "-"]))
     return table(["조건", "지표", "성공/전체", "비율 [95% CI]", "C0 대비 차이", "차이 95% CI (user task 군집 bootstrap)",
                   "불일치 쌍 C0만 / 조건만", "McNemar p"], rows)
@@ -512,12 +512,13 @@ def spend_rows():
         jin = sum(v.get("judge_input_tokens_total", 0) for v in S["conditions"].values())
         jout = sum(v.get("judge_output_tokens_total", 0) for v in S["conditions"].values())
         if jin or jout:
-            rows.append([f"C4 판정 LLM {name}", S["agent_model"], jin, jout, usd(S["agent_model"], jin, jout)])
+            rows.append([f"C4 판정 LLM {name}", JUDGE_MODEL, jin, jout, usd(JUDGE_MODEL, jin, jout)])
     total = round(sum(r[4] for r in rows if isinstance(r[4], (int, float))), 2)
     return rows, total
 
 
 LIVE_CACHE: dict = {}
+JUDGE_MODEL = "claude-sonnet-5-5"   # judge used by every C4 live run (AGENTGATE_JUDGE_MODEL unset -> AGENTGATE_LLM_MODEL)
 
 
 def probe_section() -> list[str]:
@@ -623,7 +624,26 @@ def stage6(LIVE, ENF, figs):
           "(e) 실행된 호출로는 실패지만 AgentDojo가 시도 기록으로 성공 판정.", ""]
     tk = [(k, v) for k, v in llm_runs.items() if k.startswith("sample_") and v.get("attack") != "important_instructions"
           and (v["conditions"]["C0"].get("attack_attempted") or 0) > 0]
-    if tk:
+    st = [(k, v) for k, v in strat_runs(LIVE) if all("successful_attacks" in v["conditions"][c] for c in ("C1", "C4"))]
+    if st:
+        rows = []
+        keys = sorted({(x[0], x[2], x[3]) for _, v in st for c in ("C1", "C4") for x in v["conditions"][c]["successful_attacks"]})
+        for k in keys:
+            rows.append([k[0], k[1], k[2]] + [sum(1 for x in v["conditions"][c]["successful_attacks"] if (x[0], x[2], x[3]) == k)
+                                             for _, v in st for c in ("C1", "C4")])
+        n_dprime = sum(v["conditions"]["C4"]["successful_attacks_by_class"].get("(d') 판정 LLM 허용으로 성공", 0) for _, v in st)
+        L += ["**층화 표본에서 게이트를 통과한 공격 (C1·C4)**: 아래 표는 남은 공격 성공을 suite·injection task·경로별로 센 것이다"
+              "(`summary.json`의 `successful_attacks`).", "",
+              table(["suite", "injection task", "경로"] + [f"{v['agent_model']} {c}" for _, v in st for c in ("C1", "C4")], rows), "",
+              "탐지 실패(b)는 두 가지 원인으로 모인다. "
+              "(1) slack injection_task_1·3: 사용자가 읽으라고 지목한 채널·웹 페이지 안에 공격 URL이 있어, 그 URL을 다른 사용자에게 보내거나(injection_task_1) 방문하는(injection_task_3) 호출이 "
+              "지목 출처(NAMED_SOURCE)로 판정되어 P7이 ALLOW한다(Stage 5 정책 수정 제안 v2-1과 같은 원인). "
+              "(2) 사용자가 요청한 툴의 인자 오염: travel injection_task_2는 일정 생성을 요청한 태스크(user_task_7)에서 공격도 같은 일정 생성 툴이라 P9가 통과시키고, "
+              "travel injection_task_0은 호텔 예약을 요청한 태스크(user_task_6)에서 공격 대상 호텔이 사용자가 지목한 도시의 호텔 목록에 있어 P8이 ALLOW한다"
+              "(제안 v2-5와 같은 원인). "
+              f"판정 LLM이 공격 호출을 허용해 성공한 사례(d')는 두 모델 합계 {n_dprime}건이다. "
+              "(a)는 툴 호출이 없는 유형 H, (e)는 실행된 호출로는 실패했지만 AgentDojo가 시도 기록으로 성공 판정한 slack injection_task_5다.", ""]
+    if tk and not st:
         n_dprime = sum(v["conditions"].get("C4", {}).get("successful_attacks_by_class", {}).get("(d') 판정 LLM 허용으로 성공", 0)
                        for _, v in tk)
         L += ["**넘어가는 모델에서 게이트를 통과한 공격 (C1·C4)**: 실행 기록을 확인한 결과 탐지 실패(b)는 두 유형뿐이다. "
@@ -695,7 +715,7 @@ def final(R, RL, LIVE, ENF, figs):
         def cell(c, k):
             m = g[c][k]
             pv = m.get("paired_vs_C0")
-            return ci(m) + (f" (Δ {100 * pv['diff']:+.1f}%p, p={pv['p_mcnemar']:.2g})" if pv else "")
+            return ci(m) + (f" (Δ {100 * (pv['cond_only'] - pv['c0_only']) / pv['n_pairs']:+.1f}%p, p={pv['p_mcnemar']:.2g})" if pv else "")
         L.append(f"- **실제 모델 {S['agent_model']}, 공격 `{S.get('attack')}`, 층화 표본(공격 {g['C0']['asr']['n']}쌍, 정상 {g['C0']['utility']['n']}개)**: "
                  "ASR " + "; ".join(f"{c} {cell(c, 'asr')}" for c in g) +
                  ". 정상 Utility " + "; ".join(f"{c} {cell(c, 'utility')}" for c in g) +

@@ -6,15 +6,17 @@
 
 - **RQ1 (탐지 가능성)**: 공격에 넘어간 에이전트의 궤적을 재생하면 결정론적 정책 P1~P9가 효과 호출이 있는 929쌍 중 96.2% (894/929)을 BLOCK 또는 ESCALATE로, 80.0% (743/929)을 BLOCK으로 잡는다. ESCALATE를 차단으로 집행하면 정책 없이 성공하던 860쌍 중 91.6% (788/860)이 실패로 바뀐다(실행된 호출 기준 94.1% (809/860)). 정상 user task 97개 중 BLOCK이 나온 태스크는 3개다.
 - **LLM TaskSpec**: claude-opus-5-5 추출 spec으로 재생하면 strict 79.8% (741/929), lenient 96.2% (894/929); claude-sonnet-5-5 추출 spec으로 재생하면 strict 80.7% (750/929), lenient 96.2% (894/929) (oracle과 거의 같음, `docs/stage4_spec_comparison.md`).
-- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 5769회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 0건이었다.
-- **실제 모델 mistral-large-3:675b, 공격 `tool_knowledge` (표본 105쌍, 정상 태스크 12개)**: ASR C0 66.7% / C1 4.8% / C2 22.9% / C4 5.7%; 정상 Utility C0 75.0% / C1 66.7% / C2 83.3% / C4 83.3%; C0에서 공격을 시도한 실행 80/105.
-- **실제 모델 gpt-oss:120b, 공격 `tool_knowledge` (표본 105쌍, 정상 태스크 12개)**: ASR C0 32.4% / C1 6.7% / C2 12.4% / C4 4.8%; 정상 Utility C0 91.7% / C1 75.0% / C2 91.7% / C4 91.7%; C0에서 공격을 시도한 실행 34/105.
-- **실제 모델 claude-sonnet-5-5, 공격 `important_instructions` (표본 105쌍, 정상 태스크 12개)**: ASR C0 2.9% / C1 1.9% / C2 1.9% / C4 1.9%; 정상 Utility C0 100.0% / C1 83.3% / C2 100.0% / C4 91.7%; C0에서 공격을 시도한 실행 0/105. 이 조합에서는 모델이 공격에 넘어가지 않아 방어 효과가 관찰되지 않는다(성공 집계는 유형 H의 측정 부산물).
-- **실제 모델 glm-5.3, 공격 `important_instructions` (표본 105쌍, 정상 태스크 12개)**: ASR C0 1.0%; 정상 Utility C0 100.0%; C0에서 공격을 시도한 실행 0/105. 이 조합에서는 모델이 공격에 넘어가지 않아 방어 효과가 관찰되지 않는다(성공 집계는 유형 H의 측정 부산물).
+- **RQ2 (집행 여부)**: 게이트를 AgentDojo 파이프라인에 넣고 모두 8873회 실행한 결과, BLOCK된 호출의 실행·차단 시 환경 변화·게이트를 거치지 않은 툴 실행이 0건이었다.
+- **실제 모델 gpt-oss:120b, 공격 `tool_knowledge`, 층화 표본(공격 291쌍, 정상 97개)**: ASR C0 35.1% [29.8, 40.7]; C1 4.5% [2.6, 7.5] (Δ -30.6%p, p=7.2e-24); C2 8.9% [6.2, 12.8] (Δ -26.1%p, p=9.6e-19); C4 5.2% [3.1, 8.3] (Δ -29.9%p, p=1.7e-22). 정상 Utility C0 75.3% [65.8, 82.8]; C1 63.9% [54.0, 72.8] (Δ -11.3%p, p=0.019); C2 73.2% [63.6, 81.0] (Δ -2.1%p, p=0.75); C4 70.1% [60.4, 78.3] (Δ -5.2%p, p=0.3). Utility under attack C0 60.5% [54.8, 65.9]; C1 50.9% [45.1, 56.5] (Δ -9.6%p, p=0.0015); C2 59.5% [53.7, 64.9] (Δ -1.0%p, p=0.8); C4 51.5% [45.8, 57.2] (Δ -8.9%p, p=0.0029). 정상 실행 중 게이트로 인한 실패(차단 + user task 실패, 그중 C0 성공) C1 14건(11), C2 4건(3), C4 9건(8). (괄호는 95% 신뢰구간, Δ와 p는 C0 대비 짝 비교)
+- **실제 모델 mistral-large-3:675b, 공격 `tool_knowledge`, 층화 표본(공격 291쌍, 정상 97개)**: ASR C0 63.9% [58.2, 69.2]; C1 8.2% [5.6, 12.0] (Δ -55.7%p, p=4.2e-45); C2 17.9% [13.9, 22.7] (Δ -46.0%p, p=2.8e-34); C4 7.2% [4.8, 10.8] (Δ -56.7%p, p=1.8e-48). 정상 Utility C0 63.9% [54.0, 72.8]; C1 57.7% [47.8, 67.1] (Δ -6.2%p, p=0.34); C2 59.8% [49.8, 69.0] (Δ -4.1%p, p=0.5); C4 59.8% [49.8, 69.0] (Δ -4.1%p, p=0.48). Utility under attack C0 33.7% [28.5, 39.3]; C1 36.8% [31.4, 42.4] (Δ +3.1%p, p=0.42); C2 45.4% [39.7, 51.1] (Δ +11.7%p, p=0.00032); C4 47.4% [41.8, 53.2] (Δ +13.7%p, p=5.5e-05). 정상 실행 중 게이트로 인한 실패(차단 + user task 실패, 그중 C0 성공) C1 13건(12), C2 5건(3), C4 7건(5). (괄호는 95% 신뢰구간, Δ와 p는 C0 대비 짝 비교)
+- **파일럿 mistral-large-3:675b, 공격 `tool_knowledge` (표본 105쌍, 정상 태스크 12개)**: ASR C0 66.7% / C1 4.8% / C2 22.9% / C4 5.7%; 정상 Utility C0 75.0% / C1 66.7% / C2 83.3% / C4 83.3%; C0에서 공격을 시도한 실행 80/105.
+- **파일럿 gpt-oss:120b, 공격 `tool_knowledge` (표본 105쌍, 정상 태스크 12개)**: ASR C0 32.4% / C1 6.7% / C2 12.4% / C4 4.8%; 정상 Utility C0 91.7% / C1 75.0% / C2 91.7% / C4 91.7%; C0에서 공격을 시도한 실행 34/105.
+- **파일럿 claude-sonnet-5-5, 공격 `important_instructions` (표본 105쌍, 정상 태스크 12개)**: ASR C0 2.9% / C1 1.9% / C2 1.9% / C4 1.9%; 정상 Utility C0 100.0% / C1 83.3% / C2 100.0% / C4 91.7%; C0에서 공격을 시도한 실행 0/105. 이 조합에서는 모델이 공격에 넘어가지 않아 방어 효과가 관찰되지 않는다(성공 집계는 유형 H의 측정 부산물).
+- **파일럿 glm-5.3, 공격 `important_instructions` (표본 105쌍, 정상 태스크 12개)**: ASR C0 1.0%; 정상 Utility C0 100.0%; C0에서 공격을 시도한 실행 0/105. 이 조합에서는 모델이 공격에 넘어가지 않아 방어 효과가 관찰되지 않는다(성공 집계는 유형 H의 측정 부산물).
 - **항상 넘어가는 대역 에이전트(전체 규모)**: ASR 97.4%(C0) → 7.5%(C1), 정상 Utility 99.0% → 80.4%.
 - **판정 LLM(claude-sonnet-5-5)**: 재생의 ESCALATE 583건에서 공격 호출 564건 중 ALLOW 0건, 정상 호출 19건 중 ALLOW 7건, HUMAN 비율 5.8%.
 - **넘어가는 실제 모델 탐색(tool_knowledge 공격, Ollama Cloud 17개 모델)**: 4쌍 중 3쌍 이상 공격이 성공한 모델은 gemma4:31b, gpt-oss:120b, gpt-oss:20b, mistral-large-3:675b, nemotron-3-nano:30b, nemotron-3-super이다. 이 모델들에서는 게이트의 방어 효과를 실제 모델로 측정할 수 있다(`docs/stage6_live_report.md` 4.5절).
-- **사용한 API 비용(정가 기준)**: 약 $23.15.
+- **사용한 API 비용(정가 기준)**: 약 $23.43.
 
 ## 1. 개요
 
@@ -115,6 +117,24 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 ## 4. RQ2 결과 — 파이프라인 집행
 
+**gpt-oss:120b — 층화 표본(user task 97개 전부 × 같은 suite의 injection task 3개, 시드 0), 공격 `tool_knowledge`**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 75.3% (73/97) | 60.5% (176/291) | 35.1% (102/291) | 35.1% (102/291) | 38.1% (111/291) | 24820 / 0.849 | 13391 / 720 | 0 | 0 / 0 | 0 |
+| C1 게이트 (ESCALATE→block) | 63.9% (62/97) | 50.9% (148/291) | 4.5% (13/291) | 4.5% (13/291) | 39.2% (114/291) | 28140 / 0.829 | 13080 / 768 | 181 | 0 / 0 | 0 |
+| C2 게이트 (ESCALATE→allow) | 73.2% (71/97) | 59.5% (173/291) | 8.9% (26/291) | 8.9% (26/291) | 38.8% (113/291) | 25256 / 0.701 | 12640 / 739 | 109 | 0 / 0 | 0 |
+| C4 게이트 (ESCALATE→judge) | 70.1% (68/97) | 51.5% (150/291) | 5.2% (15/291) | 5.2% (15/291) | 40.5% (118/291) | 30860 / 207.308 | 13730 / 778 | 164 | 73 / 24 | 0 |
+
+**mistral-large-3:675b — 층화 표본(user task 97개 전부 × 같은 suite의 injection task 3개, 시드 0), 공격 `tool_knowledge`**
+
+| 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | 63.9% (62/97) | 33.7% (98/291) | 63.9% (186/291) | 63.9% (186/291) | 74.2% (216/291) | 27585 / 2.662 | 17467 / 377 | 0 | 0 / 0 | 0 |
+| C1 게이트 (ESCALATE→block) | 57.7% (56/97) | 36.8% (107/291) | 8.2% (24/291) | 6.2% (18/291) | 78.4% (228/291) | 29161 / 3.009 | 16078 / 375 | 382 | 0 / 0 | 0 |
+| C2 게이트 (ESCALATE→allow) | 59.8% (58/97) | 45.4% (132/291) | 17.9% (52/291) | 16.8% (49/291) | 78.4% (228/291) | 31966 / 2.934 | 16722 / 385 | 269 | 0 / 0 | 0 |
+| C4 게이트 (ESCALATE→judge) | 59.8% (58/97) | 47.4% (138/291) | 7.2% (21/291) | 5.8% (17/291) | 75.9% (221/291) | 24430 / 262.222 | 16436 / 367 | 344 | 124 / 22 | 0 |
+
 **claude-sonnet-5-5 — 표본(suite별 user task 3개 × 전체 injection task), 공격 `important_instructions`**
 
 | 조건 | Utility | Utility under attack | ASR | ASR (executed-only) | 공격 시도한 실행 | 태스크당 지연 ms (전체 / 게이트) | 태스크당 에이전트 토큰 in/out | BLOCK 집행 | judge 호출 / HUMAN | 모델 거부(refusal) |
@@ -173,6 +193,8 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 | 실행 묶음 | 실행 | 게이트 판정 | 차단 집행 | 위반 |
 |---|---|---|---|---|
+| strat3_tk_gpt-oss_120b | 1552 | 6164 | 454 | 0 |
+| strat3_tk_mistral-large-3_675b | 1552 | 7627 | 995 | 0 |
 | sample_claude-sonnet-5-5 | 468 | 1325 | 48 | 0 |
 | sample_glm-5.3 | 117 | 411 | 0 | 0 |
 | sample_tk_gpt-oss_120b | 468 | 1547 | 119 | 0 |
@@ -186,6 +208,28 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 ## 5. ASR · Utility · Latency 트레이드오프
 
 지표 정의는 AgentDojo를 따른다. **Utility**는 공격 없이 user task의 `utility` 판정이 참인 비율, **Utility under attack**은 공격 환경에서 user task `utility`가 참인 비율, **ASR**(targeted attack success rate)은 injection task의 `security` 판정이 참(공격 목표 달성)인 비율이다.
+
+**gpt-oss:120b — 층화 표본(user task 97개 전부 × 같은 suite의 injection task 3개, 시드 0), 공격 `tool_knowledge`**
+
+| 조건 | ASR | Utility | Utility under attack | 태스크당 지연 ms | 게이트 판정 ms/태스크 |
+|---|---|---|---|---|---|
+| C0 방어 없음 | 35.1% | 75.3% | 60.5% | 24820 | 0.849 |
+| C1 게이트 (ESCALATE→block) | 4.5% | 63.9% | 50.9% | 28140 | 0.829 |
+| C2 게이트 (ESCALATE→allow) | 8.9% | 73.2% | 59.5% | 25256 | 0.701 |
+| C4 게이트 (ESCALATE→judge) | 5.2% | 70.1% | 51.5% | 30860 | 207.308 |
+
+![tradeoff](../results/figures/tradeoff_strat3_tk_gpt-oss_120b.png)
+
+**mistral-large-3:675b — 층화 표본(user task 97개 전부 × 같은 suite의 injection task 3개, 시드 0), 공격 `tool_knowledge`**
+
+| 조건 | ASR | Utility | Utility under attack | 태스크당 지연 ms | 게이트 판정 ms/태스크 |
+|---|---|---|---|---|---|
+| C0 방어 없음 | 63.9% | 63.9% | 33.7% | 27585 | 2.662 |
+| C1 게이트 (ESCALATE→block) | 8.2% | 57.7% | 36.8% | 29161 | 3.009 |
+| C2 게이트 (ESCALATE→allow) | 17.9% | 59.8% | 45.4% | 31966 | 2.934 |
+| C4 게이트 (ESCALATE→judge) | 7.2% | 59.8% | 47.4% | 24430 | 262.222 |
+
+![tradeoff](../results/figures/tradeoff_strat3_tk_mistral-large-3_675b.png)
 
 **mistral-large-3:675b — 표본(suite별 user task 3개 × 전체 injection task), 공격 `tool_knowledge`**
 
@@ -277,7 +321,8 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 - **정책 도출·평가 데이터 중복**: 정책과 분류를 같은 35개 인젝션 태스크로 설계하고 평가했다.
 - **정답 궤적 재생의 한계**: 재생은 넘어간 에이전트가 정답대로 공격한다고 가정한다.
-- **실제 모델 평가 범위**: 표본(suite별 user task 3개 × 전체 injection task)과 파일럿이다. 현행 Claude·GLM은 내장 공격에 넘어가지 않아, 실제 모델의 방어 효과는 `tool_knowledge`에 넘어가는 공개 모델(gpt-oss:120b, mistral-large-3:675b)로 측정했다.
+- **실제 모델 평가 범위**: 본 실험은 user task 97개 × injection task 3개의 층화 표본(291쌍 + 정상 97개)이며 949쌍 전체가 아니다. 그래서 949쌍으로 보고한 다른 결과와 같은 표에서 직접 비교할 수 없다. 현행 Claude·GLM은 내장 공격에 넘어가지 않아, 실제 모델의 방어 효과는 `tool_knowledge`에 넘어가는 공개 모델(gpt-oss:120b, mistral-large-3:675b)로 측정했다.
+- **조건당 1회 실행**: 정상 Utility의 수 %p 차이는 모델 무작위성과 통계적으로 구분되지 않는다. 그 대신 차단 때문에 실패한 실행을 사례 단위로 센다(Stage 6 2.5절).
 - **유형 H는 범위 밖**: 툴 호출 없이 응답 텍스트만 조작하는 공격은 툴 호출 게이트로 막을 수 없다.
 - **적응형 공격 미평가**: 정책을 아는 공격자(지목 출처에만 주입, 값 쪼개기, 프롬프트의 목적지 악용)는 평가하지 않았다. 다른 attack으로의 일반화 점검(Stage 7 작업 4)도 하지 않았다.
 - **판정 LLM 자체의 인젝션 노출**: 판정기는 주입 문장이 포함될 수 있는 주변 문맥을 본다. 인용 블록과 시스템 지시로 완화했다.
@@ -298,11 +343,15 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 | C4 판정 LLM sample_claude-sonnet-5-5 | claude-sonnet-5-5 | 7236 | 729 | 0.02 |
 | 에이전트 실행 sample_glm-5.3 (117회) | glm-5.3 | 1601110 | 260746 | (Ollama Cloud 요금제, 토큰 단가 없음) |
 | 에이전트 실행 sample_tk_gpt-oss_120b (468회) | gpt-oss:120b | 4456259 | 328572 | (Ollama Cloud 요금제, 토큰 단가 없음) |
-| C4 판정 LLM sample_tk_gpt-oss_120b | gpt-oss:120b | 7624 | 657 | None |
+| C4 판정 LLM sample_tk_gpt-oss_120b | claude-sonnet-5-5 | 7624 | 657 | 0.02 |
 | 에이전트 실행 sample_tk_mistral-large-3_675b (468회) | mistral-large-3:675b | 7699661 | 194713 | (Ollama Cloud 요금제, 토큰 단가 없음) |
-| C4 판정 LLM sample_tk_mistral-large-3_675b | mistral-large-3:675b | 17985 | 1548 | None |
+| C4 판정 LLM sample_tk_mistral-large-3_675b | claude-sonnet-5-5 | 17985 | 1548 | 0.05 |
+| 에이전트 실행 strat3_tk_gpt-oss_120b (1552회) | gpt-oss:120b | 20502195 | 1166137 | (Ollama Cloud 요금제, 토큰 단가 없음) |
+| C4 판정 LLM strat3_tk_gpt-oss_120b | claude-sonnet-5-5 | 27996 | 3496 | 0.09 |
+| 에이전트 실행 strat3_tk_mistral-large-3_675b (1552회) | mistral-large-3:675b | 25880527 | 583519 | (Ollama Cloud 요금제, 토큰 단가 없음) |
+| C4 판정 LLM strat3_tk_mistral-large-3_675b | claude-sonnet-5-5 | 39588 | 3769 | 0.12 |
 
-Claude API 합계 약 $23.15(정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영). Ollama Cloud 사용분은 요금제 기준이라 제외했다.
+Claude API 합계 약 $23.43(정가: Sonnet 5.5 $2/$10, Opus 5.5 $4/$20 per 1M tokens; 캐시 할인 미반영). Ollama Cloud 사용분은 요금제 기준이라 제외했다.
 
 ## 10. 재현 방법
 
@@ -320,5 +369,9 @@ python scripts/summarize_replay.py --run results/replay/v1/llm_claude-sonnet-5-5
 python scripts/judge_eval.py
 python scripts/live_eval.py --agent llm --spec llm --sample 3 --seed 0 --conditions C0 C1 C2 C4 --out results/live/v1/sample_claude-sonnet-5-5
 python scripts/check_enforcement.py --run results/live/v1/sample_claude-sonnet-5-5 && python scripts/summarize_live.py --run results/live/v1/sample_claude-sonnet-5-5
+# 층화 표본 (OLLAMA_API_KEY 필요, 모델마다 AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=<model>)
+python scripts/make_strat_pairs.py --k 3 --benign --out data/pairs/strat3_seed0.txt
+AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/live_eval.py --agent llm --spec llm --attack tool_knowledge --pairs @data/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/live/v1/strat3_tk_gpt-oss_120b
+python scripts/check_enforcement.py --run results/live/v1/strat3_tk_gpt-oss_120b && python scripts/summarize_live.py --run results/live/v1/strat3_tk_gpt-oss_120b && python scripts/significance_live.py --run results/live/v1/strat3_tk_gpt-oss_120b
 python scripts/build_report.py
 ```

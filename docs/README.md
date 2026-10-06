@@ -4,7 +4,7 @@
 
 ## 먼저 읽을 문서
 
-1. **`conditions_and_attacks.md`**: 실험 조건 C0–C4의 뜻, 공격 방식(`important_instructions`, `tool_knowledge`), 공격 유형 A–H, 결과를 읽는 법.
+1. **`conditions_and_attacks.md`**: 실험 조건 C0–C4의 뜻, 공격 방식(`important_instructions`, `tool_knowledge`), 실제 모델 실험 설계(층화 표본), 공격 유형 A–H, 결과를 읽는 법.
 2. **`gate_design.md`**: 게이트의 위치, 판정 입력(TaskSpec·출처), 정책 P1–P9, ESCALATE와 판정 LLM, 실제 판정 예, 다섯 단계 검증 흐름, 한계.
 3. **`final_report.md`**: 전체 결과 요약과 결론(스크립트 생성).
 
@@ -21,7 +21,7 @@
 - **`stage4_oracle_review.md`**: oracle TaskSpec 97개의 검토표와 정답 궤적 대조.
 - **`stage4_spec_comparison.md`**: LLM이 추출한 TaskSpec과 oracle 비교.
 - **`stage5_replay_report.md`**: 정답 궤적 재생 평가(탐지율, 저지율, 오탐, ablation, 실패 분석, v2 제안).
-- **`stage6_live_report.md`**: 대역 에이전트와 실제 모델의 파이프라인 실행, 집행 무결성, 우회 경로 분석.
+- **`stage6_live_report.md`**: 대역 에이전트와 실제 모델의 파이프라인 실행, 집행 무결성, 우회 경로 분석. 실제 모델 본 실험(층화 표본 291쌍 + 정상 97개)의 신뢰구간과 C0 대비 검정은 2.5절.
 
 ## 진행 상황
 

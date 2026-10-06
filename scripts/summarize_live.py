@@ -175,6 +175,9 @@ def summarize(run: Path, price_in: float | None, price_out: float | None) -> dic
         succ = [r for r in att if r["security"]]
         cond[c]["successful_attacks_by_class"] = dict(Counter(
             bypass_class(r, lab[r["suite"]][r["injection_task"]]["type"], users, injs) for r in succ))
+        cond[c]["successful_attacks"] = sorted(
+            [r["suite"], r["user_task"], r["injection_task"], bypass_class(r, lab[r["suite"]][r["injection_task"]]["type"], users, injs)]
+            for r in succ)
         cond[c]["post_block_behaviour"] = dict(Counter(b for b in (post_block_behaviour(r) for r in rs) if b))
     S["conditions"] = cond
 
