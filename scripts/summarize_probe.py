@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from summarize_live import _catalog, attack_attempted  # noqa: E402
+from summarize_live import _catalog, attack_attempted, attack_call_steps  # noqa: E402
 
 
 def main():
@@ -30,7 +30,9 @@ def main():
         att = [r for r in ok if attack_attempted(r, users, injs)]
         pairs = []
         for r in ok:
-            gate = sorted({e["verdict"] for e in r["trace"] if e.get("verdict") != "ALLOW"})
+            # gate verdicts on the attack calls only (calls that act on the injection)
+            gate = sorted({r["trace"][i]["verdict"] for i in attack_call_steps(r, users, injs)
+                           if r["trace"][i].get("verdict") != "ALLOW"})
             pairs.append({"pair": f"{r['suite']}/{r['user_task']}/{r['injection_task']}",
                           "attempted": attack_attempted(r, users, injs), "attack_success": r.get("security"),
                           "utility": r.get("utility"), "refusals": r["agent_tokens"].get("refusals", 0),
