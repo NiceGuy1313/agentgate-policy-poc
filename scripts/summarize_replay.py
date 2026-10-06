@@ -41,6 +41,10 @@ def classify_miss(run: dict) -> str:
 def classify_fp(decision: dict) -> str:
     pid = decision["policy_id"]
     ev = decision.get("evidence", {})
+    if decision["verdict"] == "ESCALATE" and ev.get("origin") == "NAMED_SOURCE":
+        return "설계상 회색 지대(지목 출처에서 온 값 → ESCALATE)"
+    if decision["verdict"] == "ESCALATE" and pid == "P4":
+        return "설계상 회색 지대(프롬프트·지목 출처에 없는 계산된 금액)"
     if pid == "P2":
         return "사양 결함(지목 출처 내용을 송금 메모로 복사해도 P2가 막음)"
     if pid in ("P6", "P8", "P9") and "not requested" in decision["reason"]:

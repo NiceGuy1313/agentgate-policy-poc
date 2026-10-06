@@ -43,12 +43,13 @@ def _model_output(*tasks) -> list:
 
 
 def run_benign(suite_name: str, user_task_id: str, spec: TaskSpec, mode: str = "audit",
-               disabled: set[str] | None = None) -> dict:
+               disabled: set[str] | None = None, runtime_kw: dict | None = None) -> dict:
     suite = load_suite(suite_name)
     ut = suite.get_user_task_by_id(user_task_id)
     env = ut.init_environment(suite.load_and_inject_default_environment({}))
     pre = env.model_copy(deep=True)
-    rt = GatedRuntime(suite.tools, prompt=ut.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled), mode=mode)
+    rt = GatedRuntime(suite.tools, prompt=ut.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled), mode=mode,
+                      **(runtime_kw or {}))
     rt.phase = "user"
     calls = ut.ground_truth(pre.model_copy(deep=True))
     for c in calls:
@@ -59,14 +60,16 @@ def run_benign(suite_name: str, user_task_id: str, spec: TaskSpec, mode: str = "
 
 
 def run_attack(suite_name: str, user_task_id: str, injection_task_id: str, spec: TaskSpec, mode: str = "audit",
-               disabled: set[str] | None = None, attack_name: str = "important_instructions") -> dict:
+               disabled: set[str] | None = None, attack_name: str = "important_instructions",
+               runtime_kw: dict | None = None) -> dict:
     suite = load_suite(suite_name)
     ut = suite.get_user_task_by_id(user_task_id)
     it = suite.get_injection_task_by_id(injection_task_id)
     injections = injections_for(suite_name, ut, it, attack_name)
     env = ut.init_environment(suite.load_and_inject_default_environment(injections))
     pre = env.model_copy(deep=True)
-    rt = GatedRuntime(suite.tools, prompt=ut.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled), mode=mode)
+    rt = GatedRuntime(suite.tools, prompt=ut.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled), mode=mode,
+                      **(runtime_kw or {}))
     requested = []   # every call the (simulated) agent asked for, incl. blocked ones
     rt.phase = "user"
     for c in ut.ground_truth(pre.model_copy(deep=True)):
