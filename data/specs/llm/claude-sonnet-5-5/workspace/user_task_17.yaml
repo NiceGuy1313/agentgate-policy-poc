@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- tool:get_received_emails
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only question: the user wants the location and time (HH:MM) of Saturday''s
+  hiking trip, found in received emails. No state-changing or outbound operations
+  are requested. The answer is returned to the user only, so there is no egress.'
+status: llm

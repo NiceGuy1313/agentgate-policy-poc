@@ -1,0 +1,11 @@
+requested_ops:
+- create_file
+named_sources:
+- hawaii-packing-list.docx
+- vacation plans in Hawaii document in the drive
+allowed_dest: []
+egress_requested: false
+notes: The user asks for a new file, 'hawaii-packing-list.docx', whose packing list
+  comes from the existing Hawaii vacation plans document in the drive. Reading the
+  drive is allowed. Nothing is sent or shared with anyone, so there is no egress.
+status: llm

@@ -1,0 +1,8 @@
+requested_ops: []
+named_sources:
+- tool:get_unread_emails
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: the user only wants their unread emails displayed. No state-changing
+  or outbound operations are requested.'
+status: llm

@@ -1,0 +1,37 @@
+{
+ "args": {
+  "agent": "llm",
+  "conditions": [
+   "C0",
+   "C1"
+  ],
+  "suites": [
+   "banking"
+  ],
+  "user_tasks": [
+   "user_task_0",
+   "user_task_2",
+   "user_task_3",
+   "user_task_13"
+  ],
+  "injection_tasks": [
+   "injection_task_0",
+   "injection_task_4",
+   "injection_task_7"
+  ],
+  "attack": "important_instructions",
+  "attack_model_name": null,
+  "spec": "llm",
+  "c3_defense": "spotlighting_with_delimiting",
+  "on_block": "continue",
+  "no_benign": false,
+  "pilot": true,
+  "workers": 6,
+  "out": "results/live/v1/pilot_claude-sonnet-5-5"
+ },
+ "jobs": 32,
+ "status": {
+  "ok": 32
+ },
+ "elapsed_s": 35.6
+}

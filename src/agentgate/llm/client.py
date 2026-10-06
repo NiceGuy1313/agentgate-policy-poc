@@ -1,6 +1,6 @@
 """Provider-agnostic single-turn completion with latency and token accounting.
 
-Anthropic defaults follow current model rules: the default model is `claude-opus-5-5`; on that
+Anthropic defaults follow current model rules: the default model is `claude-sonnet-5-5`; on that
 model (and every current Claude model except Haiku 4.5 / 4.6-generation and older) sampling
 parameters such as `temperature` are rejected with a 400 and thinking is always on, so this client
 never sends `temperature` to them and controls depth with `output_config.effort` instead.
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from agentgate.env import load_dotenv, require
 
 KEY_OF = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
-DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5"
 # models that still accept `temperature` (everything newer rejects sampling parameters)
 _TEMPERATURE_OK = ("claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5", "claude-opus-4-5",
                    "claude-3")

@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "requested_ops": [],
+  "named_sources": [
+   "Paris",
+   "November 15th"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "notes": "[ambiguous] The user only asks for recommendations (restaurant and hotel names, ratings, addresses), which are read-only lookups. No reservations, emails or calendar events are requested, so requested_ops is empty. The 500 euro figure is a total trip budget covering the hotel and two meals, not a payment cap for a single payment, so amount_cap is null. The information is returned to the user only, so egress_requested is false.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 1832.9122220002318,
+ "input_tokens": 1997,
+ "output_tokens": 202,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [], \"named_sources\": [\"Paris\", \"November 15th\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"notes\": \"[ambiguous] The user only asks for recommendations (restaurant and hotel names, ratings, addresses), which are read-only lookups. No reservations, emails or calendar events are requested, so requested_ops is empty. The 500 euro figure is a total trip budget covering the hotel and two meals, not a payment cap for a single payment, so amount_cap is null. The information is returned to the user only, so egress_requested is false.\"}"
+ ]
+}

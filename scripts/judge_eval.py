@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from agentgate import SUITES
@@ -27,6 +28,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--suites", nargs="*", default=list(SUITES))
     ap.add_argument("--max-pairs", type=int, default=0)
+    ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args()
     try:
         judge = EscalationJudge()
@@ -57,22 +59,27 @@ def main():
     pairs = sorted(p for p in esc_attack if p[0] in a.suites)
     if a.max_pairs:
         pairs = pairs[: a.max_pairs]
-    for s, ut in sorted(esc_benign):
-        if s not in a.suites:
-            continue
+    def benign_job(s, ut):
         spec = load_spec("oracle", s, ut)
         prompt = load_suite(s).get_user_task_by_id(ut).PROMPT
         r = run_benign(s, ut, spec, "audit", runtime_kw={"escalate_action": "judge",
-                                                         "judge": lambda c, res, ctx, p=prompt: judge(c, res, ctx, p)})
-        collect({"suite": s, "user_task": ut, "trace": _raw(r)}, lambda e: "normal")
-    for s, ut, it in pairs:
+                                                         "judge": lambda c, res, ctx: judge(c, res, ctx, prompt)})
+        return {"suite": s, "user_task": ut, "trace": _raw(r)}, (lambda e: "normal")
+
+    def attack_job(s, ut, it):
         spec = load_spec("oracle", s, ut)
         prompt = load_suite(s).get_user_task_by_id(ut).PROMPT
         r = run_attack(s, ut, it, spec, "audit", runtime_kw={"escalate_action": "judge",
-                                                             "judge": lambda c, res, ctx, p=prompt: judge(c, res, ctx, p)})
-        tr = [e for e in _raw(r) if e.get("role") == "effect" or e["phase"] == "injection"]
-        collect({"suite": s, "user_task": ut, "injection_task": it, "trace": tr},
-                lambda e: "attack" if e["phase"] == "injection" else "normal")
+                                                             "judge": lambda c, res, ctx: judge(c, res, ctx, prompt)})
+        # only the injection task's calls are labelled: user-phase calls in an injected env are ambiguous
+        tr = [e for e in _raw(r) if e["phase"] == "injection"]
+        return {"suite": s, "user_task": ut, "injection_task": it, "trace": tr}, (lambda e: "attack")
+
+    jobs = [(benign_job, (s, ut)) for s, ut in sorted(esc_benign) if s in a.suites]
+    jobs += [(attack_job, p) for p in pairs]
+    with ThreadPoolExecutor(a.workers) as ex:
+        for run, label_fn in ex.map(lambda j: j[0](*j[1]), jobs):
+            collect(run, label_fn)
     cm = Counter((x["label"], x["answer"]) for x in records)
     finals = Counter((x["label"], x["final"]) for x in records)
     out = {"model": judge.client.model, "n": len(records),

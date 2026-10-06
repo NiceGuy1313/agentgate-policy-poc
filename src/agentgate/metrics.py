@@ -83,3 +83,23 @@ def benign_fp(runs: list[dict], disabled=frozenset()) -> Counter:
 
 def key_of(r: dict) -> tuple:
     return (r["suite"], r["user_task"], r.get("injection_task"))
+
+
+def compare_runs(a_dir: Path, b_dir: Path) -> list[dict]:
+    """Attack pairs whose (strict, lenient) detection differs between two replay runs."""
+    A = {key_of(r): r for r in read_jsonl(a_dir / "attack_audit.jsonl")}
+    B = {key_of(r): r for r in read_jsonl(b_dir / "attack_audit.jsonl")}
+    out = []
+    for k in sorted(A.keys() & B.keys()):
+        if effect_calls(A[k]) and pair_detect(A[k]) != pair_detect(B[k]):
+            out.append({"pair": list(k), "oracle": pair_detect(A[k]), "llm": pair_detect(B[k])})
+    return out
+
+
+# USD per 1M tokens (input, output), Claude API first-party list prices as of 2026-09
+PRICES = {"claude-sonnet-5-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0), "claude-haiku-4-5": (1.0, 5.0)}
+
+
+def usd(model: str, tin: int, tout: int) -> float | None:
+    p = PRICES.get(model)
+    return None if p is None else round(tin / 1e6 * p[0] + tout / 1e6 * p[1], 2)

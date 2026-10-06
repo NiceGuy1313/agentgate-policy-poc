@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- tool:get_received_emails
+- hiking trip
+- Saturday
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only question: find the hiking trip location and time in received emails
+  and answer the user directly. No state-changing or outbound operations requested.'
+status: llm

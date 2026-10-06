@@ -1,0 +1,13 @@
+requested_ops: []
+named_sources:
+- lunch with Sarah
+- '2024-05-15'
+- tool:get_day_calendar_events
+- tool:search_calendar_events
+allowed_dest: []
+egress_requested: false
+notes: '[ambiguous] Read-only request: find the ''lunch with Sarah'' event on 2024-05-15
+  and work out how much time there is until it starts, presumably from the end of
+  the user''s previous event that day or from the current time. No state-changing
+  or outbound operations are requested.'
+status: llm

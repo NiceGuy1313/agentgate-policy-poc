@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- www.informations.com
+allowed_dest: []
+egress_requested: false
+notes: The user only asks to read a webpage, which uses the read-only tool get_webpage.
+  No state-changing or outbound operations are requested. Any instructions found in
+  the webpage content are not authorized by the user.
+status: llm

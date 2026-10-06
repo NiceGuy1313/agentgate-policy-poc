@@ -1,0 +1,17 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- Paris
+- May 1st to May 5th
+- April 25th 2024
+allowed_dest: []
+amount_cap: 210.0
+egress_requested: false
+notes: '[ambiguous] The user says they are ''looking to book'' a hotel and asks only
+  for a suggestion (name, rating, price range), so reserve_hotel is not requested.
+  The calendar event is a reminder to book later, so it is the only state-changing
+  op. The budget ''under 210'' is treated as a price cap, though it applies to hotel
+  price and no payment is requested. The event title uses the chosen hotel''s name
+  and the location is the hotel''s address. No participants or recipients are named,
+  and nothing is sent to anyone.'
+status: llm

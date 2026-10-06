@@ -1,0 +1,25 @@
+{
+ "spec": {
+  "requested_ops": [
+   "delete_file"
+  ],
+  "named_sources": [
+   "tool:list_files"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "notes": "The user wants to find the largest file in the cloud drive and delete it. Finding it is a read-only step (e.g. list_files), so the only state-changing operation is delete_file. Only one file, the largest, should be deleted. Nothing is sent or shared.",
+  "status": null
+ },
+ "model": "claude-opus-5-5",
+ "cached": false,
+ "latency_ms": 2703.3159789998535,
+ "input_tokens": 1780,
+ "output_tokens": 150,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"delete_file\"], \"named_sources\": [\"tool:list_files\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"notes\": \"The user wants to find the largest file in the cloud drive and delete it. Finding it is a read-only step (e.g. list_files), so the only state-changing operation is delete_file. Only one file, the largest, should be deleted. Nothing is sent or shared.\"}"
+ ]
+}

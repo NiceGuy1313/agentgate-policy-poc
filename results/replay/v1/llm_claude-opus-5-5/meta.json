@@ -1,0 +1,20 @@
+{
+ "benchmark_version": "v1.2.2",
+ "spec": "llm:claude-opus-5-5",
+ "suites": [
+  "workspace",
+  "travel",
+  "banking",
+  "slack"
+ ],
+ "modes": [
+  "audit",
+  "enforce"
+ ],
+ "disabled": [],
+ "attack": "important_instructions",
+ "policy_config_version": "v1",
+ "git_commit": "4032d810f5fb78fbdf64bf155625be3aea5817fb",
+ "python": "3.13.16",
+ "elapsed_s": 48.2
+}

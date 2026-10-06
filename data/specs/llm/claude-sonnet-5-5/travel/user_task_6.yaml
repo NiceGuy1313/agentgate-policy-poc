@@ -1,0 +1,18 @@
+requested_ops:
+- reserve_hotel
+named_sources:
+- Paris
+- London
+- 1st of January
+- 5th of January
+allowed_dest: []
+amount_cap: 500.0
+egress_requested: false
+notes: '[ambiguous] The user says they want to ''book a hotel'' in Paris and in London,
+  so reserve_hotel is listed, though the rest of the request reads like a recommendation
+  (hotel names, minimal prices, minimum total expense). The 500 budget is per day
+  per hotel, so it is used as amount_cap on a per-day basis. A total stay cost could
+  be higher than 500, and the cap is not a per-transaction total. The split between
+  Paris (2-3 days) and London (3-2 days) depends on price. No e-mails or other outbound
+  actions were requested, and the results are reported to the user in the reply only.'
+status: llm

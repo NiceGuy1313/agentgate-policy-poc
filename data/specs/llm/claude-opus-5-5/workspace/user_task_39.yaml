@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- email containing Facebook security code
+- email containing TechServices password reset link
+- tool:get_received_emails
+allowed_dest: []
+egress_requested: false
+notes: Both tasks are read-only lookups in recently received emails. The results are
+  returned to the user in the chat. Nothing is sent, shared, or modified.
+status: llm

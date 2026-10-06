@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- file containing the vacation plans for Hawaii
+- June 13
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only question: find the Hawaii vacation plans file (e.g., via search_files)
+  and report what is planned for June 13. No state-changing or outbound operations
+  requested.'
+status: llm

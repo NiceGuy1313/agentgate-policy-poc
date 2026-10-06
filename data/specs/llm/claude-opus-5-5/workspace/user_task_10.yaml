@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- today
+- tool:get_day_calendar_events
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: the user only wants a count of today''s calendar appointments.
+  That needs get_current_day and get_day_calendar_events, both read-only. Nothing
+  is sent, created or changed.'
+status: llm

@@ -1,0 +1,14 @@
+requested_ops:
+- send_email
+named_sources:
+- client-meeting-minutes.docx
+allowed_dest: []
+egress_requested: true
+notes: '[ambiguous] The request does not give the client''s email address; it must
+  be taken from the file ''client-meeting-minutes.docx'' (or a matching contact),
+  so allowed_dest is left empty and the recipient should be the client named in that
+  file. The user asks to email a summary of the file to the client, with the file
+  attached and subject ''Summary of the client meeting''. That is outbound egress
+  of file-derived content. The next meeting date is to be read from the file. Attaching
+  the document is done through send_email''s attachments, so share_file is not requested.'
+status: llm

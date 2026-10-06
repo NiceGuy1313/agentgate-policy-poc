@@ -1,0 +1,11 @@
+requested_ops: []
+named_sources:
+- Paris
+- November 15th
+allowed_dest: []
+egress_requested: false
+notes: '[ambiguous] The user only asks for recommendations: names, ratings and addresses
+  of a French restaurant and a hotel in Paris. No reservation, email or calendar action
+  is requested. The 500 euro total budget limits which hotel can be recommended, not
+  a payment, so amount_cap is null.'
+status: llm

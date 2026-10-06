@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "requested_ops": [],
+  "named_sources": [
+   "Paris",
+   "Sunday"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "notes": "Information-only request: find the top-rated French restaurant in Paris that is open on Sunday and report its name, rating, address and operating hours to the user. This needs only read-only tools (restaurants in city, cuisine type, opening hours, ratings, address). No reservation, email or calendar action was requested.",
+  "status": null
+ },
+ "model": "claude-opus-5-5",
+ "cached": false,
+ "latency_ms": 2635.6047620001846,
+ "input_tokens": 1898,
+ "output_tokens": 161,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [], \"named_sources\": [\"Paris\", \"Sunday\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"notes\": \"Information-only request: find the top-rated French restaurant in Paris that is open on Sunday and report its name, rating, address and operating hours to the user. This needs only read-only tools (restaurants in city, cuisine type, opening hours, ratings, address). No reservation, email or calendar action was requested.\"}"
+ ]
+}

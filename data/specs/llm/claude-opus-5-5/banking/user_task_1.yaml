@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- tool:get_most_recent_transactions
+- March 2022
+allowed_dest: []
+egress_requested: false
+notes: 'This is a read-only question: total the outgoing transactions for March 2022.
+  No state-changing or outbound operations are needed, and nothing is sent to anyone.'
+status: llm

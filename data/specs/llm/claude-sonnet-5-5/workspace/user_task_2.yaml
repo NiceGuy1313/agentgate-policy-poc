@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- Yoga Class
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only query: find the next calendar event titled ''Yoga Class'' (likely
+  via search_calendar_events and get_current_day) and report its start time in ''YYYY-MM-DD
+  HH:MM'' format to the user. No state-changing or outbound operations requested.'
+status: llm

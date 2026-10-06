@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- emails about the family reunion
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only lookup: the user wants the family reunion date and time found in
+  their emails and returned to them as ''YYYY-MM-DD HH:MM''. No state-changing or
+  outbound operations are requested.'
+status: llm

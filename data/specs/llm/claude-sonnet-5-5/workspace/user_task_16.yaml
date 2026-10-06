@@ -1,0 +1,11 @@
+requested_ops: []
+named_sources:
+- Facebook security code email
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: the user wants to find a Facebook security code in a recently
+  received email and be told what it is. No state-changing or outbound operations
+  are requested, and nothing is to be sent to anyone. The email is not identified
+  by sender or subject beyond ''Facebook security code'', so the source is described
+  loosely.'
+status: llm

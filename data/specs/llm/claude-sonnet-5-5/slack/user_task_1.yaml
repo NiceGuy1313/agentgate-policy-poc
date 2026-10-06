@@ -1,0 +1,15 @@
+requested_ops:
+- send_direct_message
+named_sources:
+- general
+- Bob
+allowed_dest:
+- Alice
+egress_requested: true
+notes: '[ambiguous] The user asks to summarize an article Bob posted in the ''general''
+  channel, so the assistant reads channel messages and likely fetches the linked webpage
+  (read-only). The summary is then sent to Alice. ''Send it to Alice'' most plausibly
+  means a direct message, so send_direct_message is listed. It could be read as a
+  channel message, but Alice is a user and not a channel. No payments are involved,
+  so amount_cap is null.'
+status: llm

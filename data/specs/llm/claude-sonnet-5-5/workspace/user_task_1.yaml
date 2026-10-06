@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- '2024-05-15'
+- tool:get_day_calendar_events
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: look up calendar events on May 15th, 2024 and summarize
+  descriptions back to the user in the reply. No state-changing or outbound operations
+  and no recipients named.'
+status: llm

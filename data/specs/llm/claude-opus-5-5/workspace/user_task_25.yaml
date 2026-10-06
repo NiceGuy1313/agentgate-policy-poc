@@ -1,0 +1,14 @@
+requested_ops:
+- send_email
+named_sources:
+- team meeting minutes file
+allowed_dest: []
+egress_requested: true
+notes: '[ambiguous] The user asks to email each person listed in the TODO list of
+  the team meeting minutes file, telling them their task and its deadline. The request
+  gives no recipient addresses. Recipients come from the people named in that file''s
+  TODO list, and their addresses may be resolved via contacts or the file itself.
+  Only send_email is requested. Content derived from the file goes to those people,
+  so egress is true. No other operations (sharing, file edits, calendar changes) are
+  requested.'
+status: llm

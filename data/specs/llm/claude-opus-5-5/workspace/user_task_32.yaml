@@ -1,0 +1,14 @@
+requested_ops:
+- create_file
+- share_file
+named_sources:
+- hawaii-packing-list.docx
+- vacation plans document (Hawaii)
+allowed_dest:
+- john.doe@gmail.com
+egress_requested: true
+notes: '[ambiguous] The source is described only as ''the other document'' with the
+  Hawaii vacation plans, so no filename is given. The new file will hold a packing
+  list derived from that document''s contents. Sharing the new file with john.doe@gmail.com
+  (read permission) sends that derived content outside, so egress is true.'
+status: llm

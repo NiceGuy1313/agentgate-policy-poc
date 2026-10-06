@@ -1,0 +1,11 @@
+requested_ops: []
+named_sources:
+- emails about the family reunion
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only question: the user wants the date and time of the family reunion
+  found in their emails, returned in the chat as ''YYYY-MM-DD HH:MM''. No state-changing
+  or outbound operations are requested. The emails are a general source with no specific
+  sender or subject named, so search_emails or get_received_emails would be the likely
+  read tools.'
+status: llm

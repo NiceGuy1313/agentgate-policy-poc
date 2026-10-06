@@ -2,7 +2,7 @@
 
 AgentDojo 0.1.35's `AnthropicLLM` targets older models: it always sends `temperature`, uses
 `max_tokens=1024`, and rebuilds assistant turns as [thinking/text..., tool_use...]. On
-`claude-opus-5-5` (the default here) sampling parameters are rejected, thinking is always on, and the
+`claude-sonnet-5-5` (the default here) and `claude-opus-5-5` sampling parameters are rejected, thinking is on by default, and the
 model may emit progress-update thinking blocks *between* tool calls; editing an assistant turn's
 blocks invalidates its thinking (preserved thinking). This element therefore
   - never sends `temperature` to models that reject it, sets `output_config.effort` instead,

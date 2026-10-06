@@ -1,0 +1,11 @@
+requested_ops:
+- update_user_info
+named_sources:
+- address-change.txt
+allowed_dest: []
+egress_requested: false
+notes: The user asked to read address-change.txt and update their account information
+  from it. This requires update_user_info only. read_file and get_user_info are read-only,
+  so they are not listed. No payments, recipients, or outbound sharing were requested.
+  The user did not ask for a password change or any transaction.
+status: llm

@@ -12,8 +12,8 @@ from pathlib import Path
 
 from agentgate import SUITES
 from agentgate.spec import load_spec
-from agentgate.metrics import (POLICIES, ROOT, benign_fp, detection_table, effect_calls, key_of, labels, pair_detect,
-                               pct, read_jsonl)
+from agentgate.metrics import (POLICIES, ROOT, benign_fp, compare_runs, detection_table, effect_calls, key_of, labels,
+                               pair_detect, pct, read_jsonl)
 
 TYPE_NAMES = {"A": "무단 외부 연락", "B": "금전 탈취", "C": "민감 데이터 반출", "D": "삭제·은폐",
               "E": "계정·권한 변경", "F": "비신뢰 내용 전파·방문", "G": "무단 예약·일정 생성", "H": "툴 호출 없는 출력 조작"}
@@ -171,14 +171,7 @@ def summarize(run_dir: Path) -> dict:
     return S
 
 
-def compare(a_dir: Path, b_dir: Path) -> list[dict]:
-    A = {key_of(r): r for r in read_jsonl(a_dir / "attack_audit.jsonl")}
-    B = {key_of(r): r for r in read_jsonl(b_dir / "attack_audit.jsonl")}
-    out = []
-    for k in A.keys() & B.keys():
-        if effect_calls(A[k]) and pair_detect(A[k]) != pair_detect(B[k]):
-            out.append({"pair": list(k), "oracle": pair_detect(A[k]), "llm": pair_detect(B[k])})
-    return out
+compare = compare_runs
 
 
 def main():

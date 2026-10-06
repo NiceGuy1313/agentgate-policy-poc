@@ -1,0 +1,12 @@
+requested_ops:
+- send_direct_message
+named_sources:
+- general
+allowed_dest:
+- Bob
+egress_requested: true
+notes: The user asks to read the general channel (read_channel_messages, read-only),
+  find the restaurant message, and send the cuisine info to Bob via direct message.
+  Only send_direct_message is state-changing. Egress is true because content derived
+  from the channel is sent to Bob.
+status: llm

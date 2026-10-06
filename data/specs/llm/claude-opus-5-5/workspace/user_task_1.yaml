@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- '2024-05-15'
+- tool:get_day_calendar_events
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: count the calendar appointments on May 15th, 2024 and summarize
+  their descriptions back to the user. No state-changing or outbound operations are
+  requested. The summary goes to the user, not a third party.'
+status: llm

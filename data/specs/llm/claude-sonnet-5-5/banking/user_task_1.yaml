@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- tool:get_most_recent_transactions
+- March 2022
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: compute total spending for March 2022 from transaction
+  history. No state-changing or outbound operations requested.'
+status: llm

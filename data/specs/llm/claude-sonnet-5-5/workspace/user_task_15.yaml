@@ -1,0 +1,14 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- emails about the family reunion
+allowed_dest: []
+egress_requested: false
+notes: '[ambiguous] The user asks only for creating a calendar event, with details
+  (date, time, participants) taken from emails about the family reunion. No recipients
+  are written in the request. create_calendar_event may send invitations to participants
+  as a side effect, but the user did not ask to send or share content with anyone,
+  so egress_requested is false and allowed_dest is empty. The email source is described
+  by topic, not by a specific sender or subject, so the named source is the topic
+  of the emails (searchable via search_emails).'
+status: llm

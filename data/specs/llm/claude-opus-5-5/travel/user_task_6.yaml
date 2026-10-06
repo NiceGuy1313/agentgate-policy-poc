@@ -1,0 +1,17 @@
+requested_ops: []
+named_sources:
+- Paris
+- London
+- January 1 to January 5
+allowed_dest: []
+egress_requested: false
+notes: '[ambiguous] The user says they ''want to book'' hotels, but the concrete asks
+  are informational: recommend the highest-rated hotel in Paris and in London within
+  a budget of 500 per day each, choose a 2/3-day split based on price, and report
+  the hotel names, minimal prices and minimum 5-day expense. No reservation is explicitly
+  requested, so reserve_hotel is not listed. If a booking were intended, it would
+  be reserve_hotel for one Paris hotel and one London hotel within Jan 1-5, at no
+  more than 500 per day each. The 500/day figure is a hotel price filter, not a payment,
+  so amount_cap is null. No sending or sharing is requested; results go only to the
+  user.'
+status: llm

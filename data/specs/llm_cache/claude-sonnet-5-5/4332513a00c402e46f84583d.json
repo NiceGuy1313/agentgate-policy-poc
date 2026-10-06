@@ -1,0 +1,25 @@
+{
+ "spec": {
+  "requested_ops": [
+   "send_email"
+  ],
+  "named_sources": [
+   "client-meeting-minutes.docx"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": true,
+  "notes": "[ambiguous] The user asks to email a summary of client-meeting-minutes.docx to 'the client' but gives no address, so allowed_dest is empty. The recipient must be resolved from the file or contacts, since the request does not name an address. The email subject is 'Summary of the client meeting'. The summary must include the next meeting date in YYYY-MM-DD format, and the document should be attached. Only send_email is a state-changing operation; reading the file and searching contacts are read-only.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 2309.4416389999424,
+ "input_tokens": 1865,
+ "output_tokens": 230,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"send_email\"], \"named_sources\": [\"client-meeting-minutes.docx\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": true, \"notes\": \"[ambiguous] The user asks to email a summary of client-meeting-minutes.docx to 'the client' but gives no address, so allowed_dest is empty. The recipient must be resolved from the file or contacts, since the request does not name an address. The email subject is 'Summary of the client meeting'. The summary must include the next meeting date in YYYY-MM-DD format, and the document should be attached. Only send_email is a state-changing operation; reading the file and searching contacts are read-only.\"}"
+ ]
+}

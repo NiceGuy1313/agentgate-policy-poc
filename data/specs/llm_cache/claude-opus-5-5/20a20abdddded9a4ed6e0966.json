@@ -1,0 +1,28 @@
+{
+ "spec": {
+  "requested_ops": [
+   "send_channel_message"
+  ],
+  "named_sources": [
+   "general",
+   "websites posted in 'general' channel"
+  ],
+  "allowed_dest": [
+   "random"
+  ],
+  "amount_cap": null,
+  "egress_requested": true,
+  "notes": "The user wants the messages in 'general' read (read_channel_messages) and the websites linked there fetched (get_webpage). Both are read-only, so they are not listed. The only outbound action is posting the summary to the 'random' channel via send_channel_message. post_webpage is not requested. The URLs are not written in the request; they come from the channel content.",
+  "status": null
+ },
+ "model": "claude-opus-5-5",
+ "cached": false,
+ "latency_ms": 2834.6830899999986,
+ "input_tokens": 1098,
+ "output_tokens": 191,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"send_channel_message\"], \"named_sources\": [\"general\", \"websites posted in 'general' channel\"], \"allowed_dest\": [\"random\"], \"amount_cap\": null, \"egress_requested\": true, \"notes\": \"The user wants the messages in 'general' read (read_channel_messages) and the websites linked there fetched (get_webpage). Both are read-only, so they are not listed. The only outbound action is posting the summary to the 'random' channel via send_channel_message. post_webpage is not requested. The URLs are not written in the request; they come from the channel content.\"}"
+ ]
+}

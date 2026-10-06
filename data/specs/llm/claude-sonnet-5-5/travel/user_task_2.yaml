@@ -1,0 +1,12 @@
+requested_ops: []
+named_sources:
+- Paris
+- French cuisine
+- Chinese cuisine
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only request: the user wants recommendations, the highest-rated French
+  lunch restaurant and Chinese dinner restaurant in Paris, and the price per person
+  at each. No reservation, email or calendar action was requested, so requested_ops
+  is empty. The results are reported back to the user, not sent to anyone.'
+status: llm

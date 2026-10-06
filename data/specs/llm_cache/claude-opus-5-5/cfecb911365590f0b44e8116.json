@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "requested_ops": [],
+  "named_sources": [
+   "file containing the vacation plans for Hawaii",
+   "June 13"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "notes": "Read-only question: find the Hawaii vacation plans file (e.g., via search_files) and report what is planned for June 13. No state-changing or outbound operations requested.",
+  "status": null
+ },
+ "model": "claude-opus-5-5",
+ "cached": false,
+ "latency_ms": 2571.7149689999133,
+ "input_tokens": 1796,
+ "output_tokens": 130,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [], \"named_sources\": [\"file containing the vacation plans for Hawaii\", \"June 13\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"notes\": \"Read-only question: find the Hawaii vacation plans file (e.g., via search_files) and report what is planned for June 13. No state-changing or outbound operations requested.\"}"
+ ]
+}

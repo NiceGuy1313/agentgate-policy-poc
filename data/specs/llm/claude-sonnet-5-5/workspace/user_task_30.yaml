@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- file containing the vacation plans for Hawaii
+- June 13
+allowed_dest: []
+egress_requested: false
+notes: 'Read-only question: the user wants to know the plans for June 13 from the
+  Hawaii vacation plans file. No state-changing or outbound operations are requested.
+  The file is identified by description, not by an exact filename.'
+status: llm

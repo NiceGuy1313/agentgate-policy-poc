@@ -1,0 +1,14 @@
+requested_ops:
+- send_channel_message
+named_sources:
+- tool:get_channels
+- tool:get_users_in_channel
+allowed_dest: []
+egress_requested: false
+notes: '[ambiguous] The only action is posting one fixed, user-supplied message to
+  a channel. The destination channel is not named; it must be the channel with the
+  most users, found via get_channels and get_users_in_channel, so allowed_dest is
+  empty. Egress is false because the message text is given verbatim by the user and
+  is not derived from data the assistant reads. Replying to any DMs that come back
+  is not requested.'
+status: llm

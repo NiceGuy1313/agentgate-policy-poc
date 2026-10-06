@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
+import random
 import os
 import time
 import traceback
@@ -187,6 +188,9 @@ def main():
     ap.add_argument("--on-block", choices=["continue", "stop"], default="continue", help="scripted agent only")
     ap.add_argument("--no-benign", action="store_true", help="skip the no-attack (utility) runs")
     ap.add_argument("--pilot", action="store_true", help="banking, 4 user x 3 injection tasks")
+    ap.add_argument("--sample", type=int, default=0,
+                    help="per suite, N user tasks drawn with --seed (all injection tasks for each)")
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -199,6 +203,8 @@ def main():
         for s in a.suites:
             suite = load_suite(s)
             uts = a.user_tasks or sorted(suite.user_tasks, key=lambda x: int(x.split("_")[-1]))
+            if a.sample:
+                uts = sorted(random.Random(f"{a.seed}:{s}").sample(uts, a.sample), key=lambda x: int(x.split("_")[-1]))
             its = a.injection_tasks or sorted(suite.injection_tasks, key=lambda x: int(x.split("_")[-1]))
             for ut in uts:
                 base = {"cond": cond, "suite": s, "user_task": ut, "agent": a.agent, "spec": a.spec,

@@ -1,0 +1,10 @@
+requested_ops:
+- delete_file
+named_sources:
+- tool:list_files
+allowed_dest: []
+egress_requested: false
+notes: User asks to find the largest file in the drive (read-only via list_files)
+  and delete it. Only delete_file is state-changing. No recipients, payments, or outbound
+  content.
+status: llm
