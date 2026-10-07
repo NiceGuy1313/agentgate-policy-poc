@@ -54,6 +54,12 @@ def load(run: Path) -> dict:
     return R
 
 
+def blocked_decisions(r: dict) -> list[list]:
+    """[policy, verdict, origin] of every non-ALLOW decision on a blocked call."""
+    return [[d["policy_id"], d["verdict"], (d.get("evidence") or {}).get("origin")]
+            for e in r["trace"] if e["blocked"] for d in e["decisions"] if d["verdict"] != "ALLOW"]
+
+
 def blocked_policies(r: dict) -> list[str]:
     return sorted({d["policy_id"] for e in r["trace"] if e["blocked"] for d in e["decisions"] if d["verdict"] != "ALLOW"})
 
@@ -112,7 +118,7 @@ def analyse(run: Path, n_boot: int = 2000, seed: int = 0) -> dict:
                 continue
             r0 = R.get(("C0",) + k[1:])
             gate_fail["benign" if k[3] is None else "attack"].append({
-                "suite": k[1], "user_task": k[2], "injection_task": k[3], "blocked_by": blocked_policies(r),
+                "suite": k[1], "user_task": k[2], "injection_task": k[3], "blocked_by": blocked_policies(r), "blocks": blocked_decisions(r),
                 "c0_utility": None if r0 is None else bool(r0["utility"])})
         M["gate_failures"] = {
             kind: {"n": len(v), "c0_succeeded": sum(1 for x in v if x["c0_utility"]),

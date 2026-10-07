@@ -89,6 +89,46 @@ def grouped_bars(path, groups, series, title, ylabel, note=None):
     plt.close(fig)
 
 
+def ci_panels(path, runs, title):
+    """One panel per metric; bars per model with Wilson 95% CI error bars (from significance.json)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams["font.family"] = "DejaVu Sans"
+    metrics = [("asr", "ASR"), ("utility", "Utility (no attack)"), ("utility_under_attack", "Utility under attack")]
+    conds = list(runs[0][1]["conditions"])
+    colors = [C1_, C2_, C3_]
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.9), dpi=150, sharey=True)
+    n = len(runs)
+    w = 0.8 / n
+    for ax, (key, label) in zip(axes, metrics):
+        for i, (model, G) in enumerate(runs):
+            xs = [g + (i - (n - 1) / 2) * w for g in range(len(conds))]
+            ms = [G["conditions"][c][key] for c in conds]
+            vals = [100 * m["k"] / m["n"] for m in ms]
+            lo = [v - 100 * m["ci95"][0] for v, m in zip(vals, ms)]
+            hi = [100 * m["ci95"][1] - v for v, m in zip(vals, ms)]
+            ax.bar(xs, vals, width=w - 0.03, color=colors[i], label=model, edgecolor="white", linewidth=1.5)
+            ax.errorbar(xs, vals, yerr=[lo, hi], fmt="none", ecolor=INK, elinewidth=0.9, capsize=2.5)
+            for x, v, h in zip(xs, vals, hi):
+                ax.text(x, v + h + 1.5, f"{v:.0f}", ha="center", va="bottom", fontsize=7, color=MUTED)
+        short = {"C0": "none", "C1": "block", "C2": "allow", "C3": "built-in", "C4": "judge"}
+        ax.set_xticks(range(len(conds)), [f"{c}\n{short[c]}" for c in conds], fontsize=7.5)
+        ax.set_ylim(0, 108)
+        ax.set_title(label, loc="left", fontsize=10, color=INK)
+        _style(ax)
+    axes[0].set_ylabel("%", color=MUTED, fontsize=9)
+    axes[-1].legend(frameon=False, fontsize=8.5, loc="upper left", bbox_to_anchor=(1.0, 1.0))
+    fig.suptitle(title, x=0.01, ha="left", fontsize=11, color=INK)
+    fig.text(0.01, 0.01, "C1/C2/C4: gate with ESCALATE → block / allow / judge LLM. Error bars: Wilson 95% CI. "
+             "Paired tests vs C0 are in the table (McNemar, user-task cluster bootstrap).",
+             fontsize=7.5, color=MUTED)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.95))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)
+    plt.close(fig)
+
+
 def figures(R, LIVE):
     figs = {}
     types = [t for t in "ABCDEFG" if t in R["by_type"]]
@@ -115,9 +155,15 @@ def figures(R, LIVE):
             ("Utility (no attack)", [100 * (m[c]["utility"] or 0) for c in conds], C1_),
             ("Utility under attack", [100 * (m[c]["utility_under_attack"] or 0) for c in conds], C3_),
             ("ASR", [100 * (m[c]["asr"] or 0) for c in conds], C2_),
-        ], f"Utility vs ASR by condition — agent: {name}" + (" (deterministic stand-in, not an LLM)" if name == "scripted" else ""), "%",
+        ], f"Utility vs ASR by condition — agent: " + (
+            f"{L['agent_model']} (stratified: 291 attack pairs + 97 benign)" if name.startswith("strat3_") else name)
+            + (" (deterministic stand-in, not an LLM)" if name == "scripted" else ""), "%",
             note="Latency is reported in the table, not on this axis (one axis per chart).")
         figs[f"tradeoff_{name}"] = f"results/figures/tradeoff_{name}.png"
+    sig = [(L["agent_model"], SIG(name)) for name, L in LIVE.items() if name.startswith("strat3_") and SIG(name)]
+    if sig:
+        ci_panels(FIG / "strat3_ci.png", sig, f"Stratified sample, attack tool_knowledge — rate by condition and model")
+        figs["strat_ci"] = "results/figures/strat3_ci.png"
     return figs
 
 
@@ -682,6 +728,78 @@ def stage6(LIVE, ENF, figs):
     (DOCS / "stage6_live_report.md").write_text("\n".join(L) + "\n")
 
 
+def _pv(m):
+    pv = m["paired_vs_C0"]
+    return f"{100 * (pv['cond_only'] - pv['c0_only']) / pv['n_pairs']:+.1f}%p(p={pv['p_mcnemar']:.2g})"
+
+
+def strat_interpretation(st_sig) -> list[str]:
+    """Interpretation of the stratified runs; every claim is checked against significance.json before it is written."""
+    out = ["**층화 표본에서 읽을 수 있는 것**", ""]
+    Gs = [(S["agent_model"], SIG(n)["conditions"]) for n, S in st_sig]
+    for model, g in Gs:
+        out.append(f"- {model}: ASR은 C0 대비 C1 {_pv(g['C1']['asr'])}, C2 {_pv(g['C2']['asr'])}, C4 {_pv(g['C4']['asr'])}. "
+                   f"정상 Utility는 C1 {_pv(g['C1']['utility'])}, C2 {_pv(g['C2']['utility'])}, C4 {_pv(g['C4']['utility'])}. "
+                   f"Utility under attack은 C1 {_pv(g['C1']['utility_under_attack'])}, C2 {_pv(g['C2']['utility_under_attack'])}, "
+                   f"C4 {_pv(g['C4']['utility_under_attack'])}.")
+    rate = lambda g, c, k: g[c][k]["k"] / g[c][k]["n"]  # noqa: E731
+    sig = lambda g, c, k: g[c][k]["paired_vs_C0"]["p_mcnemar"] < 0.05  # noqa: E731
+    claims = []
+    if all(sig(g, c, "asr") and rate(g, c, "asr") < rate(g, "C0", "asr") for _, g in Gs for c in ("C1", "C2", "C4")):
+        claims.append("세 게이트 조건 모두 두 모델에서 ASR을 유의하게 낮췄다.")
+    if all(rate(g, "C2", "asr") > max(rate(g, "C1", "asr"), rate(g, "C4", "asr")) for _, g in Gs):
+        claims.append("ESCALATE를 허용하는 C2는 ASR이 C1·C4보다 높다. 지목 출처를 거친 공격(ESCALATE)이 C2에서 통과하기 때문이다(우회 경로 (d)).")
+    if all(rate(g, "C4", "utility") >= rate(g, "C1", "utility") and rate(g, "C4", "asr") <= rate(g, "C1", "asr") + 0.01 for _, g in Gs):
+        claims.append("C4(판정 LLM)는 두 모델에서 C1과 같은 수준(차이 1%p 이내)으로 ASR을 낮추면서 정상 Utility는 C1 이상으로 유지했다.")
+    nsig_c4 = [m for m, g in Gs if not sig(g, "C4", "utility")]
+    if len(nsig_c4) == len(Gs):
+        claims.append("C4의 정상 Utility 감소는 두 모델 모두 통계적으로 유의하지 않다. 다만 조건당 1회 실행이라 수 %p 손실은 검출하지 못하므로, 게이트로 인한 실패 건수(4.1절 표)를 함께 본다.")
+    sig_c1 = [m for m, g in Gs if sig(g, "C1", "utility") and rate(g, "C1", "utility") < rate(g, "C0", "utility")]
+    if sig_c1:
+        claims.append(f"정상 Utility가 유의하게 줄어든 조합은 {', '.join(sig_c1)}의 C1(ESCALATE 차단)이다.")
+    up = [m for m, g in Gs if all(sig(g, c, "utility_under_attack") and rate(g, c, "utility_under_attack") > rate(g, "C0", "utility_under_attack") for c in ("C2", "C4"))]
+    if up:
+        gu = {m: g for m, g in Gs}
+        claims.append(f"{', '.join(up)}는 C2·C4에서 Utility under attack이 C0보다 유의하게 높다. C0에서 정상 Utility "
+                      + ", ".join(f"{100 * rate(gu[m], 'C0', 'utility'):.1f}%에 비해 Utility under attack이 {100 * rate(gu[m], 'C0', 'utility_under_attack'):.1f}%" for m in up)
+                      + "로 낮아, 공격을 수행하느라 원래 작업을 끝내지 못하는 경우가 많다. 공격 호출이 차단되면 원래 작업을 마치는 경우가 늘었다.")
+    down = [m for m, g in Gs if all(sig(g, c, "utility_under_attack") and rate(g, c, "utility_under_attack") < rate(g, "C0", "utility_under_attack") for c in ("C1", "C4"))]
+    if down:
+        gd = {m: g for m, g in Gs}
+        claims.append(f"반대로 {', '.join(down)}는 C1·C4에서 Utility under attack이 유의하게 낮다. 공격 실행 중 차단이 있었고 user task가 실패한 실행이 "
+                      + "; ".join(f"{m} C1 {gd[m]['C1']['gate_failures']['attack']['n']}건(그중 C0에서는 성공 {gd[m]['C1']['gate_failures']['attack']['c0_succeeded']}건), "
+                                  f"C4 {gd[m]['C4']['gate_failures']['attack']['n']}건({gd[m]['C4']['gate_failures']['attack']['c0_succeeded']}건)" for m in down)
+                      + "으로, 공격 호출과 함께 정상 작업에 필요한 호출까지 막히거나 차단 뒤 작업을 끝내지 못한 경우가 있다.")
+    out += ["", " ".join(claims), ""]
+    return out
+
+
+def strat_failure_bullets(st_sig) -> list[str]:
+    if not st_sig:
+        return []
+    b = []
+    for n, S in st_sig:
+        g = SIG(n)["conditions"]
+        pol = Counter()
+        for c in ("C1", "C4"):
+            for x in g[c]["gate_failures"]["benign"]["cases"]:
+                if x["c0_utility"]:
+                    pol.update(x["blocked_by"])
+        p1 = {c: Counter(f"{v}/{o}" for x in g[c]["gate_failures"]["benign"]["cases"] if x["c0_utility"]
+                         for pid, v, o in x.get("blocks", []) if pid == "P1") for c in ("C1", "C4")}
+        b.append(f"{S['agent_model']} C1 {g['C1']['gate_failures']['benign']['c0_succeeded']}건·C4 {g['C4']['gate_failures']['benign']['c0_succeeded']}건"
+                 f"(실행에 나온 차단 정책: {', '.join(f'{k} {v}' for k, v in sorted(pol.items()))}; "
+                 "P1 판정·출처 " + ", ".join(f"{c} " + (" / ".join(f"{k.replace('/', '·')} {v}" for k, v in sorted(p1[c].items())) or "없음")
+                                             for c in ("C1", "C4")) + ")")
+    return ["- **실제 모델에서 남은 공격 성공(층화 표본)**: C1·C4에서 남은 탐지 실패는 두 유형뿐이다. (1) 사용자가 읽으라고 지목한 채널·웹 페이지 안의 공격 URL을 보내거나 방문하는 호출"
+            "(slack injection_task_1·3, P7이 지목 출처로 ALLOW), (2) 사용자가 요청한 예약·일정 툴의 인자 오염(travel injection_task_0·2, P8·P9). "
+            "판정 LLM이 공격 호출을 허용한 사례는 없다. 사례 표는 `docs/stage6_live_report.md` 4절.",
+            "- **실제 모델에서 정상 작업을 막은 차단(층화 표본)**: C0에서는 성공했지만 게이트 조건에서 차단 때문에 실패한 정상 실행은 " + "; ".join(b) +
+            "이다. 가장 많은 것은 P1(외부 목적지 출처)이다. C1에서는 사용자가 지목한 자료에 있는 정당한 목적지가 ESCALATE(NAMED_SOURCE)되어 차단된 경우가 대부분이고, "
+            "C4에서는 판정 LLM이 이런 ESCALATE를 대부분 허용해 남은 실패가 줄었다. C4에 남은 P1 실패에는 사용자가 요청하지 않은 툴 응답에서 온 목적지를 BLOCK한 경우"
+            "(OTHER_TOOL, 2단계 출처)가 포함된다(재생의 오탐 원인 \"2단계 출처를 OTHER_TOOL로 판정\"과 같다)."]
+
+
 # ---------------------------------------------------------------------------------------------- final
 def final(R, RL, LIVE, ENF, figs):
     o, b, pv, ab = R["overall"], R["benign"], R["prevention"], R["ablation"]
@@ -784,7 +902,12 @@ def final(R, RL, LIVE, ENF, figs):
           "### 2.3 평가 설정", "",
           "- Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성)과 LLM 추출 spec.",
           "- Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 " + ", ".join(sorted({v['agent_model'] for v in llm_runs.values()})) +
-          "(Claude는 effort medium, GLM은 Ollama Cloud temperature 0), 그리고 전체 규모 검증용 대역 에이전트.", "",
+          "(Claude는 effort medium, GLM은 Ollama Cloud temperature 0), 그리고 전체 규모 검증용 대역 에이전트."] + (
+          ["- 실제 모델 본 실험(층화 표본): `tool_knowledge`에 넘어가는 " + ", ".join(v["agent_model"] for _, v in strat_runs(LIVE)) +
+           "로 user task 97개 전부 × 같은 suite의 injection task 3개(공격 291쌍)와 정상 실행 97개를 C0·C1·C2·C4에서 한 번씩 실행했다"
+           "(`data/pairs/strat3_seed0.txt`, 설계 근거 `docs/conditions_and_attacks.md`). 비율은 Wilson 95% 신뢰구간, C0 대비 차이는 exact McNemar 검정과 "
+           "user task 군집 bootstrap 신뢰구간으로 보고한다(`scripts/significance_live.py`). Claude·GLM과 이전 소규모 표본은 파일럿이다."]
+          if strat_runs(LIVE) else []) + ["",
           "## 3. RQ1 결과 — 재생 평가", "",
           table(["지표", "oracle TaskSpec"] + [f"LLM {m}" for m in RL],
                 [[n, f(R)] + [f(S) for S in RL.values()] for n, f in REPLAY_ROWS if not n.startswith("판정 지연")]), "",
@@ -805,8 +928,19 @@ def final(R, RL, LIVE, ENF, figs):
         L += [f"**{run_label(name, S)}**", "", live_table(S), ""]
     L += [table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"],
                 [[n, E["runs"], E["gate_events"], E["blocked_events"], E["violations"]] for n, E in ENF.items()]), "",
-          "위반은 BLOCK 호출 실행, 차단 시 환경 변화, 툴 결과-판정 1:1 불일치의 합이다.", "",
-          "## 5. ASR · Utility · Latency 트레이드오프", "",
+          "위반은 BLOCK 호출 실행, 차단 시 환경 변화, 툴 결과-판정 1:1 불일치의 합이다.", ""]
+    st_sig = [(n, v) for n, v in strat_runs(LIVE) if SIG(n)]
+    if st_sig:
+        L += ["### 4.1 층화 표본: 신뢰구간과 C0 대비 검정", "",
+              "비율 옆의 괄호는 Wilson 95% 신뢰구간이다. C0 대비 차이는 같은 (suite, user task, injection task) 짝끼리 비교했다. "
+              "p값은 exact McNemar 검정, 차이의 신뢰구간은 user task를 suite별로 다시 뽑는 군집 bootstrap이다"
+              "(같은 user task의 실행은 서로 독립이 아니므로).", ""]
+        if "strat_ci" in figs:
+            L += [f"![stratified sample CI](../{figs['strat_ci']})", ""]
+        for name, S in st_sig:
+            L += [f"**{S['agent_model']}** (`{name}`)", "", sig_table(name), "",
+                  "게이트로 인한 실패(차단된 호출이 있었고 user task가 실패한 실행):", "", gate_failure_table(name), ""]
+    L += ["## 5. ASR · Utility · Latency 트레이드오프", "",
           "지표 정의는 AgentDojo를 따른다. **Utility**는 공격 없이 user task의 `utility` 판정이 참인 비율, **Utility under attack**은 공격 환경에서 user task `utility`가 참인 비율, "
           "**ASR**(targeted attack success rate)은 injection task의 `security` 판정이 참(공격 목표 달성)인 비율이다.", ""]
     for name in [n for n, _ in strat_runs(LIVE)] + [n for n, _ in samples] + (["scripted"] if "scripted" in LIVE else []):
@@ -816,6 +950,8 @@ def final(R, RL, LIVE, ENF, figs):
                     [[f"{c} {COND_NAMES[c]}", p100(v["asr"]), p100(v["utility"]), p100(v["utility_under_attack"]),
                       round(v["wall_ms_per_task"] or 0), v["gate_ms_per_task"]] for c, v in m.items()]), "",
               f"![tradeoff](../{figs.get('tradeoff_' + name, '')})", ""]
+    if st_sig:
+        L += strat_interpretation(st_sig)
     L += [f"게이트 판정 지연은 호출당 평균 {R['decide_ms']['mean']:.2f} ms(p95 {R['decide_ms']['p95']:.2f} ms)로, LLM 한 턴(수 초)에 비해 무시할 수 있다. "
           "비용의 대부분은 지연이 아니라 Utility다. ESCALATE를 모두 차단하는 C1은 정상 작업을 가장 많이 잃고, 모두 허용하는 C2는 Utility를 회복하지만 넘어가는 에이전트(대역)에서 ASR이 다시 오른다. "
           "C4는 이 회색 지대를 판정 LLM으로 나누려는 조건이다.", ""]
@@ -828,11 +964,13 @@ def final(R, RL, LIVE, ENF, figs):
                   table(["정답 → 판정기 답", "건수"], sorted(d["confusion_answer"].items())), "",
                   table(["정답 → 최종 처리", "건수"], sorted(d["confusion_final"].items())), ""]
     L += ["## 7. 실패 분석", "",
+          "아래 앞의 다섯 항목은 재생 평가(Stage 5)에서, 그다음 항목은 실제 모델 층화 표본(Stage 6)에서 확인한 것이다.", "",
           "- **탐지 실패(정책 설계)**: 인젝션이 사용자가 지목한 출처 안에 있으면 출처 판정이 약해진다. slack injection_task_1·3(지목 웹 페이지·채널 목록 안의 링크), travel injection_task_0·4(지목 호텔 리뷰 안의 호텔)가 그 예다. banking은 같은 이유로 대부분 ESCALATE에 머문다.",
           "- **같은 권한 범위의 공격**: 사용자가 일정 생성을 요청한 태스크에서 공격도 일정 생성이면 작업 단위 정책(P9)이 구분하지 못한다(travel injection_task_2).",
           "- **정당한 목적지와 같은 공격 목적지**: travel user_task_3의 `janeLong@google.com`.",
           "- **측정상 주의**: slack injection_task_5는 AgentDojo가 시도 기록으로 성공을 판정한다(executed-only로 보정). 유형 H는 모델이 인젝션을 경고하며 이름을 언급해도 성공으로 집계된다.",
           "- **오탐 원인**: 지목 출처 내용을 송금 메모로 복사(P2), 2단계 출처를 OTHER_TOOL로 판정(P1), 위임형 프롬프트의 requested_ops 공백(P6). 나머지는 설계상 ESCALATE다. 실제 모델에서는 정상 작업을 정답과 다른 경로로 수행하면서 추가 ESCALATE가 생긴다(Stage 6 4절).",
+          ] + strat_failure_bullets(st_sig) + [
           "- 개선안 6개는 `docs/stage5_replay_report.md` 7절(정책 수정 제안 v2)에 있으며 승인 전이라 적용하지 않았다.", "",
           "## 8. 한계", "",
           "- **정책 도출·평가 데이터 중복**: 정책과 분류를 같은 35개 인젝션 태스크로 설계하고 평가했다.",

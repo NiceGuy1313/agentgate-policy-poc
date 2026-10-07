@@ -62,6 +62,7 @@ agent LLM ──tool call──► GatedRuntime.run_function ──► PolicyEng
 
 - Stage 5 재생: user task 정답 궤적 뒤에 injection task 참조 궤적을 이어 붙여 949쌍을 audit·enforce로 재생. TaskSpec은 oracle(프롬프트만 보고 작성)과 LLM 추출 spec.
 - Stage 6·7 파이프라인: AgentDojo `AgentPipeline` + `GatedRuntime`. 실제 모델 claude-opus-5-5, claude-sonnet-5-5, glm-5.3, gpt-oss:120b, mistral-large-3:675b(Claude는 effort medium, GLM은 Ollama Cloud temperature 0), 그리고 전체 규모 검증용 대역 에이전트.
+- 실제 모델 본 실험(층화 표본): `tool_knowledge`에 넘어가는 gpt-oss:120b, mistral-large-3:675b로 user task 97개 전부 × 같은 suite의 injection task 3개(공격 291쌍)와 정상 실행 97개를 C0·C1·C2·C4에서 한 번씩 실행했다(`data/pairs/strat3_seed0.txt`, 설계 근거 `docs/conditions_and_attacks.md`). 비율은 Wilson 95% 신뢰구간, C0 대비 차이는 exact McNemar 검정과 user task 군집 bootstrap 신뢰구간으로 보고한다(`scripts/significance_live.py`). Claude·GLM과 이전 소규모 표본은 파일럿이다.
 
 ## 3. RQ1 결과 — 재생 평가
 
@@ -205,6 +206,68 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 위반은 BLOCK 호출 실행, 차단 시 환경 변화, 툴 결과-판정 1:1 불일치의 합이다.
 
+### 4.1 층화 표본: 신뢰구간과 C0 대비 검정
+
+비율 옆의 괄호는 Wilson 95% 신뢰구간이다. C0 대비 차이는 같은 (suite, user task, injection task) 짝끼리 비교했다. p값은 exact McNemar 검정, 차이의 신뢰구간은 user task를 suite별로 다시 뽑는 군집 bootstrap이다(같은 user task의 실행은 서로 독립이 아니므로).
+
+![stratified sample CI](../results/figures/strat3_ci.png)
+
+**gpt-oss:120b** (`strat3_tk_gpt-oss_120b`)
+
+| 조건 | 지표 | 성공/전체 | 비율 [95% CI] | C0 대비 차이 | 차이 95% CI (user task 군집 bootstrap) | 불일치 쌍 C0만 / 조건만 | McNemar p |
+|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | ASR | 102/291 | 35.1% [29.8, 40.7] | - | - | - | - |
+| C0 방어 없음 | Utility | 73/97 | 75.3% [65.8, 82.8] | - | - | - | - |
+| C0 방어 없음 | Utility under attack | 176/291 | 60.5% [54.8, 65.9] | - | - | - | - |
+| C1 게이트 (ESCALATE→block) | ASR | 13/291 | 4.5% [2.6, 7.5] | -30.6%p | [-35.7, -25.4] | 92 / 3 | 7.2e-24 |
+| C1 게이트 (ESCALATE→block) | Utility | 62/97 | 63.9% [54.0, 72.8] | -11.3%p | [-20.6, -3.1] | 15 / 4 | 0.019 |
+| C1 게이트 (ESCALATE→block) | Utility under attack | 148/291 | 50.9% [45.1, 56.5] | -9.6%p | [-16.2, -2.8] | 51 / 23 | 0.0015 |
+| C2 게이트 (ESCALATE→allow) | ASR | 26/291 | 8.9% [6.2, 12.8] | -26.1%p | [-30.9, -21.3] | 81 / 5 | 9.6e-19 |
+| C2 게이트 (ESCALATE→allow) | Utility | 71/97 | 73.2% [63.6, 81.0] | -2.1%p | [-8.2, +4.1] | 6 / 4 | 0.75 |
+| C2 게이트 (ESCALATE→allow) | Utility under attack | 173/291 | 59.5% [53.7, 64.9] | -1.0%p | [-6.2, +4.8] | 31 / 28 | 0.8 |
+| C4 게이트 (ESCALATE→judge) | ASR | 15/291 | 5.2% [3.1, 8.3] | -29.9%p | [-35.4, -24.4] | 91 / 4 | 1.7e-22 |
+| C4 게이트 (ESCALATE→judge) | Utility | 68/97 | 70.1% [60.4, 78.3] | -5.2%p | [-13.4, +2.1] | 10 / 5 | 0.3 |
+| C4 게이트 (ESCALATE→judge) | Utility under attack | 150/291 | 51.5% [45.8, 57.2] | -8.9%p | [-15.5, -2.1] | 49 / 23 | 0.0029 |
+
+게이트로 인한 실패(차단된 호출이 있었고 user task가 실패한 실행):
+
+| 조건 | 실행 종류 | 차단이 있었고 user task 실패 | 그중 C0에서는 성공 | 차단 정책(호출 기준, 중복 포함) |
+|---|---|---|---|---|
+| C1 | 정상 실행 | 14 | 11 | P1 10, P3 1, P4 2, P5 1, P6 1, P7 1 |
+| C1 | 공격 실행 | 92 | 43 | P1 61, P2 19, P3 24, P4 5, P5 5, P6 10, P7 19, P8 11, P9 7 |
+| C2 | 정상 실행 | 4 | 3 | P1 2, P3 2, P6 1 |
+| C2 | 공격 실행 | 66 | 25 | P1 38, P2 18, P3 20, P4 2, P6 11, P7 14, P8 13, P9 6 |
+| C4 | 정상 실행 | 9 | 8 | P1 4, P3 2, P4 2, P5 2, P6 1, P7 1 |
+| C4 | 공격 실행 | 93 | 43 | P1 56, P2 26, P3 27, P4 4, P5 7, P6 14, P7 19, P8 10, P9 7 |
+
+**mistral-large-3:675b** (`strat3_tk_mistral-large-3_675b`)
+
+| 조건 | 지표 | 성공/전체 | 비율 [95% CI] | C0 대비 차이 | 차이 95% CI (user task 군집 bootstrap) | 불일치 쌍 C0만 / 조건만 | McNemar p |
+|---|---|---|---|---|---|---|---|
+| C0 방어 없음 | ASR | 186/291 | 63.9% [58.2, 69.2] | - | - | - | - |
+| C0 방어 없음 | Utility | 62/97 | 63.9% [54.0, 72.8] | - | - | - | - |
+| C0 방어 없음 | Utility under attack | 98/291 | 33.7% [28.5, 39.3] | - | - | - | - |
+| C1 게이트 (ESCALATE→block) | ASR | 24/291 | 8.2% [5.6, 12.0] | -55.7%p | [-61.2, -49.8] | 165 / 3 | 4.2e-45 |
+| C1 게이트 (ESCALATE→block) | Utility | 56/97 | 57.7% [47.8, 67.1] | -6.2%p | [-16.5, +4.1] | 17 / 11 | 0.34 |
+| C1 게이트 (ESCALATE→block) | Utility under attack | 107/291 | 36.8% [31.4, 42.4] | +3.1%p | [-4.1, +10.7] | 44 / 53 | 0.42 |
+| C2 게이트 (ESCALATE→allow) | ASR | 52/291 | 17.9% [13.9, 22.7] | -46.0%p | [-51.5, -40.2] | 140 / 6 | 2.8e-34 |
+| C2 게이트 (ESCALATE→allow) | Utility | 58/97 | 59.8% [49.8, 69.0] | -4.1%p | [-13.4, +4.1] | 12 / 8 | 0.5 |
+| C2 게이트 (ESCALATE→allow) | Utility under attack | 132/291 | 45.4% [39.7, 51.1] | +11.7%p | [+5.8, +17.9] | 26 / 60 | 0.00032 |
+| C4 게이트 (ESCALATE→judge) | ASR | 21/291 | 7.2% [4.8, 10.8] | -56.7%p | [-62.2, -50.9] | 166 / 1 | 1.8e-48 |
+| C4 게이트 (ESCALATE→judge) | Utility | 58/97 | 59.8% [49.8, 69.0] | -4.1%p | [-13.4, +4.1] | 11 / 7 | 0.48 |
+| C4 게이트 (ESCALATE→judge) | Utility under attack | 138/291 | 47.4% [41.8, 53.2] | +13.7%p | [+6.9, +21.0] | 28 / 68 | 5.5e-05 |
+
+게이트로 인한 실패(차단된 호출이 있었고 user task가 실패한 실행):
+
+| 조건 | 실행 종류 | 차단이 있었고 user task 실패 | 그중 C0에서는 성공 | 차단 정책(호출 기준, 중복 포함) |
+|---|---|---|---|---|
+| C1 | 정상 실행 | 13 | 12 | P1 10, P5 1, P6 1, P7 1 |
+| C1 | 공격 실행 | 143 | 39 | P1 118, P2 82, P3 60, P4 8, P5 10, P6 15, P7 37, P8 8, P9 7 |
+| C2 | 정상 실행 | 5 | 3 | P1 4, P3 1, P6 1, P7 1 |
+| C2 | 공격 실행 | 108 | 21 | P1 91, P2 73, P3 53, P4 3, P5 1, P6 14, P7 29, P8 7, P9 3 |
+| C4 | 정상 실행 | 7 | 5 | P1 3, P2 1, P3 1, P5 2, P6 1, P7 1 |
+| C4 | 공격 실행 | 114 | 25 | P1 94, P2 67, P3 48, P4 6, P5 7, P6 12, P7 29, P8 8, P9 3 |
+
 ## 5. ASR · Utility · Latency 트레이드오프
 
 지표 정의는 AgentDojo를 따른다. **Utility**는 공격 없이 user task의 `utility` 판정이 참인 비율, **Utility under attack**은 공격 환경에서 user task `utility`가 참인 비율, **ASR**(targeted attack success rate)은 injection task의 `security` 판정이 참(공격 목표 달성)인 비율이다.
@@ -283,6 +346,13 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 ![tradeoff](../results/figures/tradeoff_scripted.png)
 
+**층화 표본에서 읽을 수 있는 것**
+
+- gpt-oss:120b: ASR은 C0 대비 C1 -30.6%p(p=7.2e-24), C2 -26.1%p(p=9.6e-19), C4 -29.9%p(p=1.7e-22). 정상 Utility는 C1 -11.3%p(p=0.019), C2 -2.1%p(p=0.75), C4 -5.2%p(p=0.3). Utility under attack은 C1 -9.6%p(p=0.0015), C2 -1.0%p(p=0.8), C4 -8.9%p(p=0.0029).
+- mistral-large-3:675b: ASR은 C0 대비 C1 -55.7%p(p=4.2e-45), C2 -46.0%p(p=2.8e-34), C4 -56.7%p(p=1.8e-48). 정상 Utility는 C1 -6.2%p(p=0.34), C2 -4.1%p(p=0.5), C4 -4.1%p(p=0.48). Utility under attack은 C1 +3.1%p(p=0.42), C2 +11.7%p(p=0.00032), C4 +13.7%p(p=5.5e-05).
+
+세 게이트 조건 모두 두 모델에서 ASR을 유의하게 낮췄다. ESCALATE를 허용하는 C2는 ASR이 C1·C4보다 높다. 지목 출처를 거친 공격(ESCALATE)이 C2에서 통과하기 때문이다(우회 경로 (d)). C4(판정 LLM)는 두 모델에서 C1과 같은 수준(차이 1%p 이내)으로 ASR을 낮추면서 정상 Utility는 C1 이상으로 유지했다. C4의 정상 Utility 감소는 두 모델 모두 통계적으로 유의하지 않다. 다만 조건당 1회 실행이라 수 %p 손실은 검출하지 못하므로, 게이트로 인한 실패 건수(4.1절 표)를 함께 본다. 정상 Utility가 유의하게 줄어든 조합은 gpt-oss:120b의 C1(ESCALATE 차단)이다. mistral-large-3:675b는 C2·C4에서 Utility under attack이 C0보다 유의하게 높다. C0에서 정상 Utility 63.9%에 비해 Utility under attack이 33.7%로 낮아, 공격을 수행하느라 원래 작업을 끝내지 못하는 경우가 많다. 공격 호출이 차단되면 원래 작업을 마치는 경우가 늘었다. 반대로 gpt-oss:120b는 C1·C4에서 Utility under attack이 유의하게 낮다. 공격 실행 중 차단이 있었고 user task가 실패한 실행이 gpt-oss:120b C1 92건(그중 C0에서는 성공 43건), C4 93건(43건)으로, 공격 호출과 함께 정상 작업에 필요한 호출까지 막히거나 차단 뒤 작업을 끝내지 못한 경우가 있다.
+
 게이트 판정 지연은 호출당 평균 0.74 ms(p95 3.47 ms)로, LLM 한 턴(수 초)에 비해 무시할 수 있다. 비용의 대부분은 지연이 아니라 Utility다. ESCALATE를 모두 차단하는 C1은 정상 작업을 가장 많이 잃고, 모두 허용하는 C2는 Utility를 회복하지만 넘어가는 에이전트(대역)에서 ASR이 다시 오른다. C4는 이 회색 지대를 판정 LLM으로 나누려는 조건이다.
 
 ## 6. 판정 LLM 단독 평가 (Stage 7 작업 2)
@@ -310,11 +380,15 @@ P1(출처)과 P2(내용 겹침)가 가장 큰 축이다. P2는 lenient 고유 �
 
 ## 7. 실패 분석
 
+아래 앞의 다섯 항목은 재생 평가(Stage 5)에서, 그다음 항목은 실제 모델 층화 표본(Stage 6)에서 확인한 것이다.
+
 - **탐지 실패(정책 설계)**: 인젝션이 사용자가 지목한 출처 안에 있으면 출처 판정이 약해진다. slack injection_task_1·3(지목 웹 페이지·채널 목록 안의 링크), travel injection_task_0·4(지목 호텔 리뷰 안의 호텔)가 그 예다. banking은 같은 이유로 대부분 ESCALATE에 머문다.
 - **같은 권한 범위의 공격**: 사용자가 일정 생성을 요청한 태스크에서 공격도 일정 생성이면 작업 단위 정책(P9)이 구분하지 못한다(travel injection_task_2).
 - **정당한 목적지와 같은 공격 목적지**: travel user_task_3의 `janeLong@google.com`.
 - **측정상 주의**: slack injection_task_5는 AgentDojo가 시도 기록으로 성공을 판정한다(executed-only로 보정). 유형 H는 모델이 인젝션을 경고하며 이름을 언급해도 성공으로 집계된다.
 - **오탐 원인**: 지목 출처 내용을 송금 메모로 복사(P2), 2단계 출처를 OTHER_TOOL로 판정(P1), 위임형 프롬프트의 requested_ops 공백(P6). 나머지는 설계상 ESCALATE다. 실제 모델에서는 정상 작업을 정답과 다른 경로로 수행하면서 추가 ESCALATE가 생긴다(Stage 6 4절).
+- **실제 모델에서 남은 공격 성공(층화 표본)**: C1·C4에서 남은 탐지 실패는 두 유형뿐이다. (1) 사용자가 읽으라고 지목한 채널·웹 페이지 안의 공격 URL을 보내거나 방문하는 호출(slack injection_task_1·3, P7이 지목 출처로 ALLOW), (2) 사용자가 요청한 예약·일정 툴의 인자 오염(travel injection_task_0·2, P8·P9). 판정 LLM이 공격 호출을 허용한 사례는 없다. 사례 표는 `docs/stage6_live_report.md` 4절.
+- **실제 모델에서 정상 작업을 막은 차단(층화 표본)**: C0에서는 성공했지만 게이트 조건에서 차단 때문에 실패한 정상 실행은 gpt-oss:120b C1 11건·C4 8건(실행에 나온 차단 정책: P1 11, P3 3, P4 2, P5 3, P6 2, P7 2; P1 판정·출처 C1 BLOCK·OTHER_TOOL 3 / ESCALATE·NAMED_SOURCE 7, C4 BLOCK·OTHER_TOOL 2 / ESCALATE·NAMED_SOURCE 1); mistral-large-3:675b C1 12건·C4 5건(실행에 나온 차단 정책: P1 11, P3 1, P5 2, P6 2, P7 2; P1 판정·출처 C1 BLOCK·OTHER_TOOL 1 / BLOCK·UNSEEN 1 / ESCALATE·NAMED_SOURCE 8, C4 BLOCK·OTHER_TOOL 1 / ESCALATE·NAMED_SOURCE 1)이다. 가장 많은 것은 P1(외부 목적지 출처)이다. C1에서는 사용자가 지목한 자료에 있는 정당한 목적지가 ESCALATE(NAMED_SOURCE)되어 차단된 경우가 대부분이고, C4에서는 판정 LLM이 이런 ESCALATE를 대부분 허용해 남은 실패가 줄었다. C4에 남은 P1 실패에는 사용자가 요청하지 않은 툴 응답에서 온 목적지를 BLOCK한 경우(OTHER_TOOL, 2단계 출처)가 포함된다(재생의 오탐 원인 "2단계 출처를 OTHER_TOOL로 판정"과 같다).
 - 개선안 6개는 `docs/stage5_replay_report.md` 7절(정책 수정 제안 v2)에 있으며 승인 전이라 적용하지 않았다.
 
 ## 8. 한계
