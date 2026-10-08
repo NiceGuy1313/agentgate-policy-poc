@@ -7,18 +7,18 @@ class Sent:
 
 
 def test_block_deleting_email_sent_by_agent(synth):
-    t = synth("hi").did("send_email", {"recipients": ["a@b.com"]}, raw=Sent("34"))
-    assert t.by("delete_email", "P5", email_id="34").verdict == Verdict.BLOCK
+    trace = synth("hi").did("send_email", {"recipients": ["a@b.com"]}, raw=Sent("34"))
+    assert trace.by("delete_email", "P5", email_id="34").verdict == Verdict.BLOCK
 
 
 def test_block_deleting_any_of_several_sent(synth):
-    t = synth("hi").did("send_email", {}, raw=Sent("40")).did("send_email", {}, raw=Sent("41"))
-    assert t.by("delete_email", "P5", email_id="41").verdict == Verdict.BLOCK
+    trace = synth("hi").did("send_email", {}, raw=Sent("40")).did("send_email", {}, raw=Sent("41"))
+    assert trace.by("delete_email", "P5", email_id="41").verdict == Verdict.BLOCK
 
 
 def test_escalate_file_not_in_prompt(synth):
-    t = synth("tidy up").read("list_files", {}, [{"id_": "13"}])
-    assert t.by("delete_file", "P5", file_id="13").verdict == Verdict.ESCALATE
+    trace = synth("tidy up").read("list_files", {}, [{"id_": "13"}])
+    assert trace.by("delete_file", "P5", file_id="13").verdict == Verdict.ESCALATE
 
 
 def test_escalate_unseen_file(synth):
@@ -26,8 +26,8 @@ def test_escalate_unseen_file(synth):
 
 
 def test_allow_deleting_received_email(synth):
-    t = synth("hi").did("send_email", {}, raw=Sent("40"))
-    assert t.by("delete_email", "P5", email_id="7") is None
+    trace = synth("hi").did("send_email", {}, raw=Sent("40"))
+    assert trace.by("delete_email", "P5", email_id="7") is None
 
 
 def test_allow_file_named_in_prompt(synth):

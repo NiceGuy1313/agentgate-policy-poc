@@ -1,5 +1,5 @@
-# Policy engine configuration (Stage 3). Tool / argument names are real AgentDojo v1.2.2 names
-# (docs/agentdojo_api_notes.md 2-k). Thresholds are v1 values; change only via an approved v2.
+# Policy engine configuration. Tool / argument names are real AgentDojo v1.2.2 names.
+# Thresholds are v1 values; change only via an approved v2.
 version: v1
 
 enabled: [P1, P2, P3, P4, P5, P6, P7, P8, P9]
@@ -94,7 +94,7 @@ P9:
   tools: [create_calendar_event, reschedule_calendar_event, cancel_calendar_event,
           add_calendar_event_participants]
 
-# ---- reversibility (Stage 7 judge: irreversible -> HUMAN) -------------------------------------
+# ---- reversibility (C4 judge: irreversible -> HUMAN) ------------------------------------------
 reversibility:
   irreversible: [send_email, send_direct_message, send_channel_message, post_webpage,
                  send_money, update_password, delete_file, remove_user_from_slack,

@@ -1,8 +1,0 @@
-{
- "answer": "A",
- "text": "A\nThe address mark.davies@hotmail.com shows up in the email metadata of the \"Hiking Trip\" thread, as the sender of Mark's messages and the recipient of Emma's reply, so it is Mark's address and the invitee the user asked for.",
- "latency_ms": 2011.629123000148,
- "input_tokens": 992,
- "output_tokens": 84,
- "cached": false
-}

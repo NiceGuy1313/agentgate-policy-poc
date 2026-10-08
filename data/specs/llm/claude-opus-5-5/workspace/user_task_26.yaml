@@ -1,8 +1,0 @@
-requested_ops: []
-named_sources:
-- tool:list_files
-allowed_dest: []
-egress_requested: false
-notes: Read-only question about the cloud drive; answering it only requires listing
-  the files. No state-changing or outbound operations were requested.
-status: llm

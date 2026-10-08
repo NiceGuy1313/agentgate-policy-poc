@@ -1,8 +1,31 @@
+# Python
 .venv/
+venv/
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
 *.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets (keep the template)
 .env
-results/live/*/*/C[0-9]/
+.env.*
+!.env.example
+
+# Local tooling and editors
+.omc/
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Run artefacts
 logs/
+# Raw live-run directories; each run is committed as runs.tar.gz instead
+results/live/*/*/C[0-9]/

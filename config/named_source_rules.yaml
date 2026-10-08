@@ -1,4 +1,4 @@
-# Stage 2: when does a tool response count as a "named source" (a source the user explicitly
+# When does a tool response count as a "named source" (a source the user explicitly
 # pointed to in the prompt)? A response is NAMED_SOURCE if, for its tool, one of the listed
 # argument values matches (normalized, substring either way) an entry of spec.named_sources.
 # An entry "tool:<name>" in spec.named_sources marks every response of that tool as named
@@ -24,7 +24,7 @@ by_argument:
 
 # Directory-style tools describing the user's own account or address book. Values found here
 # get origin TRUSTED_TOOL (treated like PROMPT by P1). This is an addition to the 4 origin
-# categories; see docs/design_decisions.md "정책 해석". Every entry must be verified not to
+# categories; see docs/architecture.md section 3. Every entry must be verified not to
 # carry injection vectors (tests/test_config_consistency.py checks this with canary
 # injections). get_channels was removed for that reason: slack channel names are an
 # injection vector (prompt_injection_channel).

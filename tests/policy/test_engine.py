@@ -1,13 +1,16 @@
+import pathlib
+import re
+
 from agentgate.policy import Verdict
-from agentgate.policy.engine import PolicyEngine, combine
-from agentgate.policy.base import Decision
+from agentgate.policy.base import PolicyDecision
+from agentgate.policy.engine import PolicyEngine, combine_verdicts
 
 
-def test_combine_order_and_disable():
-    ds = [Decision(Verdict.ESCALATE, "P1", "x"), Decision(Verdict.BLOCK, "P2", "y")]
-    assert combine(ds) == Verdict.BLOCK
-    assert combine(ds, {"P2"}) == Verdict.ESCALATE
-    assert combine(ds, {"P1", "P2"}) == Verdict.ALLOW
+def test_combine_verdicts_order_and_disable():
+    decisions = [PolicyDecision(Verdict.ESCALATE, "P1", "x"), PolicyDecision(Verdict.BLOCK, "P2", "y")]
+    assert combine_verdicts(decisions) == Verdict.BLOCK
+    assert combine_verdicts(decisions, {"P2"}) == Verdict.ESCALATE
+    assert combine_verdicts(decisions, {"P1", "P2"}) == Verdict.ALLOW
 
 
 def test_disabled_policy_not_evaluated():
@@ -15,9 +18,7 @@ def test_disabled_policy_not_evaluated():
 
 
 def test_policy_package_has_no_llm_or_network_imports():
-    import pathlib
-    import re
-    src = pathlib.Path(__file__).resolve().parents[2] / "src" / "agentgate" / "policy"
-    pat = re.compile(r"\b(openai|anthropic|requests|httpx|urllib|socket|agentgate\.llm)\b")
-    for f in src.glob("*.py"):
-        assert not pat.search(f.read_text()), f
+    policy_dir = pathlib.Path(__file__).resolve().parents[2] / "src" / "agentgate" / "policy"
+    pattern = re.compile(r"\b(openai|anthropic|requests|httpx|urllib|socket|agentgate\.llm)\b")
+    for path in policy_dir.glob("*.py"):
+        assert not pattern.search(path.read_text()), path

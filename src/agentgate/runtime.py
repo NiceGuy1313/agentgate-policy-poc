@@ -1,6 +1,6 @@
-"""Tracking wrapper: the single gate every tool call passes through.
+"""The single gate every tool call passes through.
 
-Interception point: a `FunctionsRuntime` subclass (docs/design_decisions.md §1). Both the
+Interception point: a `FunctionsRuntime` subclass (docs/architecture.md, section 5). Both the
 AgentDojo `ToolsExecutor` (LLM agents) and the `GroundTruthPipeline` (replay) execute tools
 exclusively through `runtime.run_function`, and `TaskSuite.run_task_with_pipeline` accepts a
 `runtime_class`, so overriding `run_function` covers every execution path without touching
@@ -13,47 +13,64 @@ import contextvars
 import hashlib
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
 from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime, TaskEnvironment
 
-from agentgate.config import policies_config
-from agentgate.policy.base import Call, Context, Verdict
+from agentgate.config import load_policy_config
+from agentgate.policy.base import PolicyContext, SessionState, ToolCall, Verdict
 from agentgate.policy.engine import EngineResult, PolicyEngine
-from agentgate.session import SessionState
-from agentgate.spec import TaskSpec
-from agentgate.trace import TraceEvent, ValueIndex
+from agentgate.provenance import ValueIndex
+from agentgate.task_spec import TaskSpec
 
-IN_GATE: contextvars.ContextVar[bool] = contextvars.ContextVar("agentgate_in_gate", default=False)
+INSIDE_GATE: contextvars.ContextVar[bool] = contextvars.ContextVar("agentgate_in_gate", default=False)
 
-JudgeFn = Callable[[Call, EngineResult, Context], dict]
+
+@dataclass
+class TraceEvent:
+    step: int
+    tool: str
+    args: dict
+    raw_output: Any = None
+    output_text: str = ""
+    error: str | None = None
+    blocked: bool = False
+    executed: bool = False
+    phase: str = ""                   # replay bookkeeping: "user" | "injection" | "agent"
+    decision: dict | None = None      # serialized EngineResult
+    decide_ms: float = 0.0
+    env_hash_before: str | None = None
+
+
+EscalationJudgeFn = Callable[[ToolCall, EngineResult, PolicyContext], dict]
 """Returns {"verdict": "ALLOW"|"BLOCK", "human": bool, ...}."""
 
 
-def _plain(v: Any) -> Any:
-    if isinstance(v, FunctionCall):
-        return {"__call__": v.function, "args": _plain(dict(v.args))}
-    if isinstance(v, Mapping):
-        return {k: _plain(x) for k, x in v.items()}
-    if isinstance(v, (list, tuple)):
-        return [_plain(x) for x in v]
-    if hasattr(v, "model_dump"):
-        return v.model_dump(mode="json")
-    return v
+def _to_plain_data(value: Any) -> Any:
+    if isinstance(value, FunctionCall):
+        return {"__call__": value.function, "args": _to_plain_data(dict(value.args))}
+    if isinstance(value, Mapping):
+        return {k: _to_plain_data(item) for k, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain_data(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    return value
 
 
-def env_hash(env: TaskEnvironment | None) -> str | None:
-    if env is None:
+def compute_environment_hash(environment: TaskEnvironment | None) -> str | None:
+    if environment is None:
         return None
-    return hashlib.sha1(env.model_dump_json().encode()).hexdigest()
+    return hashlib.sha1(environment.model_dump_json().encode()).hexdigest()
 
 
-def block_message(result: EngineResult) -> str:
-    d = result.primary
-    pid = d.policy_id if d else "POLICY"
-    reason = d.reason if d else "The call was not allowed."
-    return f"Tool call blocked by security policy {pid}: {reason}"
+def format_block_message(result: EngineResult) -> str:
+    decision = result.primary_decision
+    policy_id = decision.policy_id if decision else "POLICY"
+    reason = decision.reason if decision else "The call was not allowed."
+    return f"Tool call blocked by security policy {policy_id}: {reason}"
 
 
 class GatedRuntime(FunctionsRuntime):
@@ -66,13 +83,13 @@ class GatedRuntime(FunctionsRuntime):
         engine=None,
         mode: str = "enforce",
         escalate_action: str | None = None,
-        judge: JudgeFn | None = None,
+        judge: EscalationJudgeFn | None = None,
         record_env_hash: bool = False,
     ):
         super().__init__(functions)
         if mode not in ("audit", "enforce"):
             raise ValueError("mode must be audit | enforce")
-        self.config = policies_config()
+        self.config = load_policy_config()
         self.engine = engine or PolicyEngine(self.config)
         self.mode = mode
         self.escalate_action = escalate_action or self.config["runtime"]["escalate_action"]
@@ -88,14 +105,14 @@ class GatedRuntime(FunctionsRuntime):
             self.configure(prompt, spec)
 
     @classmethod
-    def factory(cls, **kw) -> Callable[..., "GatedRuntime"]:
+    def factory(cls, **kwargs) -> Callable[..., "GatedRuntime"]:
         """For `TaskSuite.run_task_with_pipeline(runtime_class=...)`, which calls `runtime_class(tools)`."""
         created: list[GatedRuntime] = []
 
         def make(functions=()):
-            rt = cls(functions, **kw)
-            created.append(rt)
-            return rt
+            runtime = cls(functions, **kwargs)
+            created.append(runtime)
+            return runtime
 
         make.created = created  # type: ignore[attr-defined]
         return make
@@ -107,79 +124,80 @@ class GatedRuntime(FunctionsRuntime):
                                 self.config["runtime"].get("min_string_field_len", 4))
 
     @property
-    def context(self) -> Context:
-        return Context(self.spec, self.index, self.session, self.engine.config)  # type: ignore[arg-type]
+    def context(self) -> PolicyContext:
+        return PolicyContext(self.spec, self.index, self.session, self.engine.config)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------ the gate
     def run_function(self, env, function: str, kwargs, raise_on_error: bool = False):
         step = len(self.trace)
-        args = _plain(dict(kwargs))
-        ev = TraceEvent(step=step, tool=function, args=args, phase=self.phase)
+        args = _to_plain_data(dict(kwargs))
+        event = TraceEvent(step=step, tool=function, args=args, phase=self.phase)
         if self.record_env_hash:
-            ev.env_hash_before = env_hash(env)  # type: ignore[attr-defined]
+            event.env_hash_before = compute_environment_hash(env)
 
-        t0 = time.perf_counter()
+        start = time.perf_counter()
         if self.index is None:
             result = EngineResult(Verdict.BLOCK, [])
-            ev.decision = {"verdict": "BLOCK", "decisions": [], "note": "no TaskSpec configured (fail closed)"}
+            event.decision = {"verdict": "BLOCK", "decisions": [], "note": "no TaskSpec configured (fail closed)"}
         else:
-            result = self.engine.decide(Call(function, args), self.context)
-            ev.decision = result.as_dict()
+            result = self.engine.decide(ToolCall(function, args), self.context)
+            event.decision = result.as_dict()
         effective = result.verdict
         if effective == Verdict.ESCALATE:
             if self.escalate_action == "allow":
                 effective = Verdict.ALLOW
             elif self.escalate_action == "judge" and self.judge is not None:
-                j = self.judge(Call(function, args), result, self.context)
-                ev.decision["judge"] = j
-                effective = Verdict(j["verdict"])
+                judgement = self.judge(ToolCall(function, args), result, self.context)
+                event.decision["judge"] = judgement
+                effective = Verdict(judgement["verdict"])
             else:
                 effective = Verdict.BLOCK
-        ev.decide_ms = (time.perf_counter() - t0) * 1000
-        ev.decision["effective"] = effective.value
+        event.decide_ms = (time.perf_counter() - start) * 1000
+        event.decision["effective"] = effective.value
 
         if self.mode == "enforce" and effective == Verdict.BLOCK:
-            ev.blocked = True
-            msg = block_message(result)
-            ev.output_text = msg
-            self.trace.append(ev)
-            return (msg, None) if raise_on_error else (msg, msg)
+            event.blocked = True
+            message = format_block_message(result)
+            event.output_text = message
+            self.trace.append(event)
+            return (message, None) if raise_on_error else (message, message)
 
-        token = IN_GATE.set(True)
+        token = INSIDE_GATE.set(True)
         try:
-            out, err = super().run_function(env, function, kwargs, raise_on_error=raise_on_error)
+            output, error = super().run_function(env, function, kwargs, raise_on_error=raise_on_error)
         finally:
-            IN_GATE.reset(token)
-        ev.executed = True
-        ev.raw_output = out
-        ev.error = err
+            INSIDE_GATE.reset(token)
+        event.executed = True
+        event.raw_output = output
+        event.error = error
         try:
-            ev.output_text = tool_result_to_str(out) if err is None else ""
+            event.output_text = tool_result_to_str(output) if error is None else ""
         except TypeError:
-            ev.output_text = str(out)
-        if err is None and self.index is not None:
-            src = self.index.add_response(step, function, args, out, ev.output_text)
-            self.session.record(function, args, out, src.sensitive, src.sid)
-        self.trace.append(ev)
-        return out, err
+            event.output_text = str(output)
+        if error is None and self.index is not None:
+            source = self.index.add_response(step, function, args, output, event.output_text)
+            self.session.record_call(function, args, output, source.sensitive_categories, source.source_id)
+        self.trace.append(event)
+        return output, error
 
     def _execute_nested_calls(self, env, kwargs):
-        # nested FunctionCall arguments are executed through run_function -> also gated
+        # nested FunctionCall arguments are executed through run_function, so they are gated too
         return super()._execute_nested_calls(env, kwargs)
 
     # ------------------------------------------------------------------ serialization
     def trace_records(self) -> list[dict]:
-        out = []
-        for e in self.trace:
-            out.append({
-                "step": e.step, "phase": e.phase, "tool": e.tool, "args": e.args,
-                "verdict": (e.decision or {}).get("verdict"),
-                "effective": (e.decision or {}).get("effective"),
-                "decisions": (e.decision or {}).get("decisions", []),
-                "judge": (e.decision or {}).get("judge"),
-                "blocked": e.blocked, "executed": e.executed, "error": e.error,
-                "decide_ms": round(e.decide_ms, 3),
-                "output_excerpt": (e.output_text or "")[:300],
-                "env_hash_before": getattr(e, "env_hash_before", None),
+        records = []
+        for event in self.trace:
+            decision = event.decision or {}
+            records.append({
+                "step": event.step, "phase": event.phase, "tool": event.tool, "args": event.args,
+                "verdict": decision.get("verdict"),
+                "effective": decision.get("effective"),
+                "decisions": decision.get("decisions", []),
+                "judge": decision.get("judge"),
+                "blocked": event.blocked, "executed": event.executed, "error": event.error,
+                "decide_ms": round(event.decide_ms, 3),
+                "output_excerpt": (event.output_text or "")[:300],
+                "env_hash_before": event.env_hash_before,
             })
-        return out
+        return records

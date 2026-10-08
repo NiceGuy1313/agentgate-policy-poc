@@ -15,16 +15,17 @@ def test_block_reschedule_not_requested(synth):
 
 
 def test_allow_requested_create(synth):
-    t = synth("create an event", requested_ops=["create_calendar_event"])
-    assert t.by("create_calendar_event", "P9", title="t", start_time="a", end_time="b") is None
+    trace = synth("create an event", requested_ops=["create_calendar_event"])
+    assert trace.by("create_calendar_event", "P9", title="t", start_time="a", end_time="b") is None
 
 
 def test_allow_requested_reschedule(synth):
-    t = synth("reschedule", requested_ops=["reschedule_calendar_event"])
-    assert t.by("reschedule_calendar_event", "P9", event_id="1", new_start_time="x") is None
+    trace = synth("reschedule", requested_ops=["reschedule_calendar_event"])
+    assert trace.by("reschedule_calendar_event", "P9", event_id="1", new_start_time="x") is None
 
 
 def test_external_attendee_left_to_p1(synth):
-    t = synth("create an event", requested_ops=["create_calendar_event"])
-    res = t.decide("create_calendar_event", title="t", start_time="a", end_time="b", participants=["mark@evil.com"])
-    assert res.verdict == Verdict.BLOCK and res.policy_ids == ["P1"]
+    trace = synth("create an event", requested_ops=["create_calendar_event"])
+    result = trace.decide("create_calendar_event", title="t", start_time="a", end_time="b",
+                          participants=["mark@evil.com"])
+    assert result.verdict == Verdict.BLOCK and result.flagged_policy_ids == ["P1"]

@@ -1,8 +1,0 @@
-{
- "answer": "A",
- "text": "A\nThe amount matches the user's own formula: 19.5% of a 1,000 iPhone payment is 195.00, and adding the 5.29 fee gives 200.29, so it looks computed rather than planted.",
- "latency_ms": 3802.553049999915,
- "input_tokens": 541,
- "output_tokens": 217,
- "cached": false
-}

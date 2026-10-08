@@ -1,4 +1,4 @@
-# Stage 1 task 3: tools whose call changes state or sends data outside ("effect" calls).
+# Tools whose call changes state or sends data outside ("effect" calls).
 # Every other tool is a "prep" call (read / search). Names are real AgentDojo v1.2.2 tool names.
 effect:
   external_send: [send_email, send_direct_message, send_channel_message, post_webpage]

@@ -1,27 +1,27 @@
 import pytest
 
-from agentgate.config import policies_config
-from agentgate.policy.base import Call, Context
+from agentgate.config import load_policy_config
+from agentgate.policy.base import PolicyContext, SessionState, ToolCall
 from agentgate.policy.engine import PolicyEngine
-from agentgate.session import SessionState
-from agentgate.spec import TaskSpec
-from agentgate.trace import ValueIndex
+from agentgate.provenance import ValueIndex
+from agentgate.task_spec import TaskSpec
 
 
-class Synth:
+class SyntheticTrace:
     """Synthetic trace builder for policy unit tests."""
 
-    def __init__(self, prompt: str, spec: TaskSpec | None = None, **spec_kw):
-        self.spec = spec or TaskSpec(**spec_kw)
-        cfg = policies_config()
-        self.index = ValueIndex(prompt, self.spec, cfg.get("self_identifiers"))
+    def __init__(self, prompt: str, spec: TaskSpec | None = None, **spec_kwargs):
+        self.spec = spec or TaskSpec(**spec_kwargs)
+        policy_config = load_policy_config()
+        self.value_index = ValueIndex(prompt, self.spec, policy_config.get("self_identifiers"))
         self.session = SessionState()
         self.engine = PolicyEngine()
         self.step = 0
 
     def read(self, tool: str, args: dict | None = None, output="", raw=None):
-        src = self.index.add_response(self.step, tool, args or {}, raw if raw is not None else output, str(output))
-        self.session.record(tool, args or {}, raw, src.sensitive, src.sid)
+        source = self.value_index.add_response(self.step, tool, args or {}, raw if raw is not None else output,
+                                               str(output))
+        self.session.record_call(tool, args or {}, raw, source.sensitive_categories, source.source_id)
         self.step += 1
         return self
 
@@ -30,18 +30,18 @@ class Synth:
         return self.read(tool, args, "", raw)
 
     @property
-    def ctx(self):
-        return Context(self.spec, self.index, self.session, self.engine.config)
+    def context(self):
+        return PolicyContext(self.spec, self.value_index, self.session, self.engine.config)
 
     def decide(self, tool: str, **args):
-        return self.engine.decide(Call(tool, args), self.ctx)
+        return self.engine.decide(ToolCall(tool, args), self.context)
 
     def by(self, tool: str, policy: str, **args):
         """Decision of one policy (None if it did not produce one)."""
-        res = self.decide(tool, **args)
-        return next((d for d in res.decisions if d.policy_id == policy), None)
+        result = self.decide(tool, **args)
+        return next((d for d in result.decisions if d.policy_id == policy), None)
 
 
 @pytest.fixture
 def synth():
-    return Synth
+    return SyntheticTrace

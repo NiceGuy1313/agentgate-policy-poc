@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- feedback.xlsx
-allowed_dest: []
-egress_requested: false
-notes: 'Read-only request: look up the scores given by Olivia Smith, Mia Anderson,
-  and Mason Thompson in feedback.xlsx and report them to the user. No state-changing
-  or outbound operations are needed.'
-status: llm
