@@ -21,6 +21,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT
+from agentgate.evaluation.live_run_analysis import live_run_files
 from agentgate.evaluation.metrics import mcnemar_exact, wilson
 
 # Metric name -> (run kind, record field).
@@ -30,7 +31,7 @@ METRICS = {"asr": ("attack", "security"), "utility": ("benign", "utility"),
 
 def load_runs(run_dir: Path) -> dict:
     runs = {}
-    for path in run_dir.glob("C*/*/*/*.json"):
+    for path in live_run_files(run_dir):
         run = json.loads(path.read_text())
         if run.get("error"):
             continue

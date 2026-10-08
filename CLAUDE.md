@@ -5,7 +5,7 @@ AgentDojo(v1.2.2, `agentdojo==0.1.35`) 위에서 결정론적 툴 호출 정책 
 ## 규칙
 
 - agentdojo 패키지 소스는 수정하지 않는다. 확장은 서브클래스·래핑으로만 한다.
-- 정책 판정 코드(src/agentgate/policy/)에는 LLM 호출을 넣지 않는다. LLM 호출은 src/agentgate/llm/ 아래 TaskSpec 추출기와 상향 판정기에만 둔다.
+- 정책 판정 코드(src/agentgate/policy/)에는 LLM 호출을 넣지 않는다. LLM 호출은 src/agentgate/llm/ 아래 TaskSpec 추출기와 상향 판정기에만 둔다. 예외는 평가 대상 에이전트(src/agentgate/agents/)다.
 - TaskSpec 추출기의 입력은 사용자 프롬프트와 툴 목록(이름·설명)뿐이다. 툴 응답, ground truth, injection GOAL을 입력으로 넣지 않는다.
 - 정책을 수정하면 pytest 전체와 scripts/evaluation/replay_evaluation.py(생성 후)를 회귀 테스트로 다시 실행하고 이전 결과와 비교한다.
 - 평가 수치를 바꾸기 위해 정책을 조정할 때는 먼저 변경안을 보고하고 승인을 받는다. 결과는 버전별(results/.../v1, v2)로 보존한다.

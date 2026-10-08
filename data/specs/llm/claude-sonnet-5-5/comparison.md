@@ -1,6 +1,6 @@
-# Stage 4 — oracle vs LLM TaskSpec 비교
+# oracle vs LLM TaskSpec 비교
 
-이 문서는 `scripts/compare_specs.py --model claude-sonnet-5-5` 가 생성한다. oracle은 검토 완료본(`status: reviewed`)을 기준으로 한다.
+이 문서는 `scripts/taskspec/compare_specs.py --model claude-sonnet-5-5` 가 생성한다. oracle은 검토 완료본(`status: reviewed`)을 기준으로 한다.
 
 | 지표 | 값 |
 |---|---|

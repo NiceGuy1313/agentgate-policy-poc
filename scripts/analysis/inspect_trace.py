@@ -5,8 +5,8 @@ Usage:
   python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task_0 [--mode enforce] [--spec oracle]
   # a benign task (no injection)
   python scripts/analysis/inspect_trace.py benign workspace user_task_25
-  # one saved live run
-  python scripts/analysis/inspect_trace.py live results/live/v1/scripted/C1/banking/user_task_0/injection_task_7.json
+  # one saved live run (unpack results/live/v1/<run>/runs.tar.gz first)
+  python scripts/analysis/inspect_trace.py live results/live/v1/<run>/C1/banking/user_task_0/injection_task_7.json
   # ask the engine about a single hypothetical call
   python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/specs/oracle/banking/user_task_0.yaml \\
       --tool send_money --args '{"recipient": "US133000000121212121212", "amount": 10, "subject": "x", "date": "d"}'

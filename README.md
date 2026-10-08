@@ -86,6 +86,7 @@ python scripts/analysis/summarize_replay.py --run results/replay/v1/oracle
 # 실제 에이전트 (키 필요). 비용 확인 후 실행한다.
 python scripts/evaluation/live_evaluation.py --agent llm --spec llm --pairs @data/pairs/strat3_seed0.txt \
   --conditions C0 C1 C2 C4 --out results/live/v1/<run>
+# 커밋된 run을 다시 집계할 때는 원본을 먼저 푼다: tar -xzf results/live/v1/<run>/runs.tar.gz -C results/live/v1/<run>
 python scripts/analysis/check_enforcement.py --run results/live/v1/<run>
 python scripts/analysis/summarize_live.py --run results/live/v1/<run>
 

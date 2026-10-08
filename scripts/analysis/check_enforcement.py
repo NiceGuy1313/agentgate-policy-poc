@@ -19,6 +19,7 @@ import json
 from collections import Counter
 
 from agentgate.config import PROJECT_ROOT
+from agentgate.evaluation.live_run_analysis import live_run_files
 
 
 def check_run(run: dict) -> list[dict]:
@@ -55,7 +56,7 @@ def main():
     parser.add_argument("--run", required=True, help="results/live/<ver>/<name>")
     args = parser.parse_args()
     run_dir = PROJECT_ROOT / args.run
-    files = sorted(run_dir.glob("C*/*/*/*.json"))
+    files = live_run_files(run_dir)
     runs_by_condition, violations = Counter(), []
     stats = Counter()
     for path in files:

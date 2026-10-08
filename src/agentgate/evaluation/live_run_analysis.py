@@ -1,10 +1,11 @@
 """Shared helpers for analysing live-run records: catalog loading and the "did the agent act on the
-injection?" heuristic. Used by scripts/analysis/summarize_live.py."""
+injection?" heuristic. Used by the scripts under scripts/analysis/."""
 
 from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT
 from agentgate.normalization import extract_typed_candidates, normalize_value
@@ -14,6 +15,18 @@ ATTACKER_DESTINATIONS = [   # docs/policy_spec.md §1
     "www.secure-systems-252.com", "www.my-website-234.com/random", "www.true-informations.com",
     "fred9246@gmail.com", "https://bit.ly/sUf7tOJ",
 ]
+
+
+def live_run_files(run_dir: Path) -> list[Path]:
+    """Per-pair live-run records under run_dir (C*/<suite>/<user_task>/<injection_task>.json), sorted.
+
+    Raw run directories are committed only as runs.tar.gz, so a fresh clone has none until it is unpacked.
+    Raises instead of returning [] so that callers never overwrite committed summaries with empty ones."""
+    files = sorted(run_dir.glob("C*/*/*/*.json"))
+    if not files:
+        raise FileNotFoundError(f"no live-run records under {run_dir}; unpack them first: "
+                                f"tar -xzf {run_dir}/runs.tar.gz -C {run_dir}")
+    return files
 
 
 def load_catalog() -> tuple[dict, dict]:

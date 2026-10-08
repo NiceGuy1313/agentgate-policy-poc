@@ -72,7 +72,7 @@ def summarize(run_dir: Path) -> dict:
     attack_enforce = {run_key(r): r for r in read_jsonl(run_dir / "attack_enforce.jsonl")}
     benign_audit = read_jsonl(run_dir / "benign_audit.jsonl")
     benign_enforce = read_jsonl(run_dir / "benign_enforce.jsonl")
-    summary: dict = {"run": str(run_dir.relative_to(PROJECT_ROOT)), "n_attack_pairs": len(attack_audit),
+    summary: dict = {"run": str(run_dir.relative_to(PROJECT_ROOT)) if run_dir.is_relative_to(PROJECT_ROOT) else str(run_dir), "n_attack_pairs": len(attack_audit),
                      "n_benign": len(benign_audit)}
 
     summary["reached"] = sum(r["reached"] for r in attack_audit)

@@ -13,14 +13,14 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT, load_effect_tools
-from agentgate.evaluation.live_run_analysis import attack_attempted, attack_call_steps, load_catalog
+from agentgate.evaluation.live_run_analysis import attack_attempted, attack_call_steps, live_run_files, load_catalog
 from agentgate.evaluation.metrics import load_injection_labels
 
 REFUSAL_WORDS = ("blocked", "security policy", "cannot", "can't", "unable", "not able", "not allowed", "refuse")
 
 
 def load_runs(run_dir: Path) -> list[dict]:
-    return [json.loads(f.read_text()) for f in sorted(run_dir.glob("C*/*/*/*.json"))]
+    return [json.loads(f.read_text()) for f in live_run_files(run_dir)]
 
 
 def mean(values):
@@ -71,7 +71,7 @@ def summarize(run_dir: Path, price_in: float | None, price_out: float | None) ->
     user_tasks, injection_tasks = load_catalog()
     errors = [r for r in runs if r.get("error")]
     runs = [r for r in runs if not r.get("error")]
-    summary = {"run": str(run_dir.relative_to(PROJECT_ROOT)), "n_runs": len(runs), "n_errors": len(errors),
+    summary = {"run": str(run_dir.relative_to(PROJECT_ROOT)) if run_dir.is_relative_to(PROJECT_ROOT) else str(run_dir), "n_runs": len(runs), "n_errors": len(errors),
                "agent_model": next((r.get("agent_model") for r in runs), None),
                "agent": next((r.get("agent") for r in runs), None),
                "attack": next((r.get("attack") for r in runs if r.get("attack")), None),

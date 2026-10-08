@@ -93,7 +93,7 @@ def main():
     (model_dir / "comparison.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     ops = result["requested_ops"]
     lines = [
-        "# Stage 4 — oracle vs LLM TaskSpec 비교", "",
+        "# oracle vs LLM TaskSpec 비교", "",
         f"이 문서는 `scripts/taskspec/compare_specs.py --model {args.model}` 가 생성한다. "
         "oracle은 검토 완료본(`status: reviewed`)을 기준으로 한다.", "",
         "| 지표 | 값 |", "|---|---|",
