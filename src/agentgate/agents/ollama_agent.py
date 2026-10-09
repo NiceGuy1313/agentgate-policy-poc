@@ -1,14 +1,13 @@
-"""Agent-under-test AgentDojo element for Ollama models (cloud or local); HTTP transport is `llm.client.OllamaClient`.
+"""Ollama 모델(cloud 또는 local)용 평가 대상 AgentDojo element이다. HTTP 전송은 `llm.client.OllamaClient`가 맡는다.
 
-Message-format facts this module relies on (Ollama docs: github.com/ollama/ollama docs/api.md;
-ollama-python ollama/_types.py). Endpoint, host and authentication facts are in agentgate/llm/client.py.
+이 모듈이 전제하는 메시지 형식(Ollama docs: github.com/ollama/ollama docs/api.md; ollama-python ollama/_types.py).
+endpoint, host, 인증 관련 사실은 agentgate/llm/client.py에 있다.
 - request   {"model", "messages", "tools": [{"type": "function", "function": {name, description, parameters}}],
              "stream": false, "options": {"temperature", "seed"}, "think": bool|"low"|"medium"|"high"}
 - response  {"message": {"role": "assistant", "content", "thinking"?, "tool_calls"?: [{"function": {"name",
              "arguments": <object>}}]}, "done": true, "done_reason", "prompt_eval_count", "eval_count"}
-            Docs show no id; ollama.com responses observed on 2026-10-06 (glm-5.3) do carry "id" and
-            function.index - the id is used when present, otherwise one is generated. arguments is a JSON object
-            (some models emit a JSON string - handled).
+            docs에는 id가 없으나 2026-10-06 ollama.com 응답(glm-5.3)에는 "id"와 function.index가 있었다. id가 있으면
+            그대로 쓰고 없으면 생성한다. arguments는 JSON object이다(JSON string을 내는 모델도 처리한다).
 - tool result message  {"role": "tool", "content": "...", "tool_name": "<function name>"}
 """
 

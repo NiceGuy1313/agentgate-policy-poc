@@ -1,3 +1,5 @@
+"""P5(삭제) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 

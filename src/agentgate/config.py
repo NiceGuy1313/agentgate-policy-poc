@@ -1,4 +1,4 @@
-"""Project paths, YAML configuration loaders and the `.env` loader."""
+"""프로젝트 경로, YAML 설정 loader, `.env` loader를 제공한다."""
 
 from __future__ import annotations
 

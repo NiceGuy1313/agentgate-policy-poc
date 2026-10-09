@@ -1,4 +1,4 @@
-"""Metric computation over replay / live result files (shared by the summarize scripts and build_report)."""
+"""재생·live 결과 파일의 지표를 계산한다(summarize 스크립트와 build_report가 공유)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def load_injection_labels() -> dict:
-    return yaml.safe_load((PROJECT_ROOT / "data" / "catalog" / "injection_labels.yaml").read_text())
+    return yaml.safe_load((PROJECT_ROOT / "data" / "benchmark" / "injection_labels.yaml").read_text())
 
 
 def verdict_without_policies(decisions: list[dict], disabled: set[str]) -> str:

@@ -1,11 +1,11 @@
-"""Regenerate the final report, its figures and the results dashboard from result files.
+"""결과 파일로부터 최종 보고서, 그림, 결과 dashboard를 재생성한다.
 
   python scripts/reporting/build_report.py
 
-Inputs : results/replay/v1/{oracle,llm_<model>}/,
-         results/live/v1/<run>/{summary,significance,enforcement_check,run_*}.json,
-         results/judge/v1/<model>/judge_eval.json, data/catalog/, data/pairs/, data/specs/llm/, data/judge_cache/
-Outputs: docs/final_report.md, results/figures/*.png, results/dashboard.html
+입력: results/replay/v1/{oracle,llm_<model>}/,
+      results/live/v1/<run>/{summary,significance,enforcement_check,run_*}.json,
+      results/judge/v1/<model>/judge_eval.json, data/benchmark/, data/pairs/, data/specs/llm/, data/judge_cache/
+출력: docs/final_report.md, results/figures/*.png, results/dashboard.html
 """
 
 from __future__ import annotations
@@ -436,7 +436,7 @@ def enforcement_section(enforcement_checks) -> list[str]:
 
 
 def limitations_section(replay_summary) -> list[str]:
-    n_injection_tasks = len(load_json(PROJECT_ROOT / "data/catalog/injection_tasks.json") or [])
+    n_injection_tasks = len(load_json(PROJECT_ROOT / "data/benchmark/injection_tasks.json") or [])
     design = pairs_file_design()
     return ["## 6. 한계", "",
             f"- 정책과 공격 유형 분류를 평가에 쓴 injection task {n_injection_tasks}개를 보고 설계했다. 재생 탐지율은 일반화 성능이 "
@@ -512,7 +512,7 @@ def write_dashboard(replay_summary, live_summaries):
     for line in (REPLAY_DIR / "attack_enforce.jsonl").open():
         record = json.loads(line)
         enforce_by_pair[(record["suite"], record["user_task"], record["injection_task"])] = record
-    labels = yaml.safe_load((PROJECT_ROOT / "data/catalog/injection_labels.yaml").read_text())
+    labels = yaml.safe_load((PROJECT_ROOT / "data/benchmark/injection_labels.yaml").read_text())
     for line in (REPLAY_DIR / "attack_audit.jsonl").open():
         record = json.loads(line)
         pair_key = (record["suite"], record["user_task"], record["injection_task"])

@@ -1,8 +1,8 @@
-"""Field-by-field comparison oracle vs LLM TaskSpecs.
+"""oracle TaskSpec과 LLM TaskSpec을 필드별로 비교한다.
 
-Writes data/specs/llm/<model>/comparison.json and comparison.md.
+출력: data/specs/llm/<model>/comparison.json, comparison.md
 
-Usage: python scripts/taskspec/compare_specs.py --model <model>
+사용법: python scripts/taskspec/compare_specs.py --model <model>
 """
 
 from __future__ import annotations

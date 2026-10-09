@@ -1,4 +1,4 @@
-"""ClaudeAgentLLM with a fake Anthropic client: request shape and byte-exact replay of assistant turns."""
+"""fake Anthropic client로 ClaudeAgentLLM의 request 형식과 assistant 턴의 byte 단위 동일 재전송을 검사한다."""
 
 from agentdojo.types import ChatUserMessage, text_content_block_from_string
 from anthropic.types import Message

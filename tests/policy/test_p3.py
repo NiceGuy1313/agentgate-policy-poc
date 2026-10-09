@@ -1,3 +1,5 @@
+"""P3(대량 반출) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 E = [{"id_": str(i), "body": f"this is the private body number {i} of an email"} for i in range(5)]

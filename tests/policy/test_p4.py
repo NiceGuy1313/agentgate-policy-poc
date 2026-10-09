@@ -1,3 +1,5 @@
+"""P4(금전) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 ATT = "US133000000121212121212"

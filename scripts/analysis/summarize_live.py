@@ -1,7 +1,7 @@
-"""Live run: per-condition metrics, bypass/behaviour analysis, cost estimate.
+"""live run의 조건별 지표, 우회·행동 분석, 비용 추정을 계산한다.
 
-Usage: python scripts/analysis/summarize_live.py --run results/live/v1/<name> [--price-in 3 --price-out 15]
-Writes <run>/summary.json.
+사용법: python scripts/analysis/summarize_live.py --run results/live/v1/<name> [--price-in 3 --price-out 15]
+출력: <run>/summary.json
 """
 
 from __future__ import annotations
@@ -13,7 +13,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT, load_effect_tools
-from agentgate.evaluation.live_run_analysis import attack_attempted, attack_call_steps, live_run_files, load_catalog
+from agentgate.evaluation.live_run_analysis import (
+    attack_attempted,
+    attack_call_steps,
+    live_run_files,
+    load_benchmark_tasks,
+)
 from agentgate.evaluation.metrics import load_injection_labels
 
 REFUSAL_WORDS = ("blocked", "security policy", "cannot", "can't", "unable", "not able", "not allowed", "refuse")
@@ -68,7 +73,7 @@ def bypass_class(run: dict, injection_type: str, user_tasks: dict | None = None,
 def summarize(run_dir: Path, price_in: float | None, price_out: float | None) -> dict:
     runs = [r for r in load_runs(run_dir)]
     labels = load_injection_labels()
-    user_tasks, injection_tasks = load_catalog()
+    user_tasks, injection_tasks = load_benchmark_tasks()
     errors = [r for r in runs if r.get("error")]
     runs = [r for r in runs if not r.get("error")]
     summary = {"run": str(run_dir.relative_to(PROJECT_ROOT)) if run_dir.is_relative_to(PROJECT_ROOT) else str(run_dir), "n_runs": len(runs), "n_errors": len(errors),

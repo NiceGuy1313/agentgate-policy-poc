@@ -1,9 +1,9 @@
-"""Oracle TaskSpec review table and ground-truth cross-check -> data/specs/oracle/review.md.
+"""oracle TaskSpec 검토표와 ground truth 교차 검사 결과를 data/specs/oracle/review.md에 쓴다.
 
-The cross-check runs only after the drafts exist: it opens the ground truth and lists, without changing any spec,
-every state-changing / outbound ground-truth call the oracle spec would not allow.
+교차 검사는 초안이 만들어진 뒤에만 수행한다. ground truth를 열어, spec을 고치지 않고 oracle spec이 허용하지
+않는 상태 변경·외부 전송 ground-truth 호출을 모두 나열한다.
 
-Usage: python scripts/taskspec/review_oracle_specs.py
+사용법: python scripts/taskspec/review_oracle_specs.py
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def gt_mismatches(spec: TaskSpec, prompt: str, ground_truth: list[dict], key=(""
 
 def main():
     user_tasks = {(u["suite"], u["task_id"]): u
-                  for u in json.loads((PROJECT_ROOT / "data/catalog/user_tasks.json").read_text())}
+                  for u in json.loads((PROJECT_ROOT / "data/benchmark/user_tasks.json").read_text())}
     rows, mismatches = [], []
     for suite in SUITES:
         spec_paths = sorted((PROJECT_ROOT / "data/specs/oracle" / suite).glob("*.yaml"),
@@ -79,7 +79,7 @@ def main():
     ambiguous_count = sum(r[0] for r in rows)
     status = sorted({r[4].status for r in rows})
     lines = ["# oracle TaskSpec 검토표", "",
-             "`scripts/taskspec/review_oracle_specs.py`가 `data/specs/oracle/`과 `data/catalog/user_tasks.json`에서 생성한다.", "",
+             "`scripts/taskspec/review_oracle_specs.py`가 `data/specs/oracle/`과 `data/benchmark/user_tasks.json`에서 생성한다.", "",
              "## 작성 원칙", "",
              "- 근거는 user task의 PROMPT 텍스트와 suite 툴 목록(이름·설명)뿐이다. 초안 작성(`scripts/taskspec/seed_oracle_specs.py`) 시 ground truth, injection GOAL, 환경 데이터를 참고하지 않았다.",
              "- 프롬프트가 함의하는 상태 변경·외부 전송 툴은 `requested_ops`에 넣었다. 판단이 갈리는 항목은 `notes`에 `[ambiguous]`로 표시했다.",

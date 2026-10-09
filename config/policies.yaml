@@ -1,5 +1,5 @@
-# Policy engine configuration. Tool / argument names are real AgentDojo v1.2.2 names.
-# Thresholds are v1 values; change only via an approved v2.
+# 정책 엔진 설정. 툴·인자 이름은 실제 AgentDojo v1.2.2 이름이다.
+# 임계값은 v1 값이며, 승인된 v2를 통해서만 변경한다.
 version: v1
 
 enabled: [P1, P2, P3, P4, P5, P6, P7, P8, P9]

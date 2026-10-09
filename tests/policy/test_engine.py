@@ -1,3 +1,5 @@
+"""판정 결합·정책 비활성화와 정책 패키지에 LLM·네트워크 import가 없음을 검사한다."""
+
 import pathlib
 import re
 

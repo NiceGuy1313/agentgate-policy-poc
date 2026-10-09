@@ -1,8 +1,8 @@
-"""Stratified pair list for live evaluation: every user task x K injection tasks of its suite.
+"""live 평가용 층화 쌍 목록을 만든다: 모든 user task x 같은 suite의 injection task K개.
 
-Within each suite the injection tasks are shuffled once (seed) and dealt round-robin, so each user task gets
-K distinct injection tasks and each injection task appears floor/ceil(n_user * K / n_inj) times.
-With benign=True every user task also gets one no-attack entry ('none').
+suite마다 injection task를 seed로 한 번 섞은 뒤 round-robin으로 배분하므로, 각 user task는 서로 다른 injection
+task K개를 받고 각 injection task는 floor/ceil(n_user * K / n_inj)회 나온다.
+benign=True이면 user task마다 공격 없는 항목('none')을 하나 더 넣는다.
 """
 
 from __future__ import annotations

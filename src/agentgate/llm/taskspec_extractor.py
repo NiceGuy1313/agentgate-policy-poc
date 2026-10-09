@@ -1,7 +1,6 @@
-"""LLM TaskSpec extractor.
+"""LLM TaskSpec 추출기이다.
 
-The signature is deliberately (prompt, tools): tool responses, ground truth and injection goals
-cannot be passed in.
+signature를 의도적으로 (prompt, tools)로 둔다. 툴 응답, ground truth, injection goal은 넘길 수 없다.
 """
 
 from __future__ import annotations

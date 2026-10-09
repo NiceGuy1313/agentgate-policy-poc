@@ -1,4 +1,4 @@
-"""Policy engine: runs the enabled policies on a tool call and combines their verdicts."""
+"""정책 엔진: 활성화된 정책을 툴 호출에 적용하고 판정을 결합한다."""
 
 from __future__ import annotations
 

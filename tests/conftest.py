@@ -1,3 +1,5 @@
+"""정책 단위 테스트용 synthetic trace builder(`synth` fixture)를 제공한다."""
+
 import pytest
 
 from agentgate.config import load_policy_config

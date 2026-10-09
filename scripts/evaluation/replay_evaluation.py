@@ -1,9 +1,9 @@
-"""Ground-truth replay (RQ1): replay AgentDojo ground-truth trajectories through the gate. No LLM calls.
+"""재생 평가(RQ1): AgentDojo 정답(ground truth) 궤적을 게이트로 재생한다. LLM 호출 없음.
 
-Usage: python scripts/evaluation/replay_evaluation.py --spec oracle --mode audit enforce --out results/replay/v1/oracle
+사용법: python scripts/evaluation/replay_evaluation.py --spec oracle --mode audit enforce --out results/replay/v1/oracle
 
-Writes <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl and <out>/meta.json.
-`--spec llm:<model>` reads saved LLM TaskSpec extractions from data/specs/llm/<model>/ (never calls the LLM).
+출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
+`--spec llm:<model>`은 data/specs/llm/<model>/에 저장된 LLM TaskSpec 추출 결과를 읽는다(LLM을 호출하지 않는다).
 """
 
 from __future__ import annotations

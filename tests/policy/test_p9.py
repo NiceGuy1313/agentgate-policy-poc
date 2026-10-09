@@ -1,3 +1,5 @@
+"""P9(일정) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 

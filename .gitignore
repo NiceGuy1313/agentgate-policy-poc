@@ -17,9 +17,15 @@ htmlcov/
 .env.*
 !.env.example
 
-# Local tooling and editors
+# Claude Code / agent tooling (local only)
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
 .omc/
-.claude/settings.local.json
+.mcp.json
+
+# Editors
 .vscode/
 .idea/
 *.swp

@@ -1,14 +1,13 @@
-"""Agent-under-test LLM element for current Claude models (subclass of AgentDojo's AnthropicLLM).
+"""최신 Claude 모델용 평가 대상 LLM element이다(AgentDojo `AnthropicLLM`의 서브클래스).
 
-AgentDojo 0.1.35's `AnthropicLLM` targets older models: it always sends `temperature`, uses
-`max_tokens=1024`, and rebuilds assistant turns as [thinking/text..., tool_use...]. On
-`claude-sonnet-5-5` (the default here) and `claude-opus-5-5` sampling parameters are rejected, thinking is on by
-default, and the model may emit progress-update thinking blocks *between* tool calls; editing an assistant turn's
-blocks invalidates its thinking (preserved thinking). This element therefore
-  - never sends `temperature` to models that reject it, sets `output_config.effort` instead,
-  - uses a 16k output budget with streaming,
-  - keeps every assistant turn's raw content blocks and replays them unchanged,
-  - records token usage, latency and refusals (no model fallback: the agent under test must stay fixed).
+AgentDojo 0.1.35의 `AnthropicLLM`은 구형 모델 기준이다. 항상 `temperature`를 보내고 `max_tokens=1024`를 쓰며,
+assistant 턴을 [thinking/text..., tool_use...]로 재구성한다. `claude-sonnet-5-5`(기본값)와 `claude-opus-5-5`는
+sampling 파라미터를 거부하고, thinking이 기본으로 켜져 있으며, tool 호출 *사이에* 진행 상황 thinking block을
+낼 수 있다. assistant 턴의 block을 편집하면 해당 thinking이 무효가 된다(preserved thinking). 따라서 이 element는
+  - 거부하는 모델에는 `temperature`를 보내지 않고 대신 `output_config.effort`를 설정한다,
+  - streaming과 16k 출력 한도를 쓴다,
+  - 모든 assistant 턴의 원본 content block을 보관해 그대로 재전송한다,
+  - token 사용량, 지연 시간, 거부를 기록한다(model fallback 없음: 평가 대상 에이전트는 고정되어야 한다).
 """
 
 from __future__ import annotations

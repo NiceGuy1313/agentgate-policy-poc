@@ -1,4 +1,4 @@
-"""Deterministic scripted agent: replays ground-truth trajectories, used without an API key."""
+"""정답(ground truth) 궤적을 재생하는 결정론적 scripted 에이전트이다. API 키 없이 쓴다."""
 
 from __future__ import annotations
 

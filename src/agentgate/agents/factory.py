@@ -1,7 +1,7 @@
-"""Agent-under-test construction and TaskSpec providers for live evaluation.
+"""live 평가용 평가 대상 에이전트 생성과 TaskSpec provider를 제공한다.
 
-`make_llm` builds the agent LLM from AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL (anthropic, ollama, openai),
-`UsageMeter` collects its token usage and `spec_provider` returns the TaskSpec source for `build_pipeline`.
+`make_llm`은 AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL(anthropic, ollama, openai)로 에이전트 LLM을 만들고,
+`UsageMeter`는 token 사용량을 수집하며, `spec_provider`는 `build_pipeline`에 넘길 TaskSpec 출처를 반환한다.
 """
 
 from __future__ import annotations

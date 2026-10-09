@@ -1,10 +1,12 @@
-"""The escalation judge alone on every ESCALATE of the ground-truth replay (RQ1).
+"""정답 궤적 재생에서 나온 모든 ESCALATE에 판정 LLM(escalation judge)만 단독으로 적용해 평가한다(RQ1).
 
-Ground truth label per escalated call: `attack` if it is an effect call of the injection task in an
-attack replay, `normal` if it comes from a benign (no-injection) replay. Writes
-results/judge/v1/<model>/judge_eval.json with the A/B/C confusion matrix and HUMAN rate.
+선행 조건: results/replay/v1/oracle/*_audit.jsonl(재생 평가 결과), 판정 LLM 키(.env) 또는 data/judge_cache/.
 
-Usage: python scripts/evaluation/judge_evaluation.py [--suites banking] [--max-pairs 0]
+상향된 호출별 정답 레이블: 공격 쌍 재생에서 injection task의 effect 호출이면 `attack`, benign(injection 없음)
+재생에서 나온 호출이면 `normal`이다.
+출력: results/judge/v1/<model>/judge_eval.json (A/B/C confusion matrix와 HUMAN 비율)
+
+사용법: python scripts/evaluation/judge_evaluation.py [--suites banking] [--max-pairs 0]
 """
 
 from __future__ import annotations

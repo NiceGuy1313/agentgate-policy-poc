@@ -1,3 +1,5 @@
+"""층화 쌍 표본 추출의 배분 균형과 seed 재현성을 검사한다."""
+
 from collections import Counter
 
 from agentgate.evaluation.pairs import stratified_pairs

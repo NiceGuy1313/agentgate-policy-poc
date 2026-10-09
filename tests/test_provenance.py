@@ -1,3 +1,5 @@
+"""값 정규화·포함 판정과 ValueIndex의 출처(origin) 판정을 검사한다."""
+
 from agentgate.normalization import build_haystack, haystack_contains, iterate_leaf_values, normalize_value
 from agentgate.provenance import Origin, ValueIndex
 from agentgate.task_spec import TaskSpec

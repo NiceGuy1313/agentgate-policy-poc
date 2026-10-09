@@ -1,4 +1,4 @@
-"""OllamaAgentLLM against a fake /api/chat (response shapes from the Ollama API docs)."""
+"""fake /api/chat(Ollama API docs의 응답 형식)으로 OllamaAgentLLM을 검사한다."""
 
 import json
 

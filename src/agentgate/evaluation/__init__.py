@@ -1,4 +1,4 @@
-"""Offline evaluation helpers: ground-truth replay, attack trajectories, pair sampling and metrics."""
+"""평가 도구: 정답 궤적 재생, 참조 공격 궤적, 쌍 표본 추출, live run 분석, 지표 계산을 제공한다."""
 
 from agentgate.evaluation.attack_trajectories import plan_attack_calls
 from agentgate.evaluation.live_run_analysis import ATTACKER_DESTINATIONS

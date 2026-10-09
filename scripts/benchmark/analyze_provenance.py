@@ -1,9 +1,10 @@
-"""Label consistency, argument provenance, attacker destination check.
+"""레이블 일관성, 인자 출처(provenance), 공격자 목적지를 검사한다.
 
-No LLM calls. Outputs under data/catalog/:
-  label_check.json, arg_provenance.json, provenance_summary.json, attacker_dest_check.json
+LLM 호출 없음.
+입력: data/benchmark/{user_tasks,injection_tasks}.json, injection_labels.yaml (extract_benchmark.py 선행)
+출력(data/benchmark/): label_check.json, arg_provenance.json, provenance_summary.json, attacker_dest_check.json
 
-Usage: python scripts/catalog/analyze_provenance.py
+사용법: python scripts/benchmark/analyze_provenance.py
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from agentgate.runtime import GatedRuntime
 from agentgate.suites import load_default_environment, load_suite, load_task_environment
 from agentgate.task_spec import TaskSpec
 
-CATALOG_DIR = PROJECT_ROOT / "data" / "catalog"
+BENCHMARK_DIR = PROJECT_ROOT / "data" / "benchmark"
 
 # Injection type -> tool families that must appear among the injection task's calls.
 TYPE_TOOLS = {
@@ -68,8 +69,8 @@ def target_args() -> dict[str, list[str]]:
 
 
 def label_check() -> list[dict]:
-    labels = yaml.safe_load((CATALOG_DIR / "injection_labels.yaml").read_text())
-    injection_tasks = json.loads((CATALOG_DIR / "injection_tasks.json").read_text())
+    labels = yaml.safe_load((BENCHMARK_DIR / "injection_labels.yaml").read_text())
+    injection_tasks = json.loads((BENCHMARK_DIR / "injection_tasks.json").read_text())
     problems = []
     for injection_task in injection_tasks:
         label = labels[injection_task["suite"]][injection_task["task_id"]]
@@ -127,7 +128,7 @@ def provenance() -> tuple[list[dict], dict]:
 
 
 def attacker_dest_check() -> dict:
-    user_tasks = json.loads((CATALOG_DIR / "user_tasks.json").read_text())
+    user_tasks = json.loads((BENCHMARK_DIR / "user_tasks.json").read_text())
     result = {}
     env_haystacks = {}
     for suite_name in SUITES:
@@ -145,12 +146,12 @@ def attacker_dest_check() -> dict:
 
 def main():
     label_problems = label_check()
-    (CATALOG_DIR / "label_check.json").write_text(json.dumps(label_problems, indent=1))
+    (BENCHMARK_DIR / "label_check.json").write_text(json.dumps(label_problems, indent=1))
     rows, summary = provenance()
-    (CATALOG_DIR / "arg_provenance.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False, default=str))
-    (CATALOG_DIR / "provenance_summary.json").write_text(json.dumps(summary, indent=1))
+    (BENCHMARK_DIR / "arg_provenance.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False, default=str))
+    (BENCHMARK_DIR / "provenance_summary.json").write_text(json.dumps(summary, indent=1))
     destination_check = attacker_dest_check()
-    (CATALOG_DIR / "attacker_dest_check.json").write_text(json.dumps(destination_check, indent=1))
+    (BENCHMARK_DIR / "attacker_dest_check.json").write_text(json.dumps(destination_check, indent=1))
     print("label problems:", len(label_problems))
     for problem in label_problems:
         print("  ", problem)

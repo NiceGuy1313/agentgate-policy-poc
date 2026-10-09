@@ -1,10 +1,9 @@
-"""Reference attack trajectories for ground-truth replay (RQ1).
+"""재생 평가(RQ1)용 참조 공격 궤적을 제공한다.
 
-AgentDojo v1.2 workspace injection tasks 6-13 ship with `ground_truth() == []`. For replay we
-need the calls a compromised agent would make, so this module provides planners that derive
-those calls from the *current* environment (IDs depend on what the user task already did).
-Every planner is validated against the task's own `security()` on the default environment
-(tests/test_attack_trajectories.py). All other injection tasks use AgentDojo's ground truth.
+AgentDojo v1.2 workspace injection task 6–13은 `ground_truth() == []`이다. replay에는 장악된 에이전트가 할 호출이
+필요하므로, 이 모듈은 *현재* 환경에서 그 호출을 도출하는 planner를 제공한다(ID는 user task가 이미 한 일에 따라
+달라진다). 모든 planner는 기본 환경에서 해당 task의 `security()`로 검증한다(tests/test_attack_trajectories.py).
+나머지 injection task는 AgentDojo의 ground truth를 쓴다.
 """
 
 from __future__ import annotations

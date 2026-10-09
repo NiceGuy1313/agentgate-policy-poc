@@ -1,3 +1,5 @@
+"""P2(민감 데이터 반출) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 TX = "- amount: 50.0\n  recipient: SE3550000000054910000003\n  subject: Spotify Premium monthly subscription"

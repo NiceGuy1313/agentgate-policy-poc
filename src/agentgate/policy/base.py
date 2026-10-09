@@ -1,4 +1,4 @@
-"""Policy primitives. No LLM or network calls are allowed anywhere in this package."""
+"""정책 primitive이다. 이 패키지 어디에서도 LLM 호출이나 네트워크 호출을 허용하지 않는다."""
 
 from __future__ import annotations
 

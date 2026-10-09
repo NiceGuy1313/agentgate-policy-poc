@@ -1,6 +1,6 @@
-"""Replay metrics, ablation, failure analysis -> <run>/summary.json.
+"""재생 평가의 지표, ablation, 실패 분석을 계산해 <run>/summary.json에 쓴다.
 
-Usage: python scripts/analysis/summarize_replay.py --run results/replay/v1/oracle [--compare results/replay/v1/llm_<model>]
+사용법: python scripts/analysis/summarize_replay.py --run results/replay/v1/oracle [--compare results/replay/v1/llm_<model>]
 """
 
 from __future__ import annotations

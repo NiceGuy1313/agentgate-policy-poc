@@ -1,11 +1,11 @@
-"""Extract the task catalog and tool roles from AgentDojo (no LLM calls).
+"""AgentDojo에서 태스크와 툴 목록을 추출하고, 정답 호출에 config/tool_roles.yaml의 역할(prep | effect)을 표시한다. LLM 호출 없음.
 
-Outputs:
-  data/catalog/user_tasks.json
-  data/catalog/injection_tasks.json   (ground truth calls carry a `role` field: prep | effect)
-  data/catalog/tools.json             (suite tool list: name, description, parameters)
+출력:
+  data/benchmark/user_tasks.json
+  data/benchmark/injection_tasks.json   (ground truth 호출에 `role` 필드: prep | effect)
+  data/benchmark/tools.json             (suite 툴 목록: name, description, parameters)
 
-Usage: python scripts/catalog/build_catalog.py
+사용법: python scripts/benchmark/extract_benchmark.py
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from agentgate.config import PROJECT_ROOT
 from agentgate.evaluation.attack_trajectories import plan_attack_calls
 from agentgate.suites import find_injection_candidates, load_default_environment, load_suite, task_number
 
-OUTPUT_DIR = PROJECT_ROOT / "data" / "catalog"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "benchmark"
 
 
 def _to_jsonable(value):

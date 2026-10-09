@@ -1,4 +1,4 @@
-"""TaskSpec extractor and escalation judge logic with a fake client (no network, no key)."""
+"""fake client로 TaskSpec 추출기와 판정 LLM 로직을 검사한다(네트워크·키 불필요)."""
 
 import inspect
 

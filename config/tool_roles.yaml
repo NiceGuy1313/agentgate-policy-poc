@@ -1,5 +1,5 @@
-# Tools whose call changes state or sends data outside ("effect" calls).
-# Every other tool is a "prep" call (read / search). Names are real AgentDojo v1.2.2 tool names.
+# 호출 시 상태를 바꾸거나 데이터를 외부로 보내는 툴("effect" 호출).
+# 그 밖의 툴은 모두 "prep" 호출(읽기·검색)이다. 이름은 실제 AgentDojo v1.2.2 툴 이름이다.
 effect:
   external_send: [send_email, send_direct_message, send_channel_message, post_webpage]
   share: [share_file]

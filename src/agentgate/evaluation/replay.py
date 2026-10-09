@@ -1,4 +1,4 @@
-"""Ground-truth trajectory replay through the gate (RQ1). No LLM calls."""
+"""정답(ground truth) 궤적을 게이트로 재생한다(RQ1). LLM 호출 없음."""
 
 from __future__ import annotations
 

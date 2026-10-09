@@ -1,4 +1,4 @@
-"""Configuration facts that the policies rely on, checked against AgentDojo itself."""
+"""정책이 전제하는 설정 사실을 AgentDojo 자체와 대조해 검사한다."""
 
 import yaml
 from agentdojo.functions_runtime import FunctionsRuntime

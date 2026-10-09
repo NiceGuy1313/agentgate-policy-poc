@@ -1,4 +1,4 @@
-"""Value index over the prompt and tool responses, and provenance (origin) of argument values."""
+"""프롬프트와 툴 응답에 대한 값 인덱스를 만들고, 인자 값의 출처(origin)를 판정한다."""
 
 from __future__ import annotations
 

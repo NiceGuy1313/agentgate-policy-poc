@@ -1,9 +1,9 @@
-"""Extract TaskSpecs for all 97 user tasks with the LLM extractor.
+"""LLM 추출기로 user task 97개 전체의 TaskSpec을 추출한다.
 
-Usage: python scripts/taskspec/extract_llm_specs.py [--suites banking] [--workers 4]
+사용법: python scripts/taskspec/extract_llm_specs.py [--suites banking] [--workers 4]
 
-Needs AGENTGATE_LLM_PROVIDER / AGENTGATE_LLM_MODEL and the provider key in .env.
-Writes data/specs/llm/<model>/<suite>/<task>.yaml and data/specs/llm/<model>/extraction_log.json.
+.env에 AGENTGATE_LLM_PROVIDER / AGENTGATE_LLM_MODEL과 해당 provider 키가 필요하다.
+출력: data/specs/llm/<model>/<suite>/<task>.yaml, data/specs/llm/<model>/extraction_log.json
 """
 
 from __future__ import annotations

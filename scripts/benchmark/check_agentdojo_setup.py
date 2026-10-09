@@ -1,7 +1,7 @@
-"""AgentDojo setup check: for each suite, run one user task's ground truth through FunctionsRuntime on the
-default environment and print the utility verdict. No LLM calls.
+"""AgentDojo 설치를 확인한다. suite마다 user task 하나의 ground truth를 기본 환경의 FunctionsRuntime으로
+실행하고 utility 판정을 출력한다. LLM 호출 없음.
 
-Usage: python scripts/catalog/check_agentdojo_setup.py
+사용법: python scripts/benchmark/check_agentdojo_setup.py
 """
 
 from agentdojo.functions_runtime import FunctionsRuntime

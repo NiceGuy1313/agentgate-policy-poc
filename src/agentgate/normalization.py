@@ -1,10 +1,10 @@
-"""Value normalization shared by the offline provenance analysis (scripts/catalog) and the runtime ValueIndex.
+"""오프라인 provenance 분석(scripts/benchmark)과 runtime ValueIndex가 공유하는 값 정규화이다.
 
-Rules:
-- e-mail: lower-case
-- URL: lower-case, drop scheme, leading "www.", trailing "/"
-- IBAN: drop whitespace, upper-case
-- list arguments are judged element by element (see `iterate_leaf_values`)
+규칙:
+- e-mail: 소문자화
+- URL: 소문자화, scheme·앞의 "www."·끝의 "/" 제거
+- IBAN: 공백 제거, 대문자화
+- list 인자는 원소별로 판정한다(`iterate_leaf_values` 참조)
 """
 
 from __future__ import annotations

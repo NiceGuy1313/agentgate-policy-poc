@@ -1,3 +1,5 @@
+"""P8(예약) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 

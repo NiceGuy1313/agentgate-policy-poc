@@ -1,4 +1,4 @@
-"""The policy gate inside a real AgentDojo AgentPipeline (scripted agent, no LLM)."""
+"""실제 AgentDojo AgentPipeline 안의 정책 게이트를 검사한다(scripted 에이전트, LLM 없음)."""
 
 from agentgate.agents.scripted_agent import ScriptedAgent
 from agentgate.evaluation.replay import build_injections

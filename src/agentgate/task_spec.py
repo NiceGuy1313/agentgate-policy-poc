@@ -1,4 +1,4 @@
-"""TaskSpec: what the user actually asked for (docs/policy_spec.md §4)."""
+"""TaskSpec: 사용자가 실제로 요청한 범위를 표현한다(docs/policy_spec.md 3절)."""
 
 from __future__ import annotations
 

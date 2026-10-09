@@ -1,4 +1,4 @@
-"""P1-P9 as deterministic rules (docs/policy_spec.md section 2)."""
+"""P1–P9를 결정론적 규칙으로 구현한다(docs/policy_spec.md 2절)."""
 
 from __future__ import annotations
 

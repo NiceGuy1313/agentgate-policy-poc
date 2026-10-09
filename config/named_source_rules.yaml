@@ -1,8 +1,7 @@
-# When does a tool response count as a "named source" (a source the user explicitly
-# pointed to in the prompt)? A response is NAMED_SOURCE if, for its tool, one of the listed
-# argument values matches (normalized, substring either way) an entry of spec.named_sources.
-# An entry "tool:<name>" in spec.named_sources marks every response of that tool as named
-# (e.g. "see transaction history" -> tool:get_most_recent_transactions).
+# 툴 응답이 "named source"(사용자가 프롬프트에서 명시적으로 지목한 자료)로 간주되는 조건을 정한다.
+# 툴별로 나열된 인자 값 중 하나가 spec.named_sources 항목과 일치하면(정규화 후 양방향 부분 문자열) NAMED_SOURCE다.
+# spec.named_sources의 "tool:<name>" 항목은 해당 툴의 모든 응답을 named로 표시한다
+# (예: "see transaction history" -> tool:get_most_recent_transactions).
 by_argument:
   read_file: [file_path]
   get_file_by_id: [file_id]

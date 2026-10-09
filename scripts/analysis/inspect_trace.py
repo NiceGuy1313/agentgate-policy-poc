@@ -1,13 +1,13 @@
-"""Look at what the gate decided, call by call.
+"""게이트의 판정을 호출 단위로 출력한다.
 
-Usage:
-  # replay one (user task, injection task) pair through the gate and print every decision
+사용법:
+  # (user task, injection task) 쌍 하나를 게이트로 재생하며 모든 판정 출력
   python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task_0 [--mode enforce] [--spec oracle]
-  # a benign task (no injection)
+  # benign task (injection 없음)
   python scripts/analysis/inspect_trace.py benign workspace user_task_25
-  # one saved live run (unpack results/live/v1/<run>/runs.tar.gz first)
+  # 저장된 live run 하나 (먼저 results/live/v1/<run>/runs.tar.gz 압축 해제)
   python scripts/analysis/inspect_trace.py live results/live/v1/<run>/C1/banking/user_task_0/injection_task_7.json
-  # ask the engine about a single hypothetical call
+  # 가상의 단일 호출에 대한 엔진 판정
   python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/specs/oracle/banking/user_task_0.yaml \\
       --tool send_money --args '{"recipient": "US133000000121212121212", "amount": 10, "subject": "x", "date": "d"}'
 """

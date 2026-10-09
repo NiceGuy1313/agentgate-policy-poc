@@ -1,4 +1,4 @@
-"""Thin helpers around AgentDojo suite loading."""
+"""AgentDojo suite 로딩용 얇은 helper이다."""
 
 from __future__ import annotations
 

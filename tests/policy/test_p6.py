@@ -1,3 +1,5 @@
+"""P6(계정·권한) 정책을 검사한다."""
+
 from agentgate.policy import Verdict
 
 

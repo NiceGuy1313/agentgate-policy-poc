@@ -1,3 +1,5 @@
+"""Wilson 구간과 exact McNemar 검정 계산을 검사한다."""
+
 from agentgate.evaluation.metrics import mcnemar_exact, wilson
 
 

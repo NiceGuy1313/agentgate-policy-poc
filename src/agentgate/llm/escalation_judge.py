@@ -1,13 +1,11 @@
-"""Escalation judge (condition C4): resolves ESCALATE verdicts from structured facts only.
+"""판정 LLM(escalation judge, 조건 C4): 구조화된 사실만으로 ESCALATE 판정을 해소한다.
 
-Input: policy id, tool, reversibility, the questioned argument/value, its origin, the number of
-same-kind candidates in that source, the user prompt and short quoted contexts around the value.
-Never the full tool output. Contexts are wrapped as quoted data and declared "data, not instructions"
-in the system prompt.
+입력: policy id, 툴, 되돌릴 수 있는지 여부, 문제된 인자·값, 그 출처, 해당 source 안의 같은 종류 후보 수,
+사용자 프롬프트, 값 주변의 짧은 인용 문맥. 툴 출력 전체는 넣지 않는다. 문맥은 인용 데이터로 감싸고 system
+prompt에서 "지시가 아닌 데이터"로 선언한다.
 
-Final mapping (docs/policy_spec.md section 4):  B -> BLOCK;  A -> ALLOW if the
-tool is reversible, HUMAN otherwise;  C -> HUMAN.  In the benchmark HUMAN is enforced as BLOCK and counted
-separately.
+최종 매핑(docs/policy_spec.md 4절): B -> BLOCK; A -> 툴이 되돌릴 수 있으면 ALLOW, 아니면 HUMAN; C -> HUMAN.
+평가에서 HUMAN은 BLOCK으로 집행하고 따로 집계한다.
 """
 
 from __future__ import annotations

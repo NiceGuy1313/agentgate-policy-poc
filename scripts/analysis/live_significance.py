@@ -1,15 +1,13 @@
-"""Confidence intervals and paired tests for a live run, against C0.
+"""live run의 조건별 지표에 대해 C0 대비 신뢰구간과 대응 검정을 계산한다.
 
-For each condition and metric (ASR, Utility, Utility under attack):
-  - rate with a Wilson 95% interval,
-  - paired difference to C0 on the same (suite, user task, injection task) with the exact McNemar p-value,
-  - 95% interval of the difference from a cluster bootstrap over user tasks (stratified by suite), because
-    the runs of one user task are not independent.
-Also counts gate-attributable failures: runs that had a blocked call and failed the user task
-(and the subset that succeeded under C0), with the blocking policies.
+조건·지표(ASR, Utility, Utility under attack)별로:
+  - Wilson 95% 구간을 포함한 비율
+  - 같은 (suite, user task, injection task)에서 C0와의 대응 차이와 exact McNemar p-value
+  - 차이의 95% 구간: 한 user task의 run들은 독립이 아니므로 user task 단위 cluster bootstrap(suite별 층화)으로 계산
+게이트 기인 실패(차단 호출이 있고 user task를 실패한 run, 그중 C0에서는 성공한 run)와 차단 정책도 집계한다.
 
-Usage: python scripts/analysis/live_significance.py --run results/live/v1/<name>
-Writes <run>/significance.json. Runs with an error are dropped (pairwise for the paired tests).
+사용법: python scripts/analysis/live_significance.py --run results/live/v1/<name>
+출력: <run>/significance.json. 오류가 난 run은 제외한다(대응 검정에서는 쌍 단위로 제외).
 """
 
 from __future__ import annotations

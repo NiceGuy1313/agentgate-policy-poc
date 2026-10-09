@@ -1,16 +1,14 @@
-"""Provider-agnostic single-turn completion (`LLMClient`), the Ollama HTTP client and JSON reply parsing.
+"""provider 독립 단일 턴 completion(`LLMClient`), Ollama HTTP client, JSON 응답 parsing을 제공한다.
 
-Anthropic defaults follow current model rules: the default model is `claude-sonnet-5-5`; on that
-model (and every current Claude model except Haiku 4.5 / 4.6-generation and older) sampling
-parameters such as `temperature` are rejected with a 400 and thinking is always on, so this client
-never sends `temperature` to them and controls depth with `output_config.effort` instead.
-Determinism therefore comes from the on-disk caches, not from temperature 0.
+Anthropic 기본값은 현행 모델 규칙을 따른다. 기본 모델은 `claude-sonnet-5-5`이다. 이 모델(및 Haiku 4.5 / 4.6 세대와
+그 이전을 제외한 모든 현행 Claude 모델)은 `temperature` 등 sampling 파라미터를 400으로 거부하고 thinking이 항상
+켜져 있으므로, 이 client는 `temperature`를 보내지 않고 `output_config.effort`로 깊이를 조절한다.
+따라서 결정론은 temperature 0이 아니라 디스크 캐시에서 나온다.
 
-Ollama endpoint facts `OllamaClient` relies on (Ollama docs: github.com/ollama/ollama docs/api.md, docs/cloud.mdx):
-POST {host}/api/chat and GET {host}/api/tags, where host = https://ollama.com for cloud
-(Authorization: Bearer $OLLAMA_API_KEY) or http://localhost:11434 for a local server (no key). Cloud model
-names are the ones /api/tags returns (no ":cloud" suffix when calling ollama.com directly). The request and
-response message shapes are documented in agentgate/agents/ollama_agent.py.
+`OllamaClient`가 전제하는 endpoint 사실(Ollama docs: github.com/ollama/ollama docs/api.md, docs/cloud.mdx):
+POST {host}/api/chat, GET {host}/api/tags. host는 cloud면 https://ollama.com(Authorization: Bearer $OLLAMA_API_KEY),
+local server면 http://localhost:11434(키 없음)이다. cloud 모델 이름은 /api/tags가 반환하는 이름이다(ollama.com을
+직접 호출할 때는 ":cloud" 접미사 없음). request·response 메시지 형식은 agentgate/agents/ollama_agent.py에 있다.
 """
 
 from __future__ import annotations

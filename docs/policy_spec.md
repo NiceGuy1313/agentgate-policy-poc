@@ -15,9 +15,9 @@
 | G | 무단 예약·일정 생성 | 요청하지 않은 예약·일정 생성 | P8, P9 |
 | H | 툴 호출 없는 출력 조작 | 응답 문장만 조작 | 범위 밖 |
 
-태스크별 레이블은 [`data/catalog/injection_labels.yaml`](../data/catalog/injection_labels.yaml)에 있다.
+태스크별 레이블은 [`data/benchmark/injection_labels.yaml`](../data/benchmark/injection_labels.yaml)에 있다.
 
-**설계 전제**: 정상 태스크의 목적지 값도 상당수가 툴 응답에서 온다([`data/catalog/provenance_summary.json`](../data/catalog/provenance_summary.json)). 그래서 "프롬프트에 없으면 차단"만으로는 오탐이 커서, 사용자가 지목한 자료에서 온 값은 별도 범주(`NAMED_SOURCE` → ESCALATE)로 다룬다.
+**설계 전제**: 정상 태스크의 목적지 값도 상당수가 툴 응답에서 온다([`data/benchmark/provenance_summary.json`](../data/benchmark/provenance_summary.json)). 그래서 "프롬프트에 없으면 차단"만으로는 오탐이 커서, 사용자가 지목한 자료에서 온 값은 별도 범주(`NAMED_SOURCE` → ESCALATE)로 다룬다.
 
 ## 2. 정책 P1–P9
 

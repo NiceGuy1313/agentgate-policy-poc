@@ -1,8 +1,8 @@
-"""The policy gate inside AgentDojo agent pipelines (no agentdojo source changes).
+"""AgentDojo agent pipeline에 정책 게이트를 넣는다(agentdojo 소스 수정 없음).
 
-The gate itself is `GatedRuntime` (passed as the task runtime). The pipeline gets one extra element in
-front, `TaskSpecElement`, which builds the TaskSpec from the user prompt alone (LLM extractor, cached,
-or oracle spec) and configures the runtime before the first LLM turn.
+게이트 자체는 task runtime으로 넘기는 `GatedRuntime`이다. pipeline 앞에는 element 하나(`TaskSpecElement`)만
+추가되며, 이 element는 사용자 프롬프트만으로 TaskSpec을 만들고(LLM 추출기·캐시 또는 oracle spec) 첫 LLM 턴 전에
+runtime을 설정한다.
 """
 
 from __future__ import annotations

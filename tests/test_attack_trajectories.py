@@ -1,3 +1,5 @@
+"""모든 injection task의 참조 공격 궤적이 기본 환경에서 injection goal을 달성하는지 검사한다."""
+
 import pytest
 from agentdojo.functions_runtime import FunctionsRuntime
 from agentdojo.types import text_content_block_from_string

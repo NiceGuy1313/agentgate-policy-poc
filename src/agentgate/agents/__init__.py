@@ -1,4 +1,4 @@
-"""Agents under test: Claude, Ollama and a deterministic scripted stand-in, plus the live-run factory."""
+"""평가 대상 에이전트(Claude, Ollama, 결정론적 scripted 대체 에이전트)와 live run용 factory를 제공한다."""
 
 from agentgate.agents.claude_agent import ClaudeAgentLLM
 from agentgate.agents.factory import UsageMeter, make_llm, spec_provider

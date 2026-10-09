@@ -1,7 +1,7 @@
-"""LLM components. Within the gate only the TaskSpec extractor and the escalation judge call an LLM.
+"""LLM 구성 요소이다. 게이트 안에서 LLM을 호출하는 것은 TaskSpec 추출기와 판정 LLM(escalation judge)뿐이다.
 
-`llm.client` is also used by the agents under test in `agentgate.agents` (the agent-under-test exception);
-the policy package (`agentgate.policy`) never imports this package.
+평가 대상 에이전트(`agentgate.agents`)도 `llm.client`를 사용한다(평가 대상 에이전트 예외).
+정책 패키지(`agentgate.policy`)는 이 패키지를 import하지 않는다.
 """
 
 from agentgate.llm.client import LLMClient, OllamaClient

@@ -1,10 +1,8 @@
-"""The single gate every tool call passes through.
+"""모든 툴 호출이 지나는 단일 게이트이다.
 
-Interception point: a `FunctionsRuntime` subclass (docs/architecture.md, section 5). Both the
-AgentDojo `ToolsExecutor` (LLM agents) and the `GroundTruthPipeline` (replay) execute tools
-exclusively through `runtime.run_function`, and `TaskSuite.run_task_with_pipeline` accepts a
-`runtime_class`, so overriding `run_function` covers every execution path without touching
-agentdojo sources.
+가로채는 지점은 `FunctionsRuntime` 서브클래스이다(docs/architecture.md 5절). AgentDojo `ToolsExecutor`(LLM 에이전트)와
+`GroundTruthPipeline`(replay)은 모두 `runtime.run_function`으로만 툴을 실행하고, `TaskSuite.run_task_with_pipeline`은
+`runtime_class`를 받으므로, `run_function`을 override하면 agentdojo 소스를 건드리지 않고 모든 실행 경로를 덮는다.
 """
 
 from __future__ import annotations

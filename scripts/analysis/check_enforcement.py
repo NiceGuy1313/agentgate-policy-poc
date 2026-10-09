@@ -1,15 +1,15 @@
-"""Enforcement integrity over live runs.
+"""live run의 차단 무결성을 검사한다.
 
-Checks per run:
-  1. no call with blocked=True was executed
-  2. the environment did not change across a blocked call (hash before the blocked call == hash before
-     the next gate event, or the final hash if it was the last one)
-  3. tool results returned to the agent and gate events correspond 1:1 (same tool, same order),
-     ignoring calls AgentDojo rejects before execution (unknown tool / empty name). Calls requested at
-     the ToolsExecutionLoop iteration limit are never executed; they are counted separately.
+run별 검사 항목:
+  1. blocked=True인 호출이 실행되지 않았는가
+  2. 차단된 호출 전후로 환경이 바뀌지 않았는가 (차단 호출 직전 hash == 다음 gate event 직전 hash,
+     마지막 호출이면 최종 hash)
+  3. 에이전트에 반환된 툴 결과와 gate event가 1:1로 대응하는가 (같은 툴, 같은 순서). AgentDojo가 실행 전에
+     거부하는 호출(알 수 없는 툴·빈 이름)은 제외하고, ToolsExecutionLoop 반복 한도에서 요청된 호출은 실행되지
+     않으므로 따로 센다.
 
-Usage: python scripts/analysis/check_enforcement.py --run results/live/v1/<name>
-Writes <run>/enforcement_check.json.
+사용법: python scripts/analysis/check_enforcement.py --run results/live/v1/<name>
+출력: <run>/enforcement_check.json
 """
 
 from __future__ import annotations

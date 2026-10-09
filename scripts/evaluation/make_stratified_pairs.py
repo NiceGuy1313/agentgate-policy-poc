@@ -1,8 +1,8 @@
-"""Stratified pair list for live evaluation: every user task x K injection tasks of its suite.
+"""live 평가용 층화 쌍 목록을 만든다: 모든 user task x 같은 suite의 injection task K개.
 
-The sampling itself is `agentgate.evaluation.pairs.stratified_pairs` (--seed, --benign are passed through).
+표본 추출은 `agentgate.evaluation.pairs.stratified_pairs`가 하며 --seed, --benign을 그대로 넘긴다.
 
-Usage:
+사용법:
   python scripts/evaluation/make_stratified_pairs.py --k 3 --benign --out data/pairs/strat3_seed0.txt
   python scripts/evaluation/live_evaluation.py --agent llm --pairs @data/pairs/strat3_seed0.txt \\
       --conditions C0 C1 C2 C4 ...

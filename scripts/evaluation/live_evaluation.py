@@ -1,20 +1,20 @@
-"""Live evaluation (RQ2): run AgentDojo with an agent under conditions C0-C4 and log everything.
+"""live 평가(RQ2): 조건 C0–C4에서 에이전트로 AgentDojo를 실행하고 전 과정을 기록한다.
 
-Conditions
-  C0  no defense (gate in audit mode: records what it *would* decide, never blocks)
-  C1  gate, ESCALATE -> block
-  C2  gate, ESCALATE -> allow
-  C3  AgentDojo built-in defense (--c3-defense, default spotlighting_with_delimiting), gate in audit mode
-  C4  gate, ESCALATE -> judge LLM
+조건
+  C0  방어 없음 (게이트는 audit 모드: 판정만 기록하고 차단하지 않음)
+  C1  게이트, ESCALATE -> block
+  C2  게이트, ESCALATE -> allow
+  C3  AgentDojo 내장 방어 (--c3-defense, 기본값 spotlighting_with_delimiting), 게이트는 audit 모드
+  C4  게이트, ESCALATE -> 판정 LLM
 
-Agents
-  --agent llm       real LLM agent (keys from .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
-  --agent scripted  deterministic ScriptedAgent (no key) - checks the integration, not model behaviour
+에이전트
+  --agent llm       실제 LLM 에이전트 (키는 .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
+  --agent scripted  결정론적 ScriptedAgent (키 불필요) - 모델 행동이 아니라 통합을 확인한다
 
-Usage
+사용법
   python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/live/v1/scripted
   python scripts/evaluation/live_evaluation.py --agent llm --pilot --conditions C0 C1 --out results/live/v1/<model>
-Finished (condition, suite, user, injection) runs are skipped, so a run can be resumed.
+완료된 (condition, suite, user, injection) run은 건너뛰므로 중단된 실행을 이어서 할 수 있다.
 """
 
 from __future__ import annotations

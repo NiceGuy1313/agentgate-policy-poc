@@ -1,3 +1,4 @@
+"""`GatedRuntime`의 enforce·audit 동작, fail-closed, 게이트 밖 툴 실행 부재를 검사한다."""
 
 import pytest
 from agentdojo.agent_pipeline.ground_truth_pipeline import GroundTruthPipeline
