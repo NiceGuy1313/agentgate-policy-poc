@@ -89,12 +89,22 @@ def run_live_task(suite, pipeline: RecordingPipeline, user_task, injection_task,
     if model_output is None:
         warnings.warn(f"Model output was None for task {user_task.ID}")
     requested_calls = functions_stack_trace_from_messages(messages)
-    output = model_output or []
+    result = score_task(suite, user_task, injection_task, model_output or [], pre_environment, task_environment,
+                        requested_calls, runtime)
+    result["wall_ms"] = wall_ms
+    result["messages"] = [_serialize_message(m) for m in messages]
+    result["final_output"] = get_text_content_as_str(model_output or [])[:2000]
+    return result
+
+
+def score_task(suite, user_task, injection_task, output, pre_environment, task_environment, requested_calls,
+               runtime: GatedRuntime) -> dict:
+    """AgentDojo utility / security for a finished run (shared by the native pipeline and framework runs)."""
     # checks may mutate the env (Inbox.get_unread): keep snapshots for the executed-only variant
     post_copy, pre_copy = task_environment.model_copy(deep=True), pre_environment.model_copy(deep=True)
     final_hash = compute_environment_hash(task_environment)
     utility = suite._check_task_result(user_task, output, pre_environment, task_environment, requested_calls)
-    result = {"utility": bool(utility), "wall_ms": wall_ms, "final_env_hash": final_hash,
+    result = {"utility": bool(utility), "final_env_hash": final_hash,
               "n_tool_calls_requested": len(requested_calls)}
     if injection_task is not None:
         result["security"] = bool(
@@ -110,8 +120,6 @@ def run_live_task(suite, pipeline: RecordingPipeline, user_task, injection_task,
         suite._check_task_result(user_task, output, pre_copy, post_copy, executed_calls)
         result["security_executed"] = bool(
             suite._check_task_result(injection_task, output, pre_copy, post_copy, executed_calls))
-    result["messages"] = [_serialize_message(m) for m in messages]
-    result["final_output"] = get_text_content_as_str(output)[:2000]
     return result
 
 

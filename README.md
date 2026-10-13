@@ -8,6 +8,7 @@ LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션
 | [`docs/policy_spec.md`](docs/policy_spec.md) | 위협 분류, 정책 P1–P9 규칙, TaskSpec 스키마 |
 | [`docs/final_report.md`](docs/final_report.md) | 평가 결과(스크립트가 생성) |
 | [`results/dashboard.html`](results/dashboard.html) | 공격 쌍·정상 태스크별 호출 판정 근거를 브라우저로 탐색 |
+| [`dashboard/`](dashboard/) | 에이전트 프레임워크·모델·시나리오·조건을 골라 실행하고 LLM 호출·툴 호출·Gate 판정을 실시간으로 보는 서버 |
 
 ## 빠른 시작
 
@@ -20,6 +21,15 @@ python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task
 ```
 
 LLM이 필요한 단계는 `.env.example`을 `.env`로 복사해 키를 넣는다(`.env`는 git에서 제외).
+
+### 실시간 대시보드 (외부 에이전트 프레임워크)
+
+```bash
+pip install -e '.[dev,dashboard,smolagents]'
+uvicorn dashboard.app:app --host 127.0.0.1 --port 8000      # http://127.0.0.1:8000
+```
+
+왼쪽에서 프레임워크, 제공자·모델(예: ollama `gpt-oss:120b`, `mistral-large-3:675b`), suite, user task, injection task, attack, 조건(C0–C4), TaskSpec 출처, max steps를 고른다. "비교 실행"을 켜면 조건·프레임워크·모델을 바꾼 B를 나란히 실행한다. 툴 호출마다 Gate 판정(ALLOW/ESCALATE/BLOCK, 정책, 이유)이 붙고, 끝나면 utility·공격 성공 여부가 표시된다. 실행 기록은 `dashboard/runs/`(git 제외)에 저장되며 보고서 수치에는 쓰지 않는다. 연결 구조와 Wrapper 규약은 [`docs/architecture.md`](docs/architecture.md) 8절에 있다.
 
 ## 코드 지도
 
@@ -45,6 +55,18 @@ LLM이 필요한 단계는 `.env.example`을 `.env`로 복사해 키를 넣는�
 | [`src/agentgate/pipeline.py`](src/agentgate/pipeline.py) | `build_pipeline`, `TaskSpecElement`, `run_live_task` | AgentDojo 파이프라인에 TaskSpec 단계와 게이트 연결 |
 | [`src/agentgate/suites.py`](src/agentgate/suites.py) | `load_suite`, `describe_tools`, `task_number` | AgentDojo suite 로드 도우미 |
 | [`src/agentgate/config.py`](src/agentgate/config.py) | `PROJECT_ROOT`, `load_policy_config`, `load_dotenv` | 경로, 설정 로더, `.env` 로더 |
+
+### 외부 에이전트 프레임워크 연결
+
+| 위치 | 주요 심볼 | 역할 |
+|---|---|---|
+| [`src/agentgate/harness/scenario.py`](src/agentgate/harness/scenario.py) · [`bridge.py`](src/agentgate/harness/bridge.py) | `Session`, `ScenarioConfig`, `GateToolBridge` | 시나리오 하나(env·인젝션·게이트·TaskSpec·채점)와 프레임워크가 쓰는 유일한 툴 통로 |
+| [`src/agentgate/harness/runner.py`](src/agentgate/harness/runner.py) · [`registry.py`](src/agentgate/harness/registry.py) | `run_scenario`, `execute`, `RunRequest`, `registry.get` | 실행·기록(manifest 포함), 어댑터 등록(내장·`config/frameworks.yaml`·entry point) |
+| [`src/agentgate/harness/events.py`](src/agentgate/harness/events.py) · [`models.py`](src/agentgate/harness/models.py) | `EventSink`, `capture_loggers`, `ModelSpec` | 정규화 이벤트와 경계 로그 수집, 제공자 중립 모델 지정 |
+| [`src/agentgate/harness/service.py`](src/agentgate/harness/service.py) · [`agentgate_client.py`](src/agentgate/harness/agentgate_client.py) | `/v1/sessions/...`, `GateSession` | Wrapper 규약 v1 HTTP 서비스와 표준 라이브러리 클라이언트 |
+| [`src/agentgate/harness/conformance.py`](src/agentgate/harness/conformance.py) · [`fake_llm.py`](src/agentgate/harness/fake_llm.py) | `run_case`, `FakeLLMServer` | LLM 없는 적합성 검사(가짜 OpenAI 호환 모델) |
+| [`src/agentgate/agents/frameworks/`](src/agentgate/agents/frameworks/) | `FrameworkAdapter`, `NativeAdapter`, `SmolagentsAdapter`, `ContractAdapter` | 프레임워크별 번역 |
+| [`config/frameworks.yaml`](config/frameworks.yaml) | `frameworks` | 규약 Wrapper·별도 인터프리터 등록 |
 
 ### LLM 구성요소와 평가 대상 에이전트
 
@@ -72,7 +94,7 @@ LLM이 필요한 단계는 `.env.example`을 `.env`로 복사해 키를 넣는�
 |---|---|---|
 | [`scripts/catalog/`](scripts/catalog/) | `build_catalog.py`, `analyze_provenance.py`, `check_agentdojo_setup.py` | 태스크 카탈로그·인자 출처 분석(`data/catalog/`), 설치 확인 |
 | [`scripts/taskspec/`](scripts/taskspec/) | `seed_oracle_specs.py`, `review_oracle_specs.py`, `extract_llm_specs.py`, `compare_specs.py` | oracle TaskSpec 작성·검토, LLM 추출과 비교 |
-| [`scripts/evaluation/`](scripts/evaluation/) | `replay_evaluation.py`, `live_evaluation.py`, `judge_evaluation.py`, `make_stratified_pairs.py` | 재생 평가, 실제 에이전트 실행(C0–C4), 판정 LLM 단독 평가, 층화 표본 생성 |
+| [`scripts/evaluation/`](scripts/evaluation/) | `replay_evaluation.py`, `live_evaluation.py`, `judge_evaluation.py`, `make_stratified_pairs.py` | 재생 평가, 실제 에이전트 실행(C0–C4, `--framework`로 외부 프레임워크), 판정 LLM 단독 평가, 층화 표본 생성 |
 | [`scripts/analysis/`](scripts/analysis/) | `summarize_replay.py`, `summarize_live.py`, `check_enforcement.py`, `live_significance.py`, `inspect_trace.py` | 결과 집계, 집행 무결성 점검, 신뢰구간·검정, 판정 추적 |
 | [`scripts/reporting/`](scripts/reporting/) | `build_report.py` | `docs/final_report.md`, `results/figures/`, `results/dashboard.html` 생성 |
 
@@ -89,6 +111,12 @@ python scripts/evaluation/live_evaluation.py --agent llm --spec llm --pairs @dat
 # 커밋된 run을 다시 집계할 때는 원본을 먼저 푼다: tar -xzf results/live/v1/<run>/runs.tar.gz -C results/live/v1/<run>
 python scripts/analysis/check_enforcement.py --run results/live/v1/<run>
 python scripts/analysis/summarize_live.py --run results/live/v1/<run>
+
+# 외부 프레임워크로 같은 쌍 실행 (결과 형식 동일, 위 분석 스크립트 그대로 사용)
+python scripts/evaluation/live_evaluation.py --framework smolagents --model ollama:gpt-oss:120b --spec llm \
+  --pairs @data/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --out results/live/v2/smolagents_<model>
+# 프레임워크 적합성 검사 (LLM 없음)
+python -m agentgate.harness.conformance --framework smolagents
 
 # 보고서·그림·대시보드 재생성
 python scripts/reporting/build_report.py
