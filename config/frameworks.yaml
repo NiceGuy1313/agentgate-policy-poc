@@ -1,0 +1,17 @@
+# Agent frameworks the dashboard and live_evaluation.py --framework can run (agentgate.harness.registry).
+# Built-in adapters (native, smolagents) need no entry. Add a Wrapper that follows contract v1 like this:
+#
+#   my-wrapper:
+#     contract:
+#       command: [python, path/to/wrapper.py]   # started with AGENTGATE_* environment variables
+#       cwd: path/to/wrapper/repo                # optional, relative to the repository root
+#       timeout: 1800                            # optional, seconds
+#       internal_tools: [final_answer]           # optional, framework-own tools that are not AgentDojo tools
+#     python: /path/to/venv/bin/python           # optional: run the whole scenario in that interpreter
+#     display_name: My wrapper                    # optional
+frameworks:
+  example-contract:
+    display_name: Contract v1 example
+    description: Reference Wrapper (examples/contract_wrapper), stdlib OpenAI-compatible tool loop
+    contract:
+      command: [python, examples/contract_wrapper/minimal_agent.py]
