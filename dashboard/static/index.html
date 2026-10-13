@@ -36,7 +36,14 @@ header{min-height:52px;display:flex;align-items:center;gap:14px;padding:0 18px;b
 h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap}
 h1 span{color:var(--muted);font-weight:500}
 .hint{color:var(--muted);font-size:12px}
-.layout{display:grid;grid-template-columns:340px minmax(0,1fr);height:calc(100vh - 52px)}
+.layout{display:grid;grid-template-columns:var(--side,340px) 6px minmax(0,1fr);height:calc(100vh - 52px)}
+.layout.collapsed{grid-template-columns:0 0 minmax(0,1fr)}
+.layout.collapsed aside,.layout.collapsed #side-split{display:none}
+.splitter{cursor:col-resize;background:var(--line);position:relative;touch-action:none;user-select:none}
+.splitter::after{content:"";position:absolute;top:50%;left:50%;width:2px;height:28px;margin:-14px 0 0 -1px;border-left:1px dotted var(--faint);border-right:1px dotted var(--faint)}
+.splitter:hover,.splitter.drag{background:var(--accent)}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing iframe{pointer-events:none}
 aside{border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
 .panelbox{padding:12px 14px;border-bottom:1px solid var(--line)}
 .panelbox h2{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:650}
@@ -60,7 +67,8 @@ details.advanced summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
 .preview b{color:var(--text);font-weight:600}
 .preview .goal{color:var(--inj)}
 .preview pre{margin:4px 0 8px;padding:6px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:11.5px/1.5 var(--mono);white-space:pre-wrap;max-height:180px;overflow:auto}
-main{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr))}
+main{min-width:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
+main.two{grid-template-columns:minmax(0,var(--split,1fr)) 6px minmax(0,1fr)}
 .run{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
 .run:last-child{border-right:0}
 .runhead{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -120,19 +128,29 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 details.detail summary{cursor:pointer;color:var(--faint)}
 pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:12px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
 .meta{font:12px var(--mono);color:var(--faint);white-space:nowrap;text-align:right}
-.final{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:13px}
-.final .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:8px 0}
-.final .cell{border:1px solid var(--line);border-radius:8px;padding:7px 9px}
-.final .cell span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.final .cell b{font:650 15px var(--mono)}
+.final{border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px;overflow:hidden}
+.final .fhead{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.final .fhead b{font:650 12px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.final .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.final .cell{padding:10px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.final .cell:last-child{border-right:0}
+.final .cell span{font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.final .cell b{font:700 20px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.final .answer{padding:9px 12px;border-top:1px solid var(--line)}
+.final .answer span{display:block;font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.final .answer pre{margin:0;white-space:pre-wrap;font:12px/1.55 var(--mono);color:var(--text)}
+.final .answer.err pre{color:var(--err)}
+.run{container-type:inline-size}
+@container (max-width:620px){.final .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.final .cell:nth-child(2){border-right:0}.final .cell:nth-child(-n+2){border-bottom:1px solid var(--line)}}
 .good{color:var(--ok)}.bad{color:var(--err)}
-.final pre{margin:6px 0 0;white-space:pre-wrap;font:12px/1.55 var(--mono);color:var(--muted)}
 .log{display:grid;grid-template-columns:66px 92px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font:12px/1.55 var(--mono)}
 .log .t{color:var(--faint)}.log .k{font-weight:700;color:var(--muted)}
 .log .m{white-space:pre-wrap;overflow-wrap:anywhere}
 .log.error .m{color:var(--err)}
 @media (max-width:980px){
-  .layout{grid-template-columns:1fr;height:auto}
+  .layout,.layout.collapsed{grid-template-columns:1fr;height:auto}
+  .splitter{display:none}
+  main.two{grid-template-columns:1fr}
   aside{border-right:0;border-bottom:1px solid var(--line)}
   main{grid-template-columns:1fr}
   .run{min-height:80vh;border-right:0;border-bottom:1px solid var(--line)}
@@ -143,6 +161,8 @@ pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel
 <body>
 <header>
   <h1>agentgate 관측 대시보드 <span>· AgentDojo 시나리오 × 에이전트 × 정책 Gate</span></h1>
+  <button type="button" id="toggle-side" class="ghost" style="width:auto" title="설정 패널 접기/펴기">◧ 설정 패널</button>
+  <button type="button" id="reset-cols" class="ghost" style="width:auto" title="컬럼 너비를 기본값으로">컬럼 초기화</button>
   <span class="hint" id="active-hint"></span>
   <label style="margin:0 0 0 auto;display:flex;gap:6px;align-items:center;font-size:12px">
     지난 실행 <select id="history" style="width:auto;max-width:280px"><option value="">—</option></select>
@@ -187,6 +207,7 @@ pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel
     </form>
     <div class="panelbox"><h2>시나리오</h2><div id="preview" class="preview">—</div></div>
   </aside>
+  <div class="splitter" id="side-split" title="드래그해서 너비 조정 (더블클릭: 초기화)"></div>
   <main id="runs"><section class="run"><div class="empty">왼쪽에서 설정을 고르고 실행을 누르면 LLM 호출, 툴 호출, Gate 판정이 실시간으로 쌓입니다.</div></section></main>
 </div>
 <script>
@@ -294,7 +315,7 @@ class Panel {
     const exp = el('a'); exp.href = `/api/runs/${runId}/trace.json`; exp.download = ''; exp.append(el('button', 'ghost', 'JSON 내보내기'));
     bar.append(tabs, exp);
     this.timeline = el('div', 'scroll'); this.rawEl = el('div', 'scroll'); this.rawEl.hidden = true;
-    this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'flex';
+    this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'none';
     this.root.append(this.banner, head, bar, this.timeline, this.rawEl, this.archBox);
     this.stream = new EventSource(`/api/runs/${runId}/events`);
     this.stream.onmessage = e => this.apply(JSON.parse(e.data));
@@ -445,18 +466,22 @@ class Panel {
   }
   renderFinal() {
     const d = this.state.final.data || {}, f = el('div', 'final');
-    f.append(el('b', null, this.state.final.level === 'ERROR' ? 'Result · failed' : 'Result'));
+    const failed = this.state.final.level === 'ERROR';
+    const head = el('div', 'fhead');
+    head.append(el('b', null, 'Result'), el('span', `pill ${failed ? 'failed' : 'finished'}`, failed ? 'failed' : 'finished'));
+    f.append(head);
     const grid = el('div', 'grid');
-    const cell = (name, value, good) => { const c = el('div', 'cell'); c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
+    const cell = (name, value, good) => { const c = el('div', 'cell'); c.title = name; c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
     const yn = v => v == null ? null : v ? 'Yes' : 'No';
     cell('Utility', yn(d.utility), d.utility === true);
-    cell('Attack success (ASR)', yn(d.security), d.security === false);
-    cell('ASR · executed calls only', yn(d.security_executed), d.security_executed === false);
-    cell('Blocked / tool calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
+    cell('ASR', yn(d.security), d.security === false);
+    cell('ASR (executed)', yn(d.security_executed), d.security_executed === false);
+    cell('Blocked / Calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
     f.append(grid);
-    if (d.ungated_calls?.length) f.append(el('div', 'detail err', `Ungated calls: ${JSON.stringify(d.ungated_calls)}`));
-    if (d.final_output) f.append(el('pre', null, d.final_output));
-    if (d.error) f.append(el('pre', 'detail err', short(d.error, 1500)));
+    const block = (label, text, cls = '') => { const b = el('div', `answer ${cls}`); b.append(el('span', null, label), el('pre', null, text)); f.append(b); };
+    if (d.ungated_calls?.length) block('Ungated calls', JSON.stringify(d.ungated_calls), 'err');
+    if (d.final_output) block('Final answer', d.final_output);
+    if (d.error) block('Error', short(d.error, 1500), 'err');
     return f;
   }
   renderRaw() {
@@ -470,8 +495,12 @@ class Panel {
 
 function openPanels(items) {
   panels.forEach(p => p.close()); panels.length = 0;
-  const main = $('#runs'); main.replaceChildren(); main.style.setProperty('--cols', items.length);
-  for (const [id, title, condition] of items) { const p = new Panel(id, title); p.setGate(condition); panels.push(p); main.append(p.root); }
+  const main = $('#runs'); main.replaceChildren(); main.classList.toggle('two', items.length === 2);
+  items.forEach(([id, title, condition], i) => {
+    const p = new Panel(id, title); p.setGate(condition); panels.push(p);
+    if (i === 1) main.append(makeSplitter('run-split'));
+    main.append(p.root);
+  });
 }
 
 function refreshActive() {
@@ -489,6 +518,46 @@ async function loadHistory() {
   }
   sel.value = keep;
 }
+
+// ------------------------------------------------------------------ resizable columns
+const LAYOUT_KEY = 'agentgate.layout';
+function loadLayout() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {}; } catch { return {}; } }
+function saveLayout(patch) { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify({...loadLayout(), ...patch})); } catch {} }
+function applyLayout() {
+  const l = loadLayout(), layout = $('.layout'), main = $('#runs');
+  layout.style.setProperty('--side', `${l.side ?? 340}px`);
+  layout.classList.toggle('collapsed', !!l.collapsed);
+  main.style.setProperty('--split', `${l.split ?? 1}fr`);
+}
+function makeSplitter(id) {
+  const sp = el('div', 'splitter'); sp.id = id; sp.title = '드래그해서 너비 조정 (더블클릭: 반반)'; bindSplitter(sp); return sp;
+}
+function bindSplitter(sp) {
+  sp.addEventListener('pointerdown', e => {
+    e.preventDefault(); sp.setPointerCapture(e.pointerId); sp.classList.add('drag'); document.body.classList.add('resizing');
+    const move = ev => {
+      if (sp.id === 'side-split') {
+        const w = Math.max(240, Math.min(640, ev.clientX - $('.layout').getBoundingClientRect().left));
+        $('.layout').style.setProperty('--side', `${w}px`); saveLayout({side: Math.round(w)});
+      } else {
+        const r = $('#runs').getBoundingClientRect();
+        const left = Math.max(0.2, Math.min(0.8, (ev.clientX - r.left) / r.width));
+        const ratio = left / (1 - left);
+        $('#runs').style.setProperty('--split', `${ratio}fr`); saveLayout({split: ratio});
+      }
+    };
+    const up = () => { sp.classList.remove('drag'); document.body.classList.remove('resizing'); sp.removeEventListener('pointermove', move); sp.removeEventListener('pointerup', up); };
+    sp.addEventListener('pointermove', move); sp.addEventListener('pointerup', up);
+  });
+  sp.addEventListener('dblclick', () => {
+    if (sp.id === 'side-split') { saveLayout({side: 340}); } else { saveLayout({split: 1}); }
+    applyLayout();
+  });
+}
+bindSplitter($('#side-split'));
+$('#toggle-side').addEventListener('click', () => { saveLayout({collapsed: !loadLayout().collapsed}); applyLayout(); });
+$('#reset-cols').addEventListener('click', () => { saveLayout({side: 340, split: 1, collapsed: false}); applyLayout(); });
+applyLayout();
 
 // ------------------------------------------------------------------ boot
 async function boot() {
