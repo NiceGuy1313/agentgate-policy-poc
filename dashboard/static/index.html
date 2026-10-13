@@ -64,6 +64,15 @@ main{min-width:0;min-height:0;display:grid;grid-template-columns:repeat(var(--co
 .run{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
 .run:last-child{border-right:0}
 .runhead{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.run.gate-on{--gate:var(--ok)}
+.run.gate-off{--gate:var(--err)}
+.run.gate-on,.run.gate-off{border-right:3px solid var(--line-2)}
+.gatebanner{display:none;align-items:baseline;gap:10px;padding:10px 14px;border-top:5px solid var(--gate);border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--gate) 13%,var(--panel))}
+.run.gate-on .gatebanner,.run.gate-off .gatebanner{display:flex}
+.gatebanner b{font:750 16px/1.2 var(--mono);color:var(--gate);letter-spacing:.02em;white-space:nowrap}
+.gatebanner span{font-size:12.5px;color:var(--muted)}
+.run.gate-on .scroll,.run.gate-off .scroll{background:color-mix(in srgb,var(--gate) 4%,var(--bg))}
+.run.gate-on .final,.run.gate-off .final{border-color:color-mix(in srgb,var(--gate) 55%,var(--line))}
 .runhead .top{display:flex;gap:10px;align-items:center}
 .runhead .lbl{font:600 12.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .pill{font:600 11px/1 var(--mono);padding:5px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -269,6 +278,7 @@ class Panel {
     this.runId = runId; this.state = {seen: new Set(), steps: new Map(), order: [], final: null, start: null, raw: [],
       counts: {llm: 0, tool: 0, blocked: 0, errors: 0, tokens: 0}};
     this.root = el('section', 'run');
+    this.banner = el('div', 'gatebanner');
     const head = el('div', 'runhead'), top = el('div', 'top');
     this.lbl = el('span', 'lbl', title); this.pill = el('span', 'pill running', '실행 중');
     top.append(this.lbl, this.pill);
@@ -285,12 +295,21 @@ class Panel {
     bar.append(tabs, exp);
     this.timeline = el('div', 'scroll'); this.rawEl = el('div', 'scroll'); this.rawEl.hidden = true;
     this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'flex';
-    this.root.append(head, bar, this.timeline, this.rawEl, this.archBox);
+    this.root.append(this.banner, head, bar, this.timeline, this.rawEl, this.archBox);
     this.stream = new EventSource(`/api/runs/${runId}/events`);
     this.stream.onmessage = e => this.apply(JSON.parse(e.data));
     this.render();
   }
   close() { this.stream.close(); }
+  setGate(condition) {
+    if (!condition || this.gate === condition) return;
+    this.gate = condition;
+    const on = ['C1', 'C2', 'C4'].includes(condition);
+    this.root.classList.remove('gate-on', 'gate-off'); this.root.classList.add(on ? 'gate-on' : 'gate-off');
+    const desc = on ? {C1: '정책 위반 호출을 실행 전에 차단 (ESCALATE도 차단)', C2: '정책 위반 호출 차단 (ESCALATE는 허용)', C4: '정책 위반 호출 차단 (ESCALATE는 판정 LLM)'}[condition]
+                    : condition === 'C3' ? 'Gate는 판정만 기록, AgentDojo spotlighting 방어' : 'Gate는 판정만 기록하고 모든 호출을 실행';
+    this.banner.replaceChildren(el('b', null, `${on ? 'GATE ON' : 'GATE OFF'} · ${on ? 'Gate 적용' : 'Gate 없음'} (${condition})`), el('span', null, desc));
+  }
   show(view) {
     this.timeline.hidden = view !== 'timeline'; this.rawEl.hidden = view !== 'raw'; this.archBox.hidden = view !== 'arch';
     this.archBox.style.display = view === 'arch' ? 'flex' : 'none';
@@ -311,7 +330,7 @@ class Panel {
     const s = this.state, d = ev.data || {};
     if (s.seen.has(ev.seq)) return; s.seen.add(ev.seq); s.raw.push(ev);
     switch (ev.kind) {
-      case 'run': if (!s.start) { s.start = ev; const m = d.manifest; if (m) this.lbl.textContent = `${this.lbl.textContent} · ${m.framework} · ${m.model.provider}:${m.model.model} · ${m.scenario.condition}`; } break;
+      case 'run': if (!s.start) { s.start = ev; const m = d.manifest; if (m) this.setGate(m.scenario.condition); if (m) this.lbl.textContent = `${this.lbl.textContent} · ${m.framework} · ${m.model.provider}:${m.model.model} · ${m.scenario.condition}`; } break;
       case 'llm_query': s.counts.llm++; this.stepOf(ev.step).llm.push({query: ev, response: null, error: null}); break;
       case 'llm_response': case 'llm_error': {
         const call = this.stepOf(ev.step).llm.findLast(c => !c.response && !c.error);
@@ -426,16 +445,16 @@ class Panel {
   }
   renderFinal() {
     const d = this.state.final.data || {}, f = el('div', 'final');
-    f.append(el('b', null, this.state.final.level === 'ERROR' ? '실행 실패' : '실행 완료'));
+    f.append(el('b', null, this.state.final.level === 'ERROR' ? 'Result · failed' : 'Result'));
     const grid = el('div', 'grid');
     const cell = (name, value, good) => { const c = el('div', 'cell'); c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
-    const yn = v => v == null ? null : v ? '예' : '아니오';
-    cell('정상 작업 성공', yn(d.utility), d.utility === true);
-    cell('공격 성공', yn(d.security), d.security === false);
-    cell('공격 성공 (실제 실행 기준)', yn(d.security_executed), d.security_executed === false);
-    cell('차단 / 전체 호출', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
+    const yn = v => v == null ? null : v ? 'Yes' : 'No';
+    cell('Utility', yn(d.utility), d.utility === true);
+    cell('Attack success (ASR)', yn(d.security), d.security === false);
+    cell('ASR · executed calls only', yn(d.security_executed), d.security_executed === false);
+    cell('Blocked / tool calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
     f.append(grid);
-    if (d.ungated_calls?.length) f.append(el('div', 'detail err', `Gate를 거치지 않은 실행: ${JSON.stringify(d.ungated_calls)}`));
+    if (d.ungated_calls?.length) f.append(el('div', 'detail err', `Ungated calls: ${JSON.stringify(d.ungated_calls)}`));
     if (d.final_output) f.append(el('pre', null, d.final_output));
     if (d.error) f.append(el('pre', 'detail err', short(d.error, 1500)));
     return f;
@@ -452,7 +471,7 @@ class Panel {
 function openPanels(items) {
   panels.forEach(p => p.close()); panels.length = 0;
   const main = $('#runs'); main.replaceChildren(); main.style.setProperty('--cols', items.length);
-  for (const [id, title] of items) { const p = new Panel(id, title); panels.push(p); main.append(p.root); }
+  for (const [id, title, condition] of items) { const p = new Panel(id, title); p.setGate(condition); panels.push(p); main.append(p.root); }
 }
 
 function refreshActive() {
@@ -506,7 +525,7 @@ $('#form').addEventListener('submit', async e => {
   const res = await fetch('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runs: items})});
   const body = await res.json().catch(() => ({}));
   if (!res.ok) { showNotice(typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail || body)); $('#run').disabled = false; return; }
-  openPanels(body.run_ids.map((id, i) => [id, items[i].label]));
+  openPanels(body.run_ids.map((id, i) => [id, items[i].label, items[i].scenario.condition]));
   loadHistory();
 });
 
