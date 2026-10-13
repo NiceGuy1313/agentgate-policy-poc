@@ -45,6 +45,32 @@ def make_tools(bridge):
     return tools
 
 
+def _text_of(content) -> str:
+    if isinstance(content, list):
+        return "".join(part.get("text") or "" for part in content if isinstance(part, dict))
+    return content or ""
+
+
+def make_model(**kwargs):
+    """LiteLLMModel that never sends an assistant message without content and tool calls.
+
+    When a model returns an empty reply, smolagents keeps it in memory as an empty assistant message; some
+    OpenAI-compatible endpoints (mistral on Ollama Cloud) reject the next request with a 400 for that.
+    """
+    from smolagents import LiteLLMModel
+
+    class SafeLiteLLMModel(LiteLLMModel):
+        def _prepare_completion_kwargs(self, *args, **inner):
+            completion_kwargs = super()._prepare_completion_kwargs(*args, **inner)
+            for message in completion_kwargs.get("messages") or []:
+                if (getattr(message.get("role"), "value", message.get("role")) == "assistant" and not message.get("tool_calls")
+                        and not _text_of(message.get("content")).strip()):
+                    message["content"] = "(empty response)"
+            return completion_kwargs
+
+    return SafeLiteLLMModel(**kwargs)
+
+
 class SmolagentsAdapter(FrameworkAdapter):
     name = "smolagents"
     display_name = "smolagents"
@@ -64,7 +90,7 @@ class SmolagentsAdapter(FrameworkAdapter):
         return path if path.exists() else None
 
     def run(self, task, bridge, model, options, max_steps, sink):
-        from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent
+        from smolagents import CodeAgent, ToolCallingAgent
         from smolagents.memory import ActionStep, PlanningStep
 
         def on_action(step: ActionStep) -> None:
@@ -84,7 +110,7 @@ class SmolagentsAdapter(FrameworkAdapter):
             sink.emit("step", "plan", step=sink.current_step, data={"type": "planning", "plan": preview(step.plan)})
 
         kwargs = model.litellm_kwargs()
-        llm = LiteLLMModel(**kwargs)
+        llm = make_model(**kwargs)
         agent_cls = CodeAgent if options.get("agent_type") == "code" else ToolCallingAgent
         agent = agent_cls(tools=make_tools(bridge), model=llm, max_steps=max_steps, verbosity_level=-1,
                           step_callbacks={ActionStep: on_action, PlanningStep: on_plan})

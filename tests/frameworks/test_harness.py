@@ -95,3 +95,15 @@ def test_registry_accepts_a_new_adapter_without_core_changes(monkeypatch):
         assert registry.get("dummy").describe()["display_name"] == "Dummy"
     finally:
         registry.reset()
+
+
+def test_smolagents_model_fills_empty_assistant_messages():
+    pytest.importorskip("smolagents")
+    from agentgate.agents.frameworks.smolagents_adapter import make_model
+    model = make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
+    kwargs = model._prepare_completion_kwargs(messages=[
+        {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": ""}]},
+        {"role": "user", "content": [{"type": "text", "text": "again"}]}], model="openai/x")
+    assert kwargs["messages"][1]["content"] == "(empty response)"
+    assert kwargs["messages"][0]["content"] != "(empty response)"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>agentgate Observatory</title>
+<title>agentgate 관측 대시보드</title>
 <!-- Layout and call-history rendering adapted from the NiceGuy1313 "Agent Observatory" dashboards
      (smolagents fork, Apache-2.0; mini-swe-agent and browser-use forks, MIT). -->
 <style>
@@ -52,6 +52,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .check input{width:auto}
 .compare{border:1px dashed var(--line-2);border-radius:8px;padding:0 10px 10px;margin-top:8px}
 .compare[hidden]{display:none}
+details.advanced{margin-top:12px;border:1px dashed var(--line-2);border-radius:8px;padding:6px 10px 10px}
+details.advanced summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
 .notice{margin:0;padding:9px 14px;font-size:12px;color:var(--err);background:var(--err-bg);border-bottom:1px solid var(--line);white-space:pre-wrap}
 .notice[hidden]{display:none}
 .preview{font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
@@ -131,7 +133,7 @@ pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel
 </head>
 <body>
 <header>
-  <h1>agentgate Observatory <span>· AgentDojo × agent frameworks × policy gate</span></h1>
+  <h1>agentgate 관측 대시보드 <span>· AgentDojo 시나리오 × 에이전트 × 정책 Gate</span></h1>
   <span class="hint" id="active-hint"></span>
   <label style="margin:0 0 0 auto;display:flex;gap:6px;align-items:center;font-size:12px">
     지난 실행 <select id="history" style="width:auto;max-width:280px"><option value="">—</option></select>
@@ -141,42 +143,42 @@ pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel
 <div class="layout">
   <aside>
     <form id="form" class="panelbox">
-      <h2>Test variables</h2>
-      <label for="framework">Agent framework</label>
+      <h2>테스트 설정</h2>
+      <label for="framework">에이전트</label>
       <select id="framework"></select>
-      <div id="fw-options"></div>
-      <div class="two">
-        <div><label for="provider">Provider</label><select id="provider"></select></div>
-        <div><label for="max_steps">Max steps</label><input id="max_steps" type="number" min="1" max="40" value="15"></div>
-      </div>
-      <label for="model">Model</label>
-      <input id="model" list="model-list" value="gpt-oss:120b"><datalist id="model-list"></datalist>
-      <label for="base_url">Base URL (openai_compat 필수, 그 외 선택)</label>
-      <input id="base_url" placeholder="기본값 사용 (ollama: OLLAMA_HOST)">
-      <div class="two">
-        <div><label for="suite">Suite</label><select id="suite"></select></div>
-        <div><label for="condition">Condition</label><select id="condition"></select></div>
-      </div>
-      <label for="user_task">User task</label><select id="user_task"></select>
-      <label for="injection_task">Injection task</label><select id="injection_task"></select>
-      <div class="two">
-        <div><label for="attack">Attack</label><select id="attack"></select></div>
-        <div><label for="spec">TaskSpec</label><select id="spec"><option value="oracle">oracle</option><option value="llm">llm 추출</option></select></div>
-      </div>
-      <label class="check"><input type="checkbox" id="compare-on"> 비교 실행 (B를 나란히)</label>
-      <div id="compare" class="compare" hidden>
+      <label for="model-preset">모델</label>
+      <select id="model-preset"></select>
+      <label for="suite">도메인</label>
+      <select id="suite"></select>
+      <label for="user_task">사용자 작업</label><select id="user_task"></select>
+      <label for="injection_task">공격 (인젝션)</label><select id="injection_task"></select>
+      <label for="defense">방어</label>
+      <select id="defense"><option value="gate">Gate 적용</option><option value="none">Gate 없음</option></select>
+      <label class="check"><input type="checkbox" id="compare-on" checked> Gate 없이 실행한 결과와 나란히 비교</label>
+      <details class="advanced">
+        <summary>고급 설정</summary>
         <div class="two">
-          <div><label for="b-condition">B · Condition</label><select id="b-condition"></select></div>
-          <div><label for="b-framework">B · Framework</label><select id="b-framework"></select></div>
+          <div><label for="provider">제공자</label><select id="provider"></select></div>
+          <div><label for="max_steps">최대 단계</label><input id="max_steps" type="number" min="1" max="40" value="15"></div>
         </div>
-        <label for="b-model">B · Model (비우면 A와 동일)</label><input id="b-model" list="model-list" placeholder="same as A">
-      </div>
-      <button id="run" class="primary" type="submit">Run</button>
+        <label for="model">모델 직접 입력</label>
+        <input id="model" list="model-list" value="gpt-oss:120b"><datalist id="model-list"></datalist>
+        <label for="base_url">Base URL (openai_compat일 때 필수)</label>
+        <input id="base_url" placeholder="기본값 (ollama: OLLAMA_HOST)">
+        <div class="two">
+          <div><label for="attack">공격 문구 방식</label><select id="attack"></select></div>
+          <div><label for="spec">TaskSpec 출처</label><select id="spec"><option value="oracle">oracle (정답)</option><option value="llm">LLM 추출</option></select></div>
+        </div>
+        <label for="escalate">Gate 판정이 애매할 때 (ESCALATE)</label>
+        <select id="escalate"><option value="C1">차단 (C1)</option><option value="C2">허용 (C2)</option><option value="C4">판정 LLM에 맡김 (C4)</option></select>
+        <div id="fw-options"></div>
+      </details>
+      <button id="run" class="primary" type="submit">실행</button>
       <div class="hint" id="cost-hint" style="margin-top:6px"></div>
     </form>
-    <div class="panelbox"><h2>Scenario</h2><div id="preview" class="preview">—</div></div>
+    <div class="panelbox"><h2>시나리오</h2><div id="preview" class="preview">—</div></div>
   </aside>
-  <main id="runs"><section class="run"><div class="empty">왼쪽에서 변수를 고르고 Run을 누르면 LLM 호출, 툴 호출, Gate 판정이 실시간으로 쌓입니다.</div></section></main>
+  <main id="runs"><section class="run"><div class="empty">왼쪽에서 설정을 고르고 실행을 누르면 LLM 호출, 툴 호출, Gate 판정이 실시간으로 쌓입니다.</div></section></main>
 </div>
 <script>
 const $ = s => document.querySelector(s);
@@ -205,9 +207,8 @@ function renderFrameworkOptions() {
     input.id = `opt-${key}`; input.dataset.opt = key; input.value = prop.default ?? '';
     box.append(lab, input);
   }
-  const cond = $('#condition'), current = cond.value; cond.replaceChildren();
-  for (const [c, text] of Object.entries(CATALOG.conditions)) option(cond, c, `${c} · ${text}`, !info.conditions.includes(c));
-  cond.value = info.conditions.includes(current) ? current : 'C1';
+  [...$('#escalate').options].forEach(o => { o.disabled = !info.conditions.includes(o.value); });
+  if ($('#escalate').selectedOptions[0]?.disabled) $('#escalate').value = 'C1';
   $('#max_steps').value = info.default_max_steps || 15;
 }
 
@@ -215,7 +216,7 @@ function fillTasks() {
   const s = CATALOG.suites[$('#suite').value];
   const ut = $('#user_task'), it = $('#injection_task'); ut.replaceChildren(); it.replaceChildren();
   s.user_tasks.forEach(t => option(ut, t.id, `${t.id} · ${short(t.prompt, 60)}`));
-  option(it, 'none', 'none (정상 작업만, utility 확인)');
+  option(it, 'none', '공격 없음 (정상 작업만)');
   s.injection_tasks.forEach(t => option(it, t.id, `${t.id} · ${short(t.goal, 60)}`));
   if (s.injection_tasks.length) it.value = s.injection_tasks[0].id;
   updatePreview();
@@ -233,27 +234,33 @@ async function doPreview() {
   const q = new URLSearchParams({suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value, attack: $('#attack').value});
   const p = await fetch(`/api/scenario?${q}`).then(r => r.json()).catch(() => null);
   const box = $('#preview'); box.replaceChildren(); if (!p) return;
-  box.append(el('b', null, 'User prompt'), el('pre', null, p.prompt));
-  if (p.goal) { box.append(el('b', null, 'Injection GOAL'), el('pre', 'goal', p.goal)); }
+  box.append(el('b', null, '사용자 요청'), el('pre', null, p.prompt));
+  if (p.goal) { box.append(el('b', null, '공격 목표'), el('pre', 'goal', p.goal)); }
   if (p.injections) for (const [k, v] of Object.entries(p.injections)) { box.append(el('b', null, `주입 위치 · ${k}`), el('pre', null, short(v, 600))); }
-  if (p.oracle_spec) box.append(el('b', null, 'TaskSpec (oracle)'), el('pre', null, JSON.stringify(p.oracle_spec, null, 1)));
+  if (p.oracle_spec) box.append(el('b', null, 'TaskSpec (oracle, Gate가 보는 사용자 의도)'), el('pre', null, JSON.stringify(p.oracle_spec, null, 1)));
 }
 
-function readRun(prefix) {
-  const fw = prefix && $('#b-framework').value !== '' ? $('#b-framework').value : $('#framework').value;
+function readRun(gate, label) {
   const options = {};
-  if (!prefix || fw === $('#framework').value) document.querySelectorAll('[data-opt]').forEach(i => { options[i.dataset.opt] = i.value; });
-  const model = (prefix && $('#b-model').value.trim()) || $('#model').value.trim();
-  return {framework: fw, options, max_steps: Number($('#max_steps').value),
-          model: {provider: $('#provider').value, model, ...($('#base_url').value.trim() ? {base_url: $('#base_url').value.trim()} : {})},
+  document.querySelectorAll('[data-opt]').forEach(i => { options[i.dataset.opt] = i.value; });
+  const baseUrl = $('#base_url').value.trim();
+  return {framework: $('#framework').value, options, max_steps: Number($('#max_steps').value),
+          model: {provider: $('#provider').value, model: $('#model').value.trim(), ...(baseUrl ? {base_url: baseUrl} : {})},
           scenario: {suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value,
-                     condition: prefix ? $('#b-condition').value : $('#condition').value, spec: $('#spec').value, attack: $('#attack').value},
-          label: prefix ? 'B' : 'A'};
+                     condition: gate ? $('#escalate').value : 'C0', spec: $('#spec').value, attack: $('#attack').value},
+          label};
+}
+
+function applyPreset() {
+  const v = $('#model-preset').value; if (!v) return;
+  const [provider, ...rest] = v.split('|'); $('#provider').value = provider; $('#model').value = rest.join('|');
+  loadModels();
 }
 
 function updateCost() {
   const n = $('#compare-on').checked ? 2 : 1;
-  $('#cost-hint').textContent = `최대 LLM 호출 ≈ ${n} × ${$('#max_steps').value} = ${n * Number($('#max_steps').value)}회 (+ TaskSpec 추출·판정 LLM)`;
+  $('#cost-hint').textContent = `실행 ${n}건 · 최대 LLM 호출 약 ${n * Number($('#max_steps').value)}회`;
+  $('#defense').disabled = $('#compare-on').checked;
 }
 
 // ------------------------------------------------------------------ run panels
@@ -263,18 +270,18 @@ class Panel {
       counts: {llm: 0, tool: 0, blocked: 0, errors: 0, tokens: 0}};
     this.root = el('section', 'run');
     const head = el('div', 'runhead'), top = el('div', 'top');
-    this.lbl = el('span', 'lbl', title); this.pill = el('span', 'pill running', 'running');
+    this.lbl = el('span', 'lbl', title); this.pill = el('span', 'pill running', '실행 중');
     top.append(this.lbl, this.pill);
     this.stats = el('div', 'stats');
     head.append(top, this.stats);
     const bar = el('div', 'bar'), tabs = el('div', 'tabs');
     this.views = {};
-    for (const [key, name] of [['timeline', 'Call history'], ['raw', 'Raw log'], ['arch', 'Architecture']]) {
+    for (const [key, name] of [['timeline', '호출 이력'], ['raw', '원본 로그'], ['arch', '구조도']]) {
       const b = el('button', null, name); b.type = 'button'; b.setAttribute('aria-selected', key === 'timeline');
       b.onclick = () => { tabs.querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', x === b)); this.show(key); };
       tabs.append(b);
     }
-    const exp = el('a'); exp.href = `/api/runs/${runId}/trace.json`; exp.download = ''; exp.append(el('button', 'ghost', 'Export JSON'));
+    const exp = el('a'); exp.href = `/api/runs/${runId}/trace.json`; exp.download = ''; exp.append(el('button', 'ghost', 'JSON 내보내기'));
     bar.append(tabs, exp);
     this.timeline = el('div', 'scroll'); this.rawEl = el('div', 'scroll'); this.rawEl.hidden = true;
     this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'flex';
@@ -338,9 +345,9 @@ class Panel {
   render() {
     const s = this.state, c = s.counts;
     const status = s.final ? (s.final.level === 'ERROR' ? 'failed' : 'finished') : 'running';
-    this.pill.textContent = status; this.pill.className = `pill ${status}`;
+    this.pill.textContent = {running: '실행 중', finished: '완료', failed: '실패'}[status]; this.pill.className = `pill ${status}`;
     this.stats.replaceChildren();
-    for (const [k, v, cls] of [['steps', s.order.filter(k => k > 0).length], ['LLM', c.llm], ['tools', c.tool], ['blocked', c.blocked, 'blk'], ['tokens', c.tokens.toLocaleString()], ['errors', c.errors]]) {
+    for (const [k, v, cls] of [['단계', s.order.filter(k => k > 0).length], ['LLM 호출', c.llm], ['툴 호출', c.tool], ['차단', c.blocked, 'blk'], ['토큰', c.tokens.toLocaleString()], ['오류', c.errors]]) {
       const sp = el('span', cls); sp.append(`${k} `, el('b', null, String(v))); this.stats.append(sp);
     }
     if (!this.timeline.hidden) this.renderTimeline();
@@ -353,11 +360,11 @@ class Panel {
     tl.replaceChildren();
     if (s.start) {
       const d = s.start.data, t = el('div', 'task');
-      t.append(el('b', null, 'Task '), d.task || '');
-      if (d.injection_goal) { t.append('\n'); t.append(el('b', null, 'Injection GOAL ')); t.append(el('span', 'goal', d.injection_goal)); }
+      t.append(el('b', null, '사용자 요청 '), d.task || '');
+      if (d.injection_goal) { t.append('\n'); t.append(el('b', null, '공격 목표 ')); t.append(el('span', 'goal', d.injection_goal)); }
       if (d.spec) { t.append('\n'); t.append(el('b', null, `TaskSpec (${d.spec_source}) `), short(JSON.stringify(d.spec), 400)); }
       tl.append(t);
-    } else tl.append(el('div', 'empty', '시작하는 중…'));
+    } else tl.append(el('div', 'empty', '시작하는 중… (TaskSpec 준비)'));
     for (const key of s.order) tl.append(this.renderStep(s.steps.get(key)));
     if (s.final) tl.append(this.renderFinal());
     if (stick) tl.scrollTop = tl.scrollHeight;
@@ -366,16 +373,16 @@ class Panel {
     const info = st.info?.data;
     const box = el('div', `step${info?.error || st.llm.some(c => c.error) ? ' err' : ''}`);
     const head = el('div', 'step-head');
-    head.append(el('span', 'n', st.n === 0 ? 'Before step 1' : `Step ${st.n}`));
-    if (info?.is_final_answer) head.append(el('span', 'badge', 'final answer'));
+    head.append(el('span', 'n', st.n === 0 ? '시작 전' : `${st.n}단계`));
+    if (info?.is_final_answer) head.append(el('span', 'badge', '최종 답'));
     head.append(el('span', 'dur', fmtDur(info?.duration_seconds)));
     box.append(head);
-    if (st.plan) { const g = el('div', 'goalline'); g.append(el('b', null, 'Plan · '), short(st.plan, 600)); box.append(g); }
+    if (st.plan) { const g = el('div', 'goalline'); g.append(el('b', null, '계획 · '), short(st.plan, 600)); box.append(g); }
     const thought = (info?.model_output || '').split('<code>')[0].replace(/^Thought:\s*/i, '').trim();
-    if (thought) { const g = el('div', 'goalline'); g.append(el('b', null, 'Thought · '), short(thought, 400)); box.append(g); }
+    if (thought) { const g = el('div', 'goalline'); g.append(el('b', null, '생각 · '), short(thought, 400)); box.append(g); }
     for (const c of st.llm) box.append(this.llmRow(c));
     for (const t of st.tools) box.append(this.toolRow(t));
-    if (info?.error) { const r = el('div', 'row error'), m = el('div', 'main'); m.append(el('div', 'title', 'Step error'), el('div', 'detail err', short(info.error, 800))); r.append(el('span', 'tag', 'STEP'), m, el('div', 'meta')); box.append(r); }
+    if (info?.error) { const r = el('div', 'row error'), m = el('div', 'main'); m.append(el('div', 'title', '단계 오류'), el('div', 'detail err', short(info.error, 800))); r.append(el('span', 'tag', 'STEP'), m, el('div', 'meta')); box.append(r); }
     return box;
   }
   llmRow(c) {
@@ -401,9 +408,9 @@ class Panel {
       const cls = eff === 'BLOCK' ? 'block' : eff === 'ESCALATE' ? 'escalate' : '';
       const b = el('span', `badge ${cls}`, `${eff}${g.policy_id ? ' · ' + g.policy_id : ''}`); title.append(b);
       if (g.verdict && g.effective && g.verdict !== g.effective) title.append(el('span', 'badge escalate', `판정 ${g.verdict}`));
-      if (!blocked && g.effective === 'BLOCK') title.append(el('span', 'badge block audit', 'audit: 실행됨'));
-      if (g.decide_only) title.append(el('span', 'badge audit', 'decide only'));
-      if ((g.output || '').includes('<INFORMATION>')) title.append(el('span', 'badge inj', 'injection'));
+      if (!blocked && g.effective === 'BLOCK') title.append(el('span', 'badge block audit', '기록만 (실행됨)'));
+      if (g.decide_only) title.append(el('span', 'badge audit', '판정만'));
+      if ((g.output || '').includes('<INFORMATION>')) title.append(el('span', 'badge inj', '인젝션 포함'));
     } else if (t.start) {
       const internal = fwInfo(this.state.start?.data?.manifest?.framework)?.internal_tools || [];
       title.append(internal.includes(t.name) ? el('span', 'badge audit', '프레임워크 내부 툴') : el('span', 'badge block audit', 'NO GATE'));
@@ -412,20 +419,21 @@ class Panel {
     main.append(el('div', 'detail', short(g?.args ?? t.start?.data?.params, 300)));
     if (g?.reason) main.append(el('div', 'detail reason', `${g.policy_id}: ${g.reason}`));
     if (g?.judge) main.append(el('div', 'detail', `judge: ${short(g.judge, 300)}`));
-    if (g?.output) { const o = el('details', 'detail'); o.append(el('summary', null, blocked ? '에이전트가 받은 차단 메시지' : 'Tool output'), el('div', null, short(g.output, 1200))); main.append(o); }
+    if (g?.output) { const o = el('details', 'detail'); o.append(el('summary', null, blocked ? '에이전트가 받은 차단 메시지' : '툴 출력'), el('div', null, short(g.output, 1200))); main.append(o); }
     if (t.end?.kind === 'tool_error') main.append(el('div', 'detail err', t.end.data.error_type));
     r.append(el('span', 'tag', blocked ? 'BLOCK' : 'TOOL'), main, el('div', 'meta', `${g?.decide_ms != null ? 'gate ' + g.decide_ms + 'ms · ' : ''}${fmtDur(t.end?.data?.duration_seconds)}`));
     return r;
   }
   renderFinal() {
     const d = this.state.final.data || {}, f = el('div', 'final');
-    f.append(el('b', null, this.state.final.message));
+    f.append(el('b', null, this.state.final.level === 'ERROR' ? '실행 실패' : '실행 완료'));
     const grid = el('div', 'grid');
     const cell = (name, value, good) => { const c = el('div', 'cell'); c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
-    cell('utility (정상 작업)', d.utility, d.utility === true);
-    cell('attack success', d.security, d.security === false);
-    cell('attack (실행 기준)', d.security_executed, d.security_executed === false);
-    cell('blocked / calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
+    const yn = v => v == null ? null : v ? '예' : '아니오';
+    cell('정상 작업 성공', yn(d.utility), d.utility === true);
+    cell('공격 성공', yn(d.security), d.security === false);
+    cell('공격 성공 (실제 실행 기준)', yn(d.security_executed), d.security_executed === false);
+    cell('차단 / 전체 호출', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
     f.append(grid);
     if (d.ungated_calls?.length) f.append(el('div', 'detail err', `Gate를 거치지 않은 실행: ${JSON.stringify(d.ungated_calls)}`));
     if (d.final_output) f.append(el('pre', null, d.final_output));
@@ -467,31 +475,33 @@ async function loadHistory() {
 async function boot() {
   CATALOG = await fetch('/api/catalog').then(r => r.json());
   for (const f of CATALOG.frameworks) { option($('#framework'), f.name, `${f.display_name}${f.unavailable ? ' — ' + f.unavailable : ''}`, !!f.unavailable); }
-  option($('#b-framework'), '', '(A와 동일)');
-  for (const f of CATALOG.frameworks) option($('#b-framework'), f.name, f.display_name, !!f.unavailable);
   $('#framework').value = CATALOG.frameworks.find(f => f.name === 'smolagents' && !f.unavailable) ? 'smolagents' : 'native';
-  CATALOG.providers.forEach(p => option($('#provider'), p)); $('#provider').value = 'ollama';
+  for (const p of CATALOG.model_presets) option($('#model-preset'), `${p.provider}|${p.model}`, `${p.model} (${p.provider})`);
+  option($('#model-preset'), '', '직접 입력 (고급 설정)');
+  CATALOG.providers.forEach(p => option($('#provider'), p));
   Object.keys(CATALOG.suites).forEach(s => option($('#suite'), s)); $('#suite').value = 'banking';
   CATALOG.attacks.forEach(a => option($('#attack'), a));
-  for (const [c, text] of Object.entries(CATALOG.conditions)) option($('#b-condition'), c, `${c} · ${text}`);
-  $('#b-condition').value = 'C0';
-  renderFrameworkOptions(); fillTasks(); loadModels(); updateCost(); loadHistory();
+  applyPreset(); renderFrameworkOptions(); fillTasks(); updateCost(); loadHistory();
   const st = await fetch('/api/status').then(r => r.json()).catch(() => ({}));
-  const missing = Object.entries(st.missing_keys || {}).map(([p, k]) => `${p}: ${k}`);
+  const used = new Set(CATALOG.model_presets.map(p => p.provider));
+  const missing = Object.entries(st.missing_keys || {}).filter(([p]) => used.has(p)).map(([p, k]) => `${p}: ${k}`);
   if (missing.length) showNotice(`설정되지 않은 키 — ${missing.join(', ')} (.env 또는 환경 변수, 서버 재시작 필요)`);
 }
 
 $('#framework').addEventListener('change', renderFrameworkOptions);
-$('#provider').addEventListener('change', loadModels);
+$('#model-preset').addEventListener('change', applyPreset);
+$('#provider').addEventListener('change', () => { $('#model-preset').value = ''; loadModels(); });
+$('#model').addEventListener('input', () => { $('#model-preset').value = ''; });
 $('#suite').addEventListener('change', fillTasks);
 ['#user_task', '#injection_task', '#attack'].forEach(s => $(s).addEventListener('change', updatePreview));
 ['#max_steps', '#compare-on'].forEach(s => $(s).addEventListener('input', updateCost));
-$('#compare-on').addEventListener('change', () => { $('#compare').hidden = !$('#compare-on').checked; updateCost(); });
-$('#history').addEventListener('change', () => { const id = $('#history').value; if (id) openPanels([[id, 'history']]); });
+$('#compare-on').addEventListener('change', updateCost);
+$('#history').addEventListener('change', () => { const id = $('#history').value; if (id) openPanels([[id, '지난 실행']]); });
 
 $('#form').addEventListener('submit', async e => {
   e.preventDefault(); showNotice('');
-  const items = [readRun('')]; if ($('#compare-on').checked) items.push(readRun('b'));
+  const items = $('#compare-on').checked ? [readRun(true, 'Gate 적용'), readRun(false, 'Gate 없음')]
+    : [readRun($('#defense').value === 'gate', $('#defense').value === 'gate' ? 'Gate 적용' : 'Gate 없음')];
   $('#run').disabled = true;
   const res = await fetch('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runs: items})});
   const body = await res.json().catch(() => ({}));

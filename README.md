@@ -29,7 +29,7 @@ pip install -e '.[dev,dashboard,smolagents]'
 uvicorn dashboard.app:app --host 127.0.0.1 --port 8000      # http://127.0.0.1:8000
 ```
 
-왼쪽에서 프레임워크, 제공자·모델(예: ollama `gpt-oss:120b`, `mistral-large-3:675b`), suite, user task, injection task, attack, 조건(C0–C4), TaskSpec 출처, max steps를 고른다. "비교 실행"을 켜면 조건·프레임워크·모델을 바꾼 B를 나란히 실행한다. 툴 호출마다 Gate 판정(ALLOW/ESCALATE/BLOCK, 정책, 이유)이 붙고, 끝나면 utility·공격 성공 여부가 표시된다. 실행 기록은 `dashboard/runs/`(git 제외)에 저장되며 보고서 수치에는 쓰지 않는다. 연결 구조와 Wrapper 규약은 [`docs/architecture.md`](docs/architecture.md) 8절에 있다.
+기본 화면에서는 에이전트, 모델(gpt-oss:120b, mistral-large-3:675b), 도메인·사용자 작업·공격, 방어(Gate 적용/없음)만 고른다. "Gate 없이 실행한 결과와 나란히 비교"가 기본으로 켜져 있어 같은 시나리오를 C1과 C0으로 동시에 실행한다. 제공자·모델 직접 입력, 공격 문구 방식, TaskSpec 출처, 최대 단계, ESCALATE 처리(C1/C2/C4)는 "고급 설정"에 있다. 툴 호출마다 Gate 판정(ALLOW/ESCALATE/BLOCK, 정책, 이유)이 붙고, 끝나면 정상 작업 성공·공격 성공 여부가 표시된다. Ollama 모델은 `OLLAMA_API_KEY`가 서버 환경에 있어야 한다. 실행 기록은 `dashboard/runs/`(git 제외)에 저장되며 보고서 수치에는 쓰지 않는다. 연결 구조와 Wrapper 규약은 [`docs/architecture.md`](docs/architecture.md) 8절에 있다.
 
 ## 코드 지도
 

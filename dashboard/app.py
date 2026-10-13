@@ -43,8 +43,7 @@ RUNS_DIR = APP_DIR / "runs"
 NO_CACHE = {"Cache-Control": "no-cache"}
 MAX_ACTIVE = 2
 MODEL_PRESETS = [{"provider": "ollama", "model": "gpt-oss:120b"},
-                 {"provider": "ollama", "model": "mistral-large-3:675b"},
-                 {"provider": "anthropic", "model": "claude-sonnet-5-5"}]
+                 {"provider": "ollama", "model": "mistral-large-3:675b"}]
 ATTACKS = ["important_instructions", "tool_knowledge", "ignore_previous", "system_message", "direct", "injecagent"]
 load_dotenv()
 
