@@ -104,3 +104,37 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 - **요청된 툴의 인자 오염**: 요청된 일정·예약 툴에 공격 값이 섞이면 P8·P9의 툴 단위 검사로는 구분하지 못한다.
 - **툴 호출 없는 공격**(유형 H): 답변 문장만 바꾸는 공격은 범위 밖이다.
 - **TaskSpec 품질 의존**: `requested_ops`·`named_sources`가 틀리면 판정도 틀린다.
+
+## 8. 외부 에이전트 프레임워크 연결
+
+AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents, mini-swe-agent, browser-use 등)가 같은 시나리오를 수행할 때에도 모든 툴 호출이 같은 `GatedRuntime`을 지나게 한다. 구현은 [`src/agentgate/harness/`](../src/agentgate/harness/)와 [`src/agentgate/agents/frameworks/`](../src/agentgate/agents/frameworks/)에 있다.
+
+```
+대시보드 / live_evaluation.py --framework
+        │ RunRequest(framework, ModelSpec, ScenarioConfig)
+   harness.runner ── Session: AgentDojo env + 인젝션 + GatedRuntime + TaskSpec + 채점
+        │ GateToolBridge.tool_specs() / invoke(name, args)
+   어댑터(프레임워크별 번역) 또는 계약 v1 Wrapper(HTTP)
+        │
+   프레임워크 agent loop ── 모델(ModelSpec: ollama·anthropic·openai·OpenAI 호환)
+```
+
+- **역할 분리**: 어댑터는 AgentDojo 툴을 프레임워크 툴로 바꾸고 실행부에서 `bridge.invoke`만 부른다. 판정·채점·기록은 코어(`Session`)가 맡는다. 결과 레코드 형식은 `live_evaluation.py`와 같아 기존 분석 스크립트를 그대로 쓴다.
+- **등록**: 내장 어댑터, [`config/frameworks.yaml`](../config/frameworks.yaml), `agentgate.frameworks` entry point 중 하나로 등록하면 대시보드·배치 평가·적합성 테스트에 나타난다. 서버·UI는 수정하지 않는다.
+- **이벤트**: 팀원 fork의 경계 로그(`[LLM_QUERY]`, `[TOOL_EXECUTION_START]` …)를 `key=%s` 형식에서 바로 읽어 정규화 이벤트로 바꾸고, 툴 실행 사이에 `gate_decision`을 넣는다. 동시 실행은 `contextvars`로 실행별로 분리한다.
+- **우회 탐지**: 프레임워크가 남긴 `tool_start` 중 Gate 판정이 없는 실행을 `ungated_calls`로 기록하고 그 실행을 무효(`valid: false`)로 표시한다.
+- **적합성 검사**: [`harness/conformance.py`](../src/agentgate/harness/conformance.py)가 LLM 없이 OpenAI 호환 가짜 모델(`fake_llm.py`)로 프레임워크를 구동한다. 정답 궤적과 공격 궤적을 따르게 한 뒤 trace·utility·security가 네이티브 `ScriptedAgent` 결과와 같은지, 차단된 호출이 실행되지 않았는지 확인한다.
+- **의존성 격리**: `frameworks.yaml`에 `python:`을 주면 그 인터프리터의 worker 프로세스에서 시나리오 전체를 실행하고 이벤트를 JSON lines로 받는다.
+- C3(AgentDojo 방어 요소)는 네이티브 파이프라인에서만 지원한다.
+
+### Wrapper 연결 규약 v1
+
+Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wrapper는 `config/frameworks.yaml`에 `contract:` 항목 한 줄로 연결되며 Python 어댑터가 필요 없다. 참조 구현은 [`examples/contract_wrapper/minimal_agent.py`](../examples/contract_wrapper/minimal_agent.py), 클라이언트는 표준 라이브러리만 쓰는 [`agentgate_client.py`](../src/agentgate/harness/agentgate_client.py)(복사해 사용)이다.
+
+1. **툴 주입**: `GET /v1/sessions/{id}/tools`의 AgentDojo 툴(JSON schema)을 에이전트 툴로 등록한다.
+2. **실행 hook**: 툴 실행 지점에서 실제 실행 대신 `POST /v1/sessions/{id}/invoke`를 부르고, 돌아온 문자열(차단 메시지 포함)을 툴 결과로 쓴다. 예외로 루프를 끊지 않는다. Gate에 닿지 못하면 차단으로 처리한다(fail closed). Wrapper 자체 툴은 `decide`로 판정만 받을 수 있다.
+3. **모델 지정**: `AGENTGATE_MODEL`(OpenAI 호환 `base_url`·키, LiteLLM 인자)을 따른다. 특정 제공자를 고정하지 않는다.
+4. **실행 진입점**: `AGENTGATE_URL`·`AGENTGATE_SESSION`·`AGENTGATE_TOKEN`·`AGENTGATE_MAX_STEPS`·`AGENTGATE_OPTIONS` 환경 변수로 시작하고 끝에 `POST .../finish`로 최종 답을 보낸다. 스스로 시작하는 Wrapper는 `POST /v1/sessions`로 세션을 연다.
+5. **이벤트**: 경계 로그를 `POST .../events`로도 보내면 대시보드에 표시된다(선택).
+
+서비스는 `127.0.0.1`에만 바인딩하고 세션마다 bearer 토큰을 요구한다. Wrapper는 `python -m agentgate.harness.conformance --entry "<command>"`로 규약 적합성을 스스로 확인할 수 있다. MCP 노출은 아직 구현하지 않았다.

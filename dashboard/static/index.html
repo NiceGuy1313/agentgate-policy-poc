@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>agentgate 관측 대시보드</title>
+<!-- Layout and call-history rendering adapted from the NiceGuy1313 "Agent Observatory" dashboards
+     (smolagents fork, Apache-2.0; mini-swe-agent and browser-use forks, MIT). -->
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#020617;--panel:#0b1222;--panel-2:#0f172a;--line:#1e293b;--line-2:#27354d;
+  --text:#e2e8f0;--muted:#8a9ab3;--faint:#55657e;
+  --llm:#5ad1e6;--llm-bg:rgba(90,209,230,.08);
+  --tool:#f5c35b;--tool-bg:rgba(245,195,91,.08);
+  --plan:#a78bfa;--inj:#f472b6;
+  --ok:#4ade80;--ok-bg:rgba(74,222,128,.09);--warn:#fbbf24;--err:#fb7185;--err-bg:rgba(251,113,133,.09);
+  --accent:#38bdf8;--accent-ink:#04121c;
+  --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  color-scheme:light;
+  --bg:#f8fafc;--panel:#ffffff;--panel-2:#f1f5f9;--line:#e2e8f0;--line-2:#cbd5e1;
+  --text:#0f172a;--muted:#55657e;--faint:#94a3b8;
+  --llm:#0e7490;--llm-bg:rgba(14,116,144,.07);
+  --tool:#a16207;--tool-bg:rgba(161,98,7,.07);
+  --plan:#6d28d9;--inj:#be185d;
+  --ok:#15803d;--ok-bg:rgba(21,128,61,.07);--warn:#b45309;--err:#be123c;--err-bg:rgba(190,18,60,.06);
+  --accent:#0284c7;--accent-ink:#ffffff;
+}}
+:root[data-theme="dark"]{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
+header{min-height:52px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap}
+h1 span{color:var(--muted);font-weight:500}
+.hint{color:var(--muted);font-size:12px}
+.layout{display:grid;grid-template-columns:var(--side,340px) 6px minmax(0,1fr);height:calc(100vh - 52px)}
+.layout.collapsed{grid-template-columns:0 0 minmax(0,1fr)}
+.layout.collapsed aside,.layout.collapsed #side-split{display:none}
+.splitter{cursor:col-resize;background:var(--line);position:relative;touch-action:none;user-select:none}
+.splitter::after{content:"";position:absolute;top:50%;left:50%;width:2px;height:28px;margin:-14px 0 0 -1px;border-left:1px dotted var(--faint);border-right:1px dotted var(--faint)}
+.splitter:hover,.splitter.drag{background:var(--accent)}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing iframe{pointer-events:none}
+aside{border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
+.panelbox{padding:12px 14px;border-bottom:1px solid var(--line)}
+.panelbox h2{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:650}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select,button,textarea{font:inherit;color:var(--text);background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.two label{margin-top:8px}
+button{cursor:pointer;white-space:nowrap;width:auto}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650;width:100%;margin-top:12px;padding:9px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.check{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--text)}
+.check input{width:auto}
+.compare{border:1px dashed var(--line-2);border-radius:8px;padding:0 10px 10px;margin-top:8px}
+.compare[hidden]{display:none}
+details.advanced{margin-top:12px;border:1px dashed var(--line-2);border-radius:8px;padding:6px 10px 10px}
+details.advanced summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+.notice{margin:0;padding:9px 14px;font-size:12px;color:var(--err);background:var(--err-bg);border-bottom:1px solid var(--line);white-space:pre-wrap}
+.notice[hidden]{display:none}
+.preview{font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.preview b{color:var(--text);font-weight:600}
+.preview .goal{color:var(--inj)}
+.preview pre{margin:4px 0 8px;padding:6px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:11.5px/1.5 var(--mono);white-space:pre-wrap;max-height:180px;overflow:auto}
+main{min-width:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
+main.two{grid-template-columns:minmax(0,var(--split,1fr)) 6px minmax(0,1fr)}
+.run{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.run:last-child{border-right:0}
+.runhead{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.run.gate-on{--gate:var(--ok)}
+.run.gate-off{--gate:var(--err)}
+.run.gate-on,.run.gate-off{border-right:3px solid var(--line-2)}
+.gatebanner{display:none;align-items:baseline;gap:10px;padding:10px 14px;border-top:5px solid var(--gate);border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--gate) 13%,var(--panel))}
+.run.gate-on .gatebanner,.run.gate-off .gatebanner{display:flex}
+.gatebanner b{font:750 16px/1.2 var(--mono);color:var(--gate);letter-spacing:.02em;white-space:nowrap}
+.gatebanner span{font-size:12.5px;color:var(--muted)}
+.run.gate-on .scroll,.run.gate-off .scroll{background:color-mix(in srgb,var(--gate) 4%,var(--bg))}
+.run.gate-on .final,.run.gate-off .final{border-color:color-mix(in srgb,var(--gate) 55%,var(--line))}
+.runhead .top{display:flex;gap:10px;align-items:center}
+.runhead .lbl{font:600 12.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.pill{font:600 11px/1 var(--mono);padding:5px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.pill.running{color:var(--accent);border-color:var(--accent)}
+.pill.finished{color:var(--ok);border-color:var(--ok)}
+.pill.failed{color:var(--err);border-color:var(--err)}
+.stats{display:flex;gap:12px;color:var(--muted);font:12px var(--mono);flex-wrap:wrap;margin-top:4px}
+.stats b{color:var(--text);font-weight:600}
+.stats .blk b{color:var(--err)}
+.bar{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px}
+.tabs{display:flex;gap:2px;margin-right:auto}
+.tabs button{border:0;background:none;padding:5px 9px;color:var(--muted);border-radius:6px;font-size:12px}
+.tabs button[aria-selected="true"]{background:var(--panel-2);color:var(--text)}
+.ghost{background:none;font-size:12px;padding:4px 9px}
+.scroll{flex:1;overflow:auto;padding:12px}
+.scroll[hidden]{display:none}
+iframe{flex:1;width:100%;border:0;background:var(--bg)}
+.empty{color:var(--muted);padding:28px 6px;text-align:center}
+.task{font-size:13px;color:var(--muted);margin:0 0 10px;padding:9px 11px;border:1px dashed var(--line-2);border-radius:8px;white-space:pre-wrap}
+.task b{color:var(--text);font-weight:600}
+.task .goal{color:var(--inj)}
+.step{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px;overflow:hidden}
+.step.err{border-color:color-mix(in srgb,var(--err) 45%,var(--line))}
+.step-head{display:flex;align-items:baseline;gap:10px;padding:7px 11px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.step-head .n{font:650 12px var(--mono);flex:1}
+.step-head .dur{color:var(--faint);font:12px var(--mono)}
+.badge{font:600 10.5px/1 var(--mono);padding:3px 6px;border-radius:5px;border:1px solid var(--ok);color:var(--ok);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.badge.block{border-color:var(--err);color:var(--err)}
+.badge.escalate{border-color:var(--warn);color:var(--warn)}
+.badge.inj{border-color:var(--inj);color:var(--inj)}
+.badge.audit{border-style:dashed}
+.goalline{padding:7px 11px 0;font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.goalline b{color:var(--text);font-weight:600}
+.row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:start;margin:7px 11px;padding:7px 9px;border-radius:7px}
+.row.llm{background:var(--llm-bg)}
+.row.tool{background:var(--tool-bg)}
+.row.blocked,.row.error{background:var(--err-bg)}
+.tag{font:700 10.5px/20px var(--mono);letter-spacing:.06em}
+.row.llm .tag{color:var(--llm)}.row.tool .tag{color:var(--tool)}.row.blocked .tag,.row.error .tag{color:var(--err)}
+.main{min-width:0}
+.title{font:600 12.5px var(--mono);overflow-wrap:anywhere;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.detail{margin-top:3px;font:12px/1.55 var(--mono);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.detail.err{color:var(--err)}
+.detail.reason{color:var(--text)}
+details.detail summary{cursor:pointer;color:var(--faint)}
+pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:12px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
+.meta{font:12px var(--mono);color:var(--faint);white-space:nowrap;text-align:right}
+.final{border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px;overflow:hidden}
+.final .fhead{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.final .fhead b{font:650 12px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.final .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.final .cell{padding:10px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.final .cell:last-child{border-right:0}
+.final .cell span{font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.final .cell b{font:700 20px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.final .answer{padding:9px 12px;border-top:1px solid var(--line)}
+.final .answer span{display:block;font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.final .answer pre{margin:0;white-space:pre-wrap;font:12px/1.55 var(--mono);color:var(--text)}
+.final .answer.err pre{color:var(--err)}
+.run{container-type:inline-size}
+@container (max-width:620px){.final .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.final .cell:nth-child(2){border-right:0}.final .cell:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+.good{color:var(--ok)}.bad{color:var(--err)}
+.log{display:grid;grid-template-columns:66px 92px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font:12px/1.55 var(--mono)}
+.log .t{color:var(--faint)}.log .k{font-weight:700;color:var(--muted)}
+.log .m{white-space:pre-wrap;overflow-wrap:anywhere}
+.log.error .m{color:var(--err)}
+@media (max-width:980px){
+  .layout,.layout.collapsed{grid-template-columns:1fr;height:auto}
+  .splitter{display:none}
+  main.two{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--line)}
+  main{grid-template-columns:1fr}
+  .run{min-height:80vh;border-right:0;border-bottom:1px solid var(--line)}
+  header{padding:8px 16px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>agentgate 관측 대시보드 <span>· AgentDojo 시나리오 × 에이전트 × 정책 Gate</span></h1>
+  <button type="button" id="toggle-side" class="ghost" style="width:auto" title="설정 패널 접기/펴기">◧ 설정 패널</button>
+  <button type="button" id="reset-cols" class="ghost" style="width:auto" title="컬럼 너비를 기본값으로">컬럼 초기화</button>
+  <span class="hint" id="active-hint"></span>
+  <label style="margin:0 0 0 auto;display:flex;gap:6px;align-items:center;font-size:12px">
+    지난 실행 <select id="history" style="width:auto;max-width:280px"><option value="">—</option></select>
+  </label>
+</header>
+<p id="notice" class="notice" hidden></p>
+<div class="layout">
+  <aside>
+    <form id="form" class="panelbox">
+      <h2>테스트 설정</h2>
+      <label for="framework">에이전트</label>
+      <select id="framework"></select>
+      <label for="model-preset">모델</label>
+      <select id="model-preset"></select>
+      <label for="suite">도메인</label>
+      <select id="suite"></select>
+      <label for="user_task">사용자 작업</label><select id="user_task"></select>
+      <label for="injection_task">공격 (인젝션)</label><select id="injection_task"></select>
+      <label for="defense">방어</label>
+      <select id="defense"><option value="gate">Gate 적용</option><option value="none">Gate 없음</option></select>
+      <label class="check"><input type="checkbox" id="compare-on" checked> Gate 없이 실행한 결과와 나란히 비교</label>
+      <details class="advanced">
+        <summary>고급 설정</summary>
+        <div class="two">
+          <div><label for="provider">제공자</label><select id="provider"></select></div>
+          <div><label for="max_steps">최대 단계</label><input id="max_steps" type="number" min="1" max="40" value="15"></div>
+        </div>
+        <label for="model">모델 직접 입력</label>
+        <input id="model" list="model-list" value="gpt-oss:120b"><datalist id="model-list"></datalist>
+        <label for="base_url">Base URL (openai_compat일 때 필수)</label>
+        <input id="base_url" placeholder="기본값 (ollama: OLLAMA_HOST)">
+        <div class="two">
+          <div><label for="attack">공격 문구 방식</label><select id="attack"></select></div>
+          <div><label for="spec">TaskSpec 출처</label><select id="spec"><option value="oracle">oracle (정답)</option><option value="llm">LLM 추출</option></select></div>
+        </div>
+        <label for="escalate">Gate 판정이 애매할 때 (ESCALATE)</label>
+        <select id="escalate"><option value="C1">차단 (C1)</option><option value="C2">허용 (C2)</option><option value="C4">판정 LLM에 맡김 (C4)</option></select>
+        <div id="fw-options"></div>
+      </details>
+      <button id="run" class="primary" type="submit">실행</button>
+      <div class="hint" id="cost-hint" style="margin-top:6px"></div>
+    </form>
+    <div class="panelbox"><h2>시나리오</h2><div id="preview" class="preview">—</div></div>
+  </aside>
+  <div class="splitter" id="side-split" title="드래그해서 너비 조정 (더블클릭: 초기화)"></div>
+  <main id="runs"><section class="run"><div class="empty">왼쪽에서 설정을 고르고 실행을 누르면 LLM 호출, 툴 호출, Gate 판정이 실시간으로 쌓입니다.</div></section></main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const notice = $('#notice');
+let CATALOG = null;
+const panels = [];
+
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+const fmtDur = s => s == null ? '' : s < 1 ? `${Math.round(s * 1000)}ms` : `${Number(s).toFixed(2)}s`;
+const fmtTime = iso => new Date(iso).toLocaleTimeString('ko-KR', {hour12: false});
+const short = (v, n = 220) => { if (v == null) return ''; const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; };
+function showNotice(msg) { notice.textContent = msg || ''; notice.hidden = !msg; }
+function option(sel, value, text, disabled) { const o = el('option', null, text ?? value); o.value = value; if (disabled) o.disabled = true; sel.append(o); }
+
+// ------------------------------------------------------------------ form
+function fwInfo(name) { return CATALOG.frameworks.find(f => f.name === name); }
+
+function renderFrameworkOptions() {
+  const box = $('#fw-options'); box.replaceChildren();
+  const info = fwInfo($('#framework').value); if (!info) return;
+  for (const [key, prop] of Object.entries(info.options_schema?.properties || {})) {
+    const lab = el('label', null, prop.title || key); lab.htmlFor = `opt-${key}`;
+    let input;
+    if (prop.enum) { input = el('select'); prop.enum.forEach(v => option(input, v)); }
+    else input = el('input');
+    input.id = `opt-${key}`; input.dataset.opt = key; input.value = prop.default ?? '';
+    box.append(lab, input);
+  }
+  [...$('#escalate').options].forEach(o => { o.disabled = !info.conditions.includes(o.value); });
+  if ($('#escalate').selectedOptions[0]?.disabled) $('#escalate').value = 'C1';
+  $('#max_steps').value = info.default_max_steps || 15;
+}
+
+function fillTasks() {
+  const s = CATALOG.suites[$('#suite').value];
+  const ut = $('#user_task'), it = $('#injection_task'); ut.replaceChildren(); it.replaceChildren();
+  s.user_tasks.forEach(t => option(ut, t.id, `${t.id} · ${short(t.prompt, 60)}`));
+  option(it, 'none', '공격 없음 (정상 작업만)');
+  s.injection_tasks.forEach(t => option(it, t.id, `${t.id} · ${short(t.goal, 60)}`));
+  if (s.injection_tasks.length) it.value = s.injection_tasks[0].id;
+  updatePreview();
+}
+
+async function loadModels() {
+  const list = $('#model-list'); list.replaceChildren();
+  const r = await fetch(`/api/models?provider=${$('#provider').value}`).then(r => r.json()).catch(() => ({models: []}));
+  (r.models || []).forEach(m => option(list, m));
+}
+
+let previewTimer = null;
+function updatePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(doPreview, 150); }
+async function doPreview() {
+  const q = new URLSearchParams({suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value, attack: $('#attack').value});
+  const p = await fetch(`/api/scenario?${q}`).then(r => r.json()).catch(() => null);
+  const box = $('#preview'); box.replaceChildren(); if (!p) return;
+  box.append(el('b', null, '사용자 요청'), el('pre', null, p.prompt));
+  if (p.goal) { box.append(el('b', null, '공격 목표'), el('pre', 'goal', p.goal)); }
+  if (p.injections) for (const [k, v] of Object.entries(p.injections)) { box.append(el('b', null, `주입 위치 · ${k}`), el('pre', null, short(v, 600))); }
+  if (p.oracle_spec) box.append(el('b', null, 'TaskSpec (oracle, Gate가 보는 사용자 의도)'), el('pre', null, JSON.stringify(p.oracle_spec, null, 1)));
+}
+
+function readRun(gate, label) {
+  const options = {};
+  document.querySelectorAll('[data-opt]').forEach(i => { options[i.dataset.opt] = i.value; });
+  const baseUrl = $('#base_url').value.trim();
+  return {framework: $('#framework').value, options, max_steps: Number($('#max_steps').value),
+          model: {provider: $('#provider').value, model: $('#model').value.trim(), ...(baseUrl ? {base_url: baseUrl} : {})},
+          scenario: {suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value,
+                     condition: gate ? $('#escalate').value : 'C0', spec: $('#spec').value, attack: $('#attack').value},
+          label};
+}
+
+function applyPreset() {
+  const v = $('#model-preset').value; if (!v) return;
+  const [provider, ...rest] = v.split('|'); $('#provider').value = provider; $('#model').value = rest.join('|');
+  loadModels();
+}
+
+function updateCost() {
+  const n = $('#compare-on').checked ? 2 : 1;
+  $('#cost-hint').textContent = `실행 ${n}건 · 최대 LLM 호출 약 ${n * Number($('#max_steps').value)}회`;
+  $('#defense').disabled = $('#compare-on').checked;
+}
+
+// ------------------------------------------------------------------ run panels
+class Panel {
+  constructor(runId, title) {
+    this.runId = runId; this.state = {seen: new Set(), steps: new Map(), order: [], final: null, start: null, raw: [],
+      counts: {llm: 0, tool: 0, blocked: 0, errors: 0, tokens: 0}};
+    this.root = el('section', 'run');
+    this.banner = el('div', 'gatebanner');
+    const head = el('div', 'runhead'), top = el('div', 'top');
+    this.lbl = el('span', 'lbl', title); this.pill = el('span', 'pill running', '실행 중');
+    top.append(this.lbl, this.pill);
+    this.stats = el('div', 'stats');
+    head.append(top, this.stats);
+    const bar = el('div', 'bar'), tabs = el('div', 'tabs');
+    this.views = {};
+    for (const [key, name] of [['timeline', '호출 이력'], ['raw', '원본 로그'], ['arch', '구조도']]) {
+      const b = el('button', null, name); b.type = 'button'; b.setAttribute('aria-selected', key === 'timeline');
+      b.onclick = () => { tabs.querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', x === b)); this.show(key); };
+      tabs.append(b);
+    }
+    const exp = el('a'); exp.href = `/api/runs/${runId}/trace.json`; exp.download = ''; exp.append(el('button', 'ghost', 'JSON 내보내기'));
+    bar.append(tabs, exp);
+    this.timeline = el('div', 'scroll'); this.rawEl = el('div', 'scroll'); this.rawEl.hidden = true;
+    this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'none';
+    this.root.append(this.banner, head, bar, this.timeline, this.rawEl, this.archBox);
+    this.stream = new EventSource(`/api/runs/${runId}/events`);
+    this.stream.onmessage = e => this.apply(JSON.parse(e.data));
+    this.render();
+  }
+  close() { this.stream.close(); }
+  setGate(condition) {
+    if (!condition || this.gate === condition) return;
+    this.gate = condition;
+    const on = ['C1', 'C2', 'C4'].includes(condition);
+    this.root.classList.remove('gate-on', 'gate-off'); this.root.classList.add(on ? 'gate-on' : 'gate-off');
+    const desc = on ? {C1: '정책 위반 호출을 실행 전에 차단 (ESCALATE도 차단)', C2: '정책 위반 호출 차단 (ESCALATE는 허용)', C4: '정책 위반 호출 차단 (ESCALATE는 판정 LLM)'}[condition]
+                    : condition === 'C3' ? 'Gate는 판정만 기록, AgentDojo spotlighting 방어' : 'Gate는 판정만 기록하고 모든 호출을 실행';
+    this.banner.replaceChildren(el('b', null, `${on ? 'GATE ON' : 'GATE OFF'} · ${on ? 'Gate 적용' : 'Gate 없음'} (${condition})`), el('span', null, desc));
+  }
+  show(view) {
+    this.timeline.hidden = view !== 'timeline'; this.rawEl.hidden = view !== 'raw'; this.archBox.hidden = view !== 'arch';
+    this.archBox.style.display = view === 'arch' ? 'flex' : 'none';
+    if (view === 'arch' && !this.archBox.childElementCount) {
+      const fw = this.state.start?.data?.manifest?.framework;
+      const info = fw && fwInfo(fw);
+      if (info?.has_architecture) { const f = el('iframe'); f.src = `/architecture/${fw}`; f.title = `${fw} architecture`; this.archBox.append(f); }
+      else this.archBox.append(el('div', 'empty', '이 프레임워크에는 구조도가 없습니다.'));
+    }
+    this.render();
+  }
+  stepOf(n) {
+    const key = n ?? 0, s = this.state;
+    if (!s.steps.has(key)) { s.steps.set(key, {n: key, llm: [], tools: [], info: null, plan: null}); s.order.push(key); }
+    return s.steps.get(key);
+  }
+  apply(ev) {
+    const s = this.state, d = ev.data || {};
+    if (s.seen.has(ev.seq)) return; s.seen.add(ev.seq); s.raw.push(ev);
+    switch (ev.kind) {
+      case 'run': if (!s.start) { s.start = ev; const m = d.manifest; if (m) this.setGate(m.scenario.condition); if (m) this.lbl.textContent = `${this.lbl.textContent} · ${m.framework} · ${m.model.provider}:${m.model.model} · ${m.scenario.condition}`; } break;
+      case 'llm_query': s.counts.llm++; this.stepOf(ev.step).llm.push({query: ev, response: null, error: null}); break;
+      case 'llm_response': case 'llm_error': {
+        const call = this.stepOf(ev.step).llm.findLast(c => !c.response && !c.error);
+        if (call) call[ev.kind === 'llm_error' ? 'error' : 'response'] = ev; else this.stepOf(ev.step).llm.push({query: ev, response: ev});
+        if (ev.kind === 'llm_error') s.counts.errors++;
+        s.counts.tokens += Number(d.input_tokens || 0) + Number(d.output_tokens || 0);
+        break;
+      }
+      case 'tool_start': this.stepOf(ev.step).tools.push({name: d.action, start: ev, gate: null, end: null}); break;
+      case 'gate_decision': {
+        const st = this.stepOf(ev.step);
+        let t = st.tools.findLast(x => x.name === d.tool && !x.gate && !x.end);
+        if (!t) { t = {name: d.tool, start: null, gate: null, end: null}; st.tools.push(t); }
+        t.gate = ev;
+        if (!d.decide_only) s.counts.tool++;
+        if (d.blocked) s.counts.blocked++;
+        break;
+      }
+      case 'tool_end': case 'tool_error': {
+        const t = this.stepOf(ev.step).tools.findLast(x => !x.end && x.name === d.action);
+        if (t) t.end = ev; else this.stepOf(ev.step).tools.push({name: d.action, start: null, gate: null, end: ev});
+        if (ev.kind === 'tool_error') s.counts.errors++;
+        break;
+      }
+      case 'step': { const st = this.stepOf(ev.step); if (d.type === 'planning') st.plan = d.plan; else st.info = ev; break; }
+      case 'result': s.final = ev; this.stream.close(); break;
+    }
+    this.schedule();
+  }
+  schedule() { if (!this.pending) { this.pending = true; requestAnimationFrame(() => { this.pending = false; this.render(); }); } }
+  render() {
+    const s = this.state, c = s.counts;
+    const status = s.final ? (s.final.level === 'ERROR' ? 'failed' : 'finished') : 'running';
+    this.pill.textContent = {running: '실행 중', finished: '완료', failed: '실패'}[status]; this.pill.className = `pill ${status}`;
+    this.stats.replaceChildren();
+    for (const [k, v, cls] of [['단계', s.order.filter(k => k > 0).length], ['LLM 호출', c.llm], ['툴 호출', c.tool], ['차단', c.blocked, 'blk'], ['토큰', c.tokens.toLocaleString()], ['오류', c.errors]]) {
+      const sp = el('span', cls); sp.append(`${k} `, el('b', null, String(v))); this.stats.append(sp);
+    }
+    if (!this.timeline.hidden) this.renderTimeline();
+    if (!this.rawEl.hidden) this.renderRaw();
+    refreshActive();
+  }
+  renderTimeline() {
+    const s = this.state, tl = this.timeline;
+    const stick = tl.scrollHeight - tl.scrollTop - tl.clientHeight < 40;
+    tl.replaceChildren();
+    if (s.start) {
+      const d = s.start.data, t = el('div', 'task');
+      t.append(el('b', null, '사용자 요청 '), d.task || '');
+      if (d.injection_goal) { t.append('\n'); t.append(el('b', null, '공격 목표 ')); t.append(el('span', 'goal', d.injection_goal)); }
+      if (d.spec) { t.append('\n'); t.append(el('b', null, `TaskSpec (${d.spec_source}) `), short(JSON.stringify(d.spec), 400)); }
+      tl.append(t);
+    } else tl.append(el('div', 'empty', '시작하는 중… (TaskSpec 준비)'));
+    for (const key of s.order) tl.append(this.renderStep(s.steps.get(key)));
+    if (s.final) tl.append(this.renderFinal());
+    if (stick) tl.scrollTop = tl.scrollHeight;
+  }
+  renderStep(st) {
+    const info = st.info?.data;
+    const box = el('div', `step${info?.error || st.llm.some(c => c.error) ? ' err' : ''}`);
+    const head = el('div', 'step-head');
+    head.append(el('span', 'n', st.n === 0 ? '시작 전' : `${st.n}단계`));
+    if (info?.is_final_answer) head.append(el('span', 'badge', '최종 답'));
+    head.append(el('span', 'dur', fmtDur(info?.duration_seconds)));
+    box.append(head);
+    if (st.plan) { const g = el('div', 'goalline'); g.append(el('b', null, '계획 · '), short(st.plan, 600)); box.append(g); }
+    const thought = (info?.model_output || '').split('<code>')[0].replace(/^Thought:\s*/i, '').trim();
+    if (thought) { const g = el('div', 'goalline'); g.append(el('b', null, '생각 · '), short(thought, 400)); box.append(g); }
+    for (const c of st.llm) box.append(this.llmRow(c));
+    for (const t of st.tools) box.append(this.toolRow(t));
+    if (info?.error) { const r = el('div', 'row error'), m = el('div', 'main'); m.append(el('div', 'title', '단계 오류'), el('div', 'detail err', short(info.error, 800))); r.append(el('span', 'tag', 'STEP'), m, el('div', 'meta')); box.append(r); }
+    return box;
+  }
+  llmRow(c) {
+    const d = c.response?.data, r = el('div', `row ${c.error ? 'error' : 'llm'}`), main = el('div', 'main');
+    main.append(el('div', 'title', c.query.message));
+    for (const a of Array.isArray(d?.actions) ? d.actions : []) {
+      const [k, v] = Object.entries(a)[0] ?? ['?', {}];
+      if (k === 'python_interpreter') main.append(el('pre', 'code', String(v)));
+      else main.append(el('div', 'detail', `→ ${k} ${short(v, 160)}`));
+    }
+    if (d?.content) main.append(el('div', 'detail', short(d.content, 300)));
+    if (c.error) main.append(el('div', 'detail err', c.error.message));
+    const tokens = d && d.output_tokens != null ? `${d.input_tokens}→${d.output_tokens} tok · ` : '';
+    r.append(el('span', 'tag', 'LLM'), main, el('div', 'meta', d ? tokens + fmtDur(d.duration_seconds) : ''));
+    return r;
+  }
+  toolRow(t) {
+    const g = t.gate?.data, blocked = !!g?.blocked;
+    const r = el('div', `row ${blocked ? 'blocked' : t.end?.kind === 'tool_error' ? 'error' : 'tool'}`), main = el('div', 'main');
+    const title = el('div', 'title', t.name);
+    if (g) {
+      const eff = g.effective || g.verdict || '?';
+      const cls = eff === 'BLOCK' ? 'block' : eff === 'ESCALATE' ? 'escalate' : '';
+      const b = el('span', `badge ${cls}`, `${eff}${g.policy_id ? ' · ' + g.policy_id : ''}`); title.append(b);
+      if (g.verdict && g.effective && g.verdict !== g.effective) title.append(el('span', 'badge escalate', `판정 ${g.verdict}`));
+      if (!blocked && g.effective === 'BLOCK') title.append(el('span', 'badge block audit', '기록만 (실행됨)'));
+      if (g.decide_only) title.append(el('span', 'badge audit', '판정만'));
+      if ((g.output || '').includes('<INFORMATION>')) title.append(el('span', 'badge inj', '인젝션 포함'));
+    } else if (t.start) {
+      const internal = fwInfo(this.state.start?.data?.manifest?.framework)?.internal_tools || [];
+      title.append(internal.includes(t.name) ? el('span', 'badge audit', '프레임워크 내부 툴') : el('span', 'badge block audit', 'NO GATE'));
+    }
+    main.append(title);
+    main.append(el('div', 'detail', short(g?.args ?? t.start?.data?.params, 300)));
+    if (g?.reason) main.append(el('div', 'detail reason', `${g.policy_id}: ${g.reason}`));
+    if (g?.judge) main.append(el('div', 'detail', `judge: ${short(g.judge, 300)}`));
+    if (g?.output) { const o = el('details', 'detail'); o.append(el('summary', null, blocked ? '에이전트가 받은 차단 메시지' : '툴 출력'), el('div', null, short(g.output, 1200))); main.append(o); }
+    if (t.end?.kind === 'tool_error') main.append(el('div', 'detail err', t.end.data.error_type));
+    r.append(el('span', 'tag', blocked ? 'BLOCK' : 'TOOL'), main, el('div', 'meta', `${g?.decide_ms != null ? 'gate ' + g.decide_ms + 'ms · ' : ''}${fmtDur(t.end?.data?.duration_seconds)}`));
+    return r;
+  }
+  renderFinal() {
+    const d = this.state.final.data || {}, f = el('div', 'final');
+    const failed = this.state.final.level === 'ERROR';
+    const head = el('div', 'fhead');
+    head.append(el('b', null, 'Result'), el('span', `pill ${failed ? 'failed' : 'finished'}`, failed ? 'failed' : 'finished'));
+    f.append(head);
+    const grid = el('div', 'grid');
+    const cell = (name, value, good) => { const c = el('div', 'cell'); c.title = name; c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
+    const yn = v => v == null ? null : v ? 'Yes' : 'No';
+    cell('Utility', yn(d.utility), d.utility === true);
+    cell('ASR', yn(d.security), d.security === false);
+    cell('ASR (executed)', yn(d.security_executed), d.security_executed === false);
+    cell('Blocked / Calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
+    f.append(grid);
+    const block = (label, text, cls = '') => { const b = el('div', `answer ${cls}`); b.append(el('span', null, label), el('pre', null, text)); f.append(b); };
+    if (d.ungated_calls?.length) block('Ungated calls', JSON.stringify(d.ungated_calls), 'err');
+    if (d.final_output) block('Final answer', d.final_output);
+    if (d.error) block('Error', short(d.error, 1500), 'err');
+    return f;
+  }
+  renderRaw() {
+    this.rawEl.replaceChildren(...this.state.raw.map(ev => {
+      const row = el('div', `log${ev.level === 'ERROR' ? ' error' : ''}`);
+      row.append(el('span', 't', fmtTime(ev.timestamp)), el('span', 'k', ev.kind), el('span', 'm', `${ev.step != null ? `step=${ev.step} ` : ''}${ev.message}${Object.keys(ev.data || {}).length ? '\n' + JSON.stringify(ev.data) : ''}`));
+      return row;
+    }));
+  }
+}
+
+function openPanels(items) {
+  panels.forEach(p => p.close()); panels.length = 0;
+  const main = $('#runs'); main.replaceChildren(); main.classList.toggle('two', items.length === 2);
+  items.forEach(([id, title, condition], i) => {
+    const p = new Panel(id, title); p.setGate(condition); panels.push(p);
+    if (i === 1) main.append(makeSplitter('run-split'));
+    main.append(p.root);
+  });
+}
+
+function refreshActive() {
+  const running = panels.some(p => !p.state.final);
+  $('#run').disabled = running;
+  $('#active-hint').textContent = running ? '실행 중…' : '';
+}
+
+async function loadHistory() {
+  const r = await fetch('/api/runs').then(r => r.json()).catch(() => ({runs: []}));
+  const sel = $('#history'); const keep = sel.value; sel.replaceChildren(); option(sel, '', '—');
+  for (const run of r.runs) {
+    const sc = run.request?.scenario || {};
+    option(sel, run.id, `${new Date(run.started * 1000).toLocaleTimeString('ko-KR', {hour12: false})} ${run.label || ''} ${run.request?.framework || ''} ${sc.condition || ''} ${sc.user_task || ''}/${sc.injection_task || '-'} [${run.status}]`);
+  }
+  sel.value = keep;
+}
+
+// ------------------------------------------------------------------ resizable columns
+const LAYOUT_KEY = 'agentgate.layout';
+function loadLayout() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {}; } catch { return {}; } }
+function saveLayout(patch) { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify({...loadLayout(), ...patch})); } catch {} }
+function applyLayout() {
+  const l = loadLayout(), layout = $('.layout'), main = $('#runs');
+  layout.style.setProperty('--side', `${l.side ?? 340}px`);
+  layout.classList.toggle('collapsed', !!l.collapsed);
+  main.style.setProperty('--split', `${l.split ?? 1}fr`);
+}
+function makeSplitter(id) {
+  const sp = el('div', 'splitter'); sp.id = id; sp.title = '드래그해서 너비 조정 (더블클릭: 반반)'; bindSplitter(sp); return sp;
+}
+function bindSplitter(sp) {
+  sp.addEventListener('pointerdown', e => {
+    e.preventDefault(); sp.setPointerCapture(e.pointerId); sp.classList.add('drag'); document.body.classList.add('resizing');
+    const move = ev => {
+      if (sp.id === 'side-split') {
+        const w = Math.max(240, Math.min(640, ev.clientX - $('.layout').getBoundingClientRect().left));
+        $('.layout').style.setProperty('--side', `${w}px`); saveLayout({side: Math.round(w)});
+      } else {
+        const r = $('#runs').getBoundingClientRect();
+        const left = Math.max(0.2, Math.min(0.8, (ev.clientX - r.left) / r.width));
+        const ratio = left / (1 - left);
+        $('#runs').style.setProperty('--split', `${ratio}fr`); saveLayout({split: ratio});
+      }
+    };
+    const up = () => { sp.classList.remove('drag'); document.body.classList.remove('resizing'); sp.removeEventListener('pointermove', move); sp.removeEventListener('pointerup', up); };
+    sp.addEventListener('pointermove', move); sp.addEventListener('pointerup', up);
+  });
+  sp.addEventListener('dblclick', () => {
+    if (sp.id === 'side-split') { saveLayout({side: 340}); } else { saveLayout({split: 1}); }
+    applyLayout();
+  });
+}
+bindSplitter($('#side-split'));
+$('#toggle-side').addEventListener('click', () => { saveLayout({collapsed: !loadLayout().collapsed}); applyLayout(); });
+$('#reset-cols').addEventListener('click', () => { saveLayout({side: 340, split: 1, collapsed: false}); applyLayout(); });
+applyLayout();
+
+// ------------------------------------------------------------------ boot
+async function boot() {
+  CATALOG = await fetch('/api/catalog').then(r => r.json());
+  for (const f of CATALOG.frameworks) { option($('#framework'), f.name, `${f.display_name}${f.unavailable ? ' — ' + f.unavailable : ''}`, !!f.unavailable); }
+  $('#framework').value = CATALOG.frameworks.find(f => f.name === 'smolagents' && !f.unavailable) ? 'smolagents' : 'native';
+  for (const p of CATALOG.model_presets) option($('#model-preset'), `${p.provider}|${p.model}`, `${p.model} (${p.provider})`);
+  option($('#model-preset'), '', '직접 입력 (고급 설정)');
+  CATALOG.providers.forEach(p => option($('#provider'), p));
+  Object.keys(CATALOG.suites).forEach(s => option($('#suite'), s)); $('#suite').value = 'banking';
+  CATALOG.attacks.forEach(a => option($('#attack'), a));
+  applyPreset(); renderFrameworkOptions(); fillTasks(); updateCost(); loadHistory();
+  const st = await fetch('/api/status').then(r => r.json()).catch(() => ({}));
+  const used = new Set(CATALOG.model_presets.map(p => p.provider));
+  const missing = Object.entries(st.missing_keys || {}).filter(([p]) => used.has(p)).map(([p, k]) => `${p}: ${k}`);
+  if (missing.length) showNotice(`설정되지 않은 키 — ${missing.join(', ')} (.env 또는 환경 변수, 서버 재시작 필요)`);
+}
+
+$('#framework').addEventListener('change', renderFrameworkOptions);
+$('#model-preset').addEventListener('change', applyPreset);
+$('#provider').addEventListener('change', () => { $('#model-preset').value = ''; loadModels(); });
+$('#model').addEventListener('input', () => { $('#model-preset').value = ''; });
+$('#suite').addEventListener('change', fillTasks);
+['#user_task', '#injection_task', '#attack'].forEach(s => $(s).addEventListener('change', updatePreview));
+['#max_steps', '#compare-on'].forEach(s => $(s).addEventListener('input', updateCost));
+$('#compare-on').addEventListener('change', updateCost);
+$('#history').addEventListener('change', () => { const id = $('#history').value; if (id) openPanels([[id, '지난 실행']]); });
+
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault(); showNotice('');
+  const items = $('#compare-on').checked ? [readRun(true, 'Gate 적용'), readRun(false, 'Gate 없음')]
+    : [readRun($('#defense').value === 'gate', $('#defense').value === 'gate' ? 'Gate 적용' : 'Gate 없음')];
+  $('#run').disabled = true;
+  const res = await fetch('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runs: items})});
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) { showNotice(typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail || body)); $('#run').disabled = false; return; }
+  openPanels(body.run_ids.map((id, i) => [id, items[i].label, items[i].scenario.condition]));
+  loadHistory();
+});
+
+boot().catch(err => showNotice(`초기화 실패: ${err}`));
+</script>
+</body>
+</html>

@@ -11,9 +11,17 @@
   --agent llm       실제 LLM 에이전트 (키는 .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
   --agent scripted  결정론적 ScriptedAgent (키 불필요) - 모델 행동이 아니라 통합을 확인한다
 
+프레임워크 (--framework, 기본값 native = 위 AgentDojo pipeline, 변경 없음)
+  agentgate.harness.registry에 등록된 이름 (smolagents, config/frameworks.yaml의 contract Wrapper 등).
+  모델은 AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL (또는 --model provider:model)에서 가져온다.
+  --agent scripted이면 LLM 없는 fake endpoint(agentgate.harness.fake_llm)로 프레임워크를 구동한다.
+  C3는 native에서만 지원한다.
+
 사용법
   python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/live/v1/scripted
   python scripts/evaluation/live_evaluation.py --agent llm --pilot --conditions C0 C1 --out results/live/v1/<model>
+  python scripts/evaluation/live_evaluation.py --framework smolagents --model ollama:gpt-oss:120b --pilot \
+      --conditions C0 C1 --out results/live/v2/smolagents_gpt-oss_120b
 완료된 (condition, suite, user, injection) run은 건너뛰므로 중단된 실행을 이어서 할 수 있다.
 """
 
@@ -48,6 +56,39 @@ GATE = {"C0": ("audit", "block"), "C1": ("enforce", "block"), "C2": ("enforce", 
         "C3": ("audit", "block"), "C4": ("enforce", "judge")}
 
 
+def run_framework_one(job: dict, output_path: Path) -> str:
+    """One pair through agentgate.harness (any registered framework); same record schema as run_one."""
+    from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
+    from agentgate.harness.models import ModelSpec
+    from agentgate.harness.runner import RunRequest, execute, run_scenario
+    from agentgate.harness.scenario import ScenarioConfig, Session
+
+    config = ScenarioConfig(job["suite"], job["user_task"], job["injection_task"], condition=job["cond"],
+                            spec=job["spec"], attack=job["attack"], attack_model_name=job["attack_model_name"])
+    provider, _, model_name = job["model"].partition(":")
+    options = json.loads(job.get("framework_options") or "{}")
+    try:
+        if job["agent"] == "scripted":
+            config.attack_model_name = "GPT-4"
+            session = Session(config)
+            with FakeLLMServer(ScriptedPlan(session)) as server:
+                request = RunRequest(job["framework"], ModelSpec("openai_compat", "scripted", base_url=server.base_url),
+                                     config, options, job.get("max_steps"))
+                record = run_scenario(request, session=session)
+        else:
+            request = RunRequest(job["framework"], ModelSpec(provider, model_name), config, options,
+                                 job.get("max_steps"))
+            record = execute(request)
+    except Exception as exc:  # keep going; record the failure
+        record = {"condition": job["cond"], "suite": job["suite"], "user_task": job["user_task"],
+                  "injection_task": job["injection_task"], "framework": job["framework"], "trace": [],
+                  "error": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-1500:]}"}
+    record["agent"] = job["agent"]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(record, ensure_ascii=False, default=str))
+    return "error" if record.get("error") else "ok"
+
+
 def run_one(job: dict) -> str:
     load_dotenv()
     condition, suite_name = job["cond"], job["suite"]
@@ -55,6 +96,8 @@ def run_one(job: dict) -> str:
     output_path = Path(job["out"]) / condition / suite_name / user_task_id / f"{injection_task_id or 'none'}.json"
     if output_path.exists():
         return "skip"
+    if job.get("framework", "native") != "native":
+        return run_framework_one(job, output_path)
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     injection_task = suite.get_injection_task_by_id(injection_task_id) if injection_task_id else None
@@ -125,6 +168,11 @@ def main():
     parser.add_argument("--pairs", default=None,
                         help="explicit pairs 'suite:user_task:injection_task,...' or @file (one per line); "
                              "injection_task 'none' = benign run (overrides suites/tasks)")
+    parser.add_argument("--framework", default="native",
+                        help="agent framework from agentgate.harness.registry (default native = AgentDojo pipeline)")
+    parser.add_argument("--framework-options", default="{}", help="framework options as JSON")
+    parser.add_argument("--model", default=None, help="provider:model for --framework (default from .env)")
+    parser.add_argument("--max-steps", type=int, default=None, help="--framework step limit (default 15)")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -133,8 +181,14 @@ def main():
                                                               PILOT["injection_tasks"])
     provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
     agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
+    if args.model:
+        provider, _, agent_model = args.model.partition(":")
+    if args.framework != "native" and "C3" in args.conditions:
+        parser.error("C3 (AgentDojo pipeline defense) is native only")
     attack_model = args.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
         provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
+    framework_fields = {"framework": args.framework, "framework_options": args.framework_options,
+                        "model": f"{provider}:{agent_model}", "max_steps": args.max_steps}
     jobs = []
     if args.pairs:
         for condition in args.conditions:
@@ -146,7 +200,8 @@ def main():
                 jobs.append({"cond": condition, "suite": suite_name, "user_task": user_task_id,
                              "injection_task": injection_task_id, "agent": args.agent,
                              "spec": args.spec, "attack": args.attack, "attack_model_name": attack_model,
-                             "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out})
+                             "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out,
+                             **framework_fields})
         args.conditions = []   # skip the suite loop below
     for condition in args.conditions:
         for suite_name in args.suites:
@@ -159,13 +214,14 @@ def main():
             for user_task_id in user_task_ids:
                 base = {"cond": condition, "suite": suite_name, "user_task": user_task_id, "agent": args.agent,
                         "spec": args.spec, "attack": args.attack, "attack_model_name": attack_model,
-                        "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out}
+                        "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out,
+                        **framework_fields}
                 if not args.no_benign:
                     jobs.append({**base, "injection_task": None})
                 for injection_task_id in injection_task_ids:
                     jobs.append({**base, "injection_task": injection_task_id})
     started = time.time()
-    if args.agent == "scripted":
+    if args.agent == "scripted" and args.framework == "native":
         with mp.Pool(args.workers) as pool:
             status = list(pool.imap_unordered(run_one, jobs, chunksize=8))
     else:
