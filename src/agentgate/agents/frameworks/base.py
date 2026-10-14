@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import importlib.util
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,6 +29,29 @@ class FrameworkResult:
     info: dict = field(default_factory=dict)
 
 
+_PROBES: dict[tuple, str | None] = {}
+
+
+def _probe_interpreter(python: str, modules: tuple[str, ...]) -> str | None:
+    """Can `python` (another venv) import agentgate and `modules`? Cached per process."""
+    key = (python, modules)
+    if key not in _PROBES:
+        from agentgate.config import PROJECT_ROOT
+        code = ("import importlib.util, sys; missing = [m for m in sys.argv[1:] if importlib.util.find_spec(m) is None]; "
+                "print(','.join(missing))")
+        try:
+            out = subprocess.run([python, "-c", code, "agentgate", *modules], capture_output=True, text=True,
+                                 timeout=30, cwd=PROJECT_ROOT)
+            if out.returncode != 0:
+                _PROBES[key] = f"interpreter error: {out.stderr.strip()[-200:]}"
+            else:
+                missing = out.stdout.strip()
+                _PROBES[key] = f"not installed in {python}: {missing}" if missing else None
+        except OSError as error:
+            _PROBES[key] = f"interpreter {python} not found ({error.strerror})"
+    return _PROBES[key]
+
+
 class FrameworkAdapter:
     name = ""
     display_name = ""
@@ -38,8 +62,11 @@ class FrameworkAdapter:
     internal_tools: frozenset[str] = frozenset()   # framework-own tools that are not AgentDojo tools
     conditions: tuple[str, ...] = FRAMEWORK_CONDITIONS
     default_max_steps = 15                    # AgentDojo's tool loop limit, for comparability
+    subprocess_python: str | None = None      # set by the registry from `python:` in config/frameworks.yaml
 
     def unavailable_reason(self) -> str | None:
+        if self.subprocess_python:
+            return _probe_interpreter(self.subprocess_python, self.requires)
         missing = [m for m in self.requires if importlib.util.find_spec(m) is None]
         return f"not installed: {', '.join(missing)}" if missing else None
 

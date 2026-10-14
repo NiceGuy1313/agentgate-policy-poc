@@ -7,6 +7,8 @@ Step results come from `step_callbacks`, as in the fork's dashboard (examples/ag
 
 from __future__ import annotations
 
+import json
+import uuid
 from pathlib import Path
 
 from agentgate.agents.frameworks.base import FrameworkAdapter, FrameworkResult
@@ -51,22 +53,81 @@ def _text_of(content) -> str:
     return content or ""
 
 
+def recover_tool_call(text: str, tools) -> tuple[str, dict] | None:
+    """(tool name, arguments) for a reply that carries a tool call as plain content, or None.
+
+    gpt-oss on Ollama writes the final answer on the harmony `final` channel, so the reply has no
+    `tool_calls` and `tool_choice="required"` is not enforced. Observed content shapes:
+    `{"name": ..., "arguments": ...}` (smolagents parses it itself), arguments only (`{"answer": ...}`),
+    and plain prose. Arguments only map to the single tool whose required inputs they cover; prose
+    becomes `final_answer`. Anything else is left to smolagents, which reports a parsing error.
+    """
+    text = text.strip()
+    if not text:
+        return None
+    start, end = text.find("{"), text.rfind("}")
+    data = None
+    if start != -1 and end > start:
+        try:
+            data = json.loads(text[start:end + 1], strict=False)
+        except json.JSONDecodeError:
+            return None
+    if data is None:
+        names = {tool.name for tool in tools}
+        return ("final_answer", {"answer": text}) if "final_answer" in names else None
+    if not isinstance(data, dict) or not data or "name" in data:
+        return None
+    matches = [tool.name for tool in tools
+               if set(data) <= set(tool.inputs)
+               and {k for k, v in tool.inputs.items() if not v.get("nullable")} <= set(data)]
+    return (matches[0], data) if len(matches) == 1 else None
+
+
 def make_model(**kwargs):
     """LiteLLMModel that never sends an assistant message without content and tool calls.
 
     When a model returns an empty reply, smolagents keeps it in memory as an empty assistant message; some
     OpenAI-compatible endpoints (mistral on Ollama Cloud) reject the next request with a 400 for that.
+    A reply whose tool call is in the content instead of `tool_calls` goes through `recover_tool_call`.
     """
     from smolagents import LiteLLMModel
+    from smolagents.models import ChatMessageToolCall, ChatMessageToolCallFunction, parse_json_if_needed
 
     class SafeLiteLLMModel(LiteLLMModel):
+        _tools: list = []
+
         def _prepare_completion_kwargs(self, *args, **inner):
+            self._tools = list(inner.get("tools_to_call_from") or [])
             completion_kwargs = super()._prepare_completion_kwargs(*args, **inner)
             for message in completion_kwargs.get("messages") or []:
                 if (getattr(message.get("role"), "value", message.get("role")) == "assistant" and not message.get("tool_calls")
                         and not _text_of(message.get("content")).strip()):
                     message["content"] = "(empty response)"
             return completion_kwargs
+
+        def generate(self, *args, **inner):
+            return self._drop_unknown_arguments(super().generate(*args, **inner))
+
+        def parse_tool_calls(self, message):
+            if not message.tool_calls:
+                recovered = recover_tool_call(_text_of(message.content), self._tools)
+                if recovered:
+                    message.tool_calls = [ChatMessageToolCall(
+                        id=f"call_{uuid.uuid4().hex[:8]}", type="function",
+                        function=ChatMessageToolCallFunction(name=recovered[0], arguments=recovered[1]))]
+            return self._drop_unknown_arguments(super().parse_tool_calls(message))
+
+        def _drop_unknown_arguments(self, message):
+            # gpt-oss sends {"n": null}, {"n": {}} or {"n": 10} to get_scheduled_transactions, which takes no
+            # arguments. smolagents fails the step on any key outside the schema; AgentDojo's runtime (pydantic,
+            # extra="ignore") ignores such keys, so they are dropped here to give the same behaviour.
+            inputs = {tool.name: tool.inputs for tool in self._tools}
+            for call in message.tool_calls or []:
+                arguments = parse_json_if_needed(call.function.arguments)
+                if isinstance(arguments, dict) and call.function.name in inputs:
+                    call.function.arguments = {k: v for k, v in arguments.items()
+                                               if k in inputs[call.function.name]}
+            return message
 
     return SafeLiteLLMModel(**kwargs)
 

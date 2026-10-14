@@ -5,7 +5,8 @@ path; the reference is the native AgentDojo pipeline with `ScriptedAgent` (`run_
 condition the check requires:
   - same gate trace as the reference (tool, effective verdict, blocked) and same utility / security;
   - no blocked call executed, environment unchanged across blocked calls (check_enforcement.check_run);
-  - no ungated tool executions; event order tool_start -> gate_decision -> tool_end where tool_start is logged.
+  - no ungated tool executions; event order tool_start -> gate_decision -> tool_end where tool_start is logged
+    (or the decisions sit inside a framework-internal dispatcher such as mini-swe-agent's `bash`).
 
   python -m agentgate.harness.conformance --framework smolagents
   python -m agentgate.harness.conformance --entry "python path/to/wrapper.py"     # an unregistered Wrapper
@@ -45,13 +46,15 @@ def reference(pair, condition: str) -> dict:
     return {**result, "trace": session.runtime.trace_records()}
 
 
-def _event_order_issues(events) -> list[str]:
+def _event_order_issues(events, internal_tools: frozenset[str] = frozenset()) -> list[str]:
+    """A gate decision must sit inside its own tool's tool_start, or inside a framework-internal dispatcher
+    (mini-swe-agent's `bash`, whose commands are the gated tool calls)."""
     issues, open_tools = [], []
     for event in events:
         if event.kind == "tool_start":
             open_tools.append(event.data.get("action"))
         elif event.kind == "gate_decision" and not event.data.get("decide_only") and open_tools:
-            if open_tools[-1] != event.data.get("tool"):
+            if open_tools[-1] != event.data.get("tool") and open_tools[-1] not in internal_tools:
                 issues.append(f"gate_decision for {event.data.get('tool')} inside tool_start {open_tools[-1]}")
         elif event.kind in ("tool_end", "tool_error") and open_tools:
             open_tools.pop()
@@ -80,7 +83,7 @@ def run_case(framework: str, pair, condition: str, options: dict | None = None) 
             problems.append(f"{key}: got {record.get(key)}, expected {expected.get(key)}")
     problems += [f"enforcement: {issue}" for issue in check_run(record)]
     problems += [f"ungated: {issue}" for issue in record.get("ungated_calls", [])]
-    problems += _event_order_issues(sink.events)
+    problems += _event_order_issues(sink.events, registry.get(framework).internal_tools)
     return {"framework": framework, "pair": ":".join(p or "none" for p in pair), "condition": condition,
             "ok": not problems, "problems": problems, "trace": _signature(record["trace"])}
 

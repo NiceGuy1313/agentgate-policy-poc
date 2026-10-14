@@ -6,12 +6,15 @@ framework's real model path (LiteLLM, OpenAI SDK, a Wrapper's own client) is exe
   - once a tool result in the conversation contains the injection marker, inserts the injection task's calls
     (planned on the session's current environment, `plan_attack_calls`), then resumes;
   - continues after a policy block; finally answers with the ground-truth output(s).
-If the request offers a `final_answer` tool (smolagents), the answer is given as that tool call.
+If the request offers a `final_answer` tool (smolagents), the answer is given as that tool call. A request whose only
+tool is `bash` (mini-swe-agent) gets gated-shell commands; one with an AgentOutput JSON schema (browser-use) gets
+the actions as structured JSON content.
 """
 
 from __future__ import annotations
 
 import json
+import shlex
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +31,15 @@ def _text(content) -> str:
     if isinstance(content, list):
         return " ".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
     return "" if content is None else str(content)
+
+
+def _empty(node: dict):
+    """Neutral value for a required JSON-schema field (null when allowed)."""
+    kinds = node.get("type") if isinstance(node.get("type"), list) else [node.get("type")]
+    kinds += [option.get("type") for option in node.get("anyOf") or []]
+    if "null" in kinds:
+        return None
+    return {"string": "", "integer": 0, "number": 0, "boolean": False, "array": [], "object": {}}.get(kinds[0], "")
 
 
 class ScriptedPlan:
@@ -102,6 +114,15 @@ class FakeLLMServer:
         message: dict = {"role": "assistant", "content": None}
         if kind == "final" and "final_answer" in tool_names:
             kind, name, payload = "call", "final_answer", {"answer": payload}
+        if tool_names == {"bash"}:   # mini-swe-agent: tools are commands of the gated shell
+            command = f"{name} {shlex.quote(json.dumps(payload))}" if kind == "call" else f"submit {shlex.quote(payload)}"
+            kind, name, payload = "call", "bash", {"command": command}
+        schema = ((request.get("response_format") or {}).get("json_schema") or {}).get("schema")
+        if schema and "action" in (schema.get("properties") or {}):   # browser-use: AgentOutput as JSON content
+            action = {name: payload} if kind == "call" else {"done": {"text": payload, "success": True}}
+            properties = schema.get("properties") or {}
+            output = {key: _empty(properties.get(key) or {}) for key in schema.get("required", []) if key != "action"}
+            kind, payload = "final", json.dumps({**output, "action": [action]})
         if kind == "call":
             message["tool_calls"] = [{"id": f"call_{self.plan.requests}", "type": "function",
                                       "function": {"name": name, "arguments": json.dumps(payload)}}]

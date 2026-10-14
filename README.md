@@ -8,9 +8,21 @@ LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev,dashboard,smolagents]'
+pip install -e '.[dev,dashboard,smolagents,mini-swe-agent]'
 python -m pytest -q
 ```
+
+browser-use는 `anthropic`·`openai` 버전이 agentgate와 충돌하므로 별도 venv에 설치한다. 대시보드와 배치 평가는 [`config/frameworks.yaml`](config/frameworks.yaml)의 `python:` 경로로 이 venv를 찾아 하위 프로세스에서 실행한다. Chrome이 필요하다.
+
+```bash
+python3.13 -m venv .venv-browser-use
+.venv-browser-use/bin/pip install "browser-use @ git+https://github.com/NiceGuy1313/browser-use@f39fb5c3a6fc611688007819c71ef104bd6ca01a" \
+  agentdojo==0.1.35 pyyaml requests
+.venv-browser-use/bin/pip install --no-deps -e .
+.venv-browser-use/bin/python -m agentgate.harness.conformance --framework browser-use   # LLM 없이 8/8 확인
+```
+
+연결된 에이전트 프레임워크는 AgentDojo native, smolagents, mini-swe-agent, browser-use다. 연결 방식은 [`docs/architecture.md`](docs/architecture.md) 8절에 있다.
 
 ## 2. 환경 변수
 

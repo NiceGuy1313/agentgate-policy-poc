@@ -1,5 +1,6 @@
 # Python
 .venv/
+.venv-*/
 venv/
 __pycache__/
 *.py[cod]
@@ -38,3 +39,14 @@ results/live/*/*/C[0-9]/
 
 # Dashboard run history (inspection only)
 dashboard/runs/
+
+# LLM response caches: only the model behind the report (claude-sonnet-5-5) is committed;
+# caches from other models that people try locally stay out of git
+data/judge_cache/*/
+!data/judge_cache/claude-sonnet-5-5/
+data/specs/llm_cache/*/
+!data/specs/llm_cache/claude-sonnet-5-5/
+
+# Stray logs from local runs
+*.log
+nohup.out

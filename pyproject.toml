@@ -23,6 +23,9 @@ report = ["matplotlib>=3.8"]
 dashboard = ["fastapi>=0.110", "uvicorn>=0.30"]
 # agent frameworks under test: the NiceGuy1313 forks carry the boundary logs the dashboard reads
 smolagents = ["smolagents[litellm] @ git+https://github.com/NiceGuy1313/smolagents@74139966ac0842b84f43c6f0fca03284348591da"]
+mini-swe-agent = ["mini-swe-agent @ git+https://github.com/NiceGuy1313/mini-swe-agent@d1fe8af5dc44802780949d6488b41c96f5774f01"]
+# browser-use pins anthropic/openai below agentgate's floor: install it in its own venv (README), not next to agentgate
+browser-use = ["browser-use @ git+https://github.com/NiceGuy1313/browser-use@f39fb5c3a6fc611688007819c71ef104bd6ca01a"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
