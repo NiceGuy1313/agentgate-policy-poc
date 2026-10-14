@@ -127,6 +127,16 @@ AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents,
 - **의존성 격리**: `frameworks.yaml`에 `python:`을 주면 그 인터프리터의 worker 프로세스에서 시나리오 전체를 실행하고 이벤트를 JSON lines로 받는다.
 - C3(AgentDojo 방어 요소)는 네이티브 파이프라인에서만 지원한다.
 
+연결된 프레임워크는 다음과 같다. 세 fork 모두 NiceGuy1313 fork이며 경계 로그를 담고 있다.
+
+| 프레임워크 | AgentDojo 툴을 넘기는 방식 | Gate 위치 (이벤트 순서) |
+|---|---|---|
+| smolagents | 툴마다 smolagents `Tool` 하나, `forward`에서 `bridge.invoke` | `Tool.__call__`: tool_start → gate_decision → tool_end |
+| mini-swe-agent | 프레임워크 툴은 `bash` 하나다. 환경을 `GatedShell`로 바꿔 명령 한 줄을 툴 호출 하나로 처리한다(`tool '{json}'`, `submit '답'`). 실제 셸은 실행하지 않는다. | `execute_action`: tool_start(bash) → gate_decision(명령별) → tool_end(bash). `bash`는 내부 dispatcher로 선언한다. |
+| browser-use | 브라우저 액션을 제외하고 `done`과 browser-use 자체 파일 동작(`write_file`·`replace_file`·`read_file`, 임시 폴더만 다룸)만 남긴 뒤 툴마다 커스텀 액션을 등록한다. 이름이 겹치면(banking `read_file`) AgentDojo 툴이 우선한다. Agent에 BrowserSession이 필요해 headless Chrome(about:blank)을 띄운다. | `Registry.execute_action`: tool_start → gate_decision → tool_end |
+
+browser-use fork는 `anthropic`·`openai`를 agentgate가 요구하는 버전보다 낮게 고정한다. 그래서 별도 venv(`.venv-browser-use`)에 설치하고 `frameworks.yaml`의 `python:`으로 worker에서 실행한다. 대시보드는 그 인터프리터에서 import가 되는지 확인해 사용 가능 여부를 표시한다.
+
 ### Wrapper 연결 규약 v1
 
 Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wrapper는 `config/frameworks.yaml`에 `contract:` 항목 한 줄로 연결되며 Python 어댑터가 필요 없다. 참조 구현은 [`examples/contract_wrapper/minimal_agent.py`](../examples/contract_wrapper/minimal_agent.py), 클라이언트는 표준 라이브러리만 쓰는 [`agentgate_client.py`](../src/agentgate/harness/agentgate_client.py)(복사해 사용)이다.

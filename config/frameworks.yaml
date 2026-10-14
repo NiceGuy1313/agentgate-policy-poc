@@ -15,3 +15,7 @@ frameworks:
     description: Reference Wrapper (examples/contract_wrapper), stdlib OpenAI-compatible tool loop
     contract:
       command: [python, examples/contract_wrapper/minimal_agent.py]
+  browser-use:
+    # browser-use pins anthropic/openai versions that conflict with agentgate's, so it runs in its own venv
+    # (README "browser-use"). Built-in adapter; this entry only adds the interpreter.
+    python: .venv-browser-use/bin/python

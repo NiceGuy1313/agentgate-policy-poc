@@ -24,6 +24,8 @@ from agentgate.config import CONFIG_DIR
 BUILTIN = {
     "native": "agentgate.agents.frameworks.native:NativeAdapter",
     "smolagents": "agentgate.agents.frameworks.smolagents_adapter:SmolagentsAdapter",
+    "mini-swe-agent": "agentgate.agents.frameworks.mini_swe_agent_adapter:MiniSweAgentAdapter",
+    "browser-use": "agentgate.agents.frameworks.browser_use_adapter:BrowserUseAdapter",
 }
 ENTRY_POINT_GROUP = "agentgate.frameworks"
 
@@ -71,6 +73,7 @@ def get(name: str):
         adapter.display_name = item["display_name"]
     if item.get("description"):
         adapter.description = item["description"]
+    adapter.subprocess_python = item.get("python")
     return adapter
 
 
