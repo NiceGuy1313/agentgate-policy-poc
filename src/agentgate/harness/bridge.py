@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+import json
+
 from agentgate.harness.events import EventSink, preview
 from agentgate.harness.scenario import Session
+
+
+def _jsonable(args: dict | None) -> dict | None:
+    """Arguments as JSON data for the dashboard's JSON viewer; None when they do not serialize or are large."""
+    try:
+        return args if len(json.dumps(args)) <= 4000 else None
+    except (TypeError, ValueError):
+        return None
 
 
 class GateToolBridge:
@@ -30,7 +40,7 @@ class GateToolBridge:
         self.sink.emit(
             "gate_decision", f"{record.get('effective') or '?'} {tool}",
             level="WARNING" if record.get("blocked") else "INFO",
-            data={"tool": tool, "args": preview(args, 600), "verdict": record.get("verdict"),
+            data={"tool": tool, "args": preview(args, 600), "args_value": _jsonable(args), "verdict": record.get("verdict"),
                   "effective": record.get("effective"), "blocked": record.get("blocked"),
                   "executed": record.get("executed"), "error": record.get("error"),
                   "policy_id": primary.get("policy_id") if primary else None,

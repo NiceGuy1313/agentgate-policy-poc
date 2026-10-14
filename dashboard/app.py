@@ -25,6 +25,7 @@ from typing import Any
 import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agentgate import SUITES
@@ -95,6 +96,10 @@ async def remember_base_url(request: Request, call_next):
     # contract Wrappers launched from here call the gate back on this server
     set_service_url(str(request.base_url).rstrip("/"))
     return await call_next(request)
+
+
+# third-party browser libraries, vendored so the dashboard works without a CDN
+app.mount("/vendor", StaticFiles(directory=APP_DIR / "static" / "vendor"), name="vendor")
 
 
 @app.get("/")

@@ -107,3 +107,92 @@ def test_smolagents_model_fills_empty_assistant_messages():
         {"role": "user", "content": [{"type": "text", "text": "again"}]}], model="openai/x")
     assert kwargs["messages"][1]["content"] == "(empty response)"
     assert kwargs["messages"][0]["content"] != "(empty response)"
+
+
+@pytest.mark.parametrize("content, expected", [
+    # replies recorded from gpt-oss:120b on Ollama Cloud (finish_reason "stop", no tool_calls)
+    ('{\n  "answer": "Your total spending in March 2022 was 1,050.0."\n}',
+     ("final_answer", {"answer": "Your total spending in March 2022 was 1,050.0."})),
+    ('{\n  "answer": 1050.0\n}', ("final_answer", {"answer": 1050.0})),
+    ("Your total spending in March 2022 was **€1,050.00**.",
+     ("final_answer", {"answer": "Your total spending in March 2022 was **€1,050.00**."})),
+    ('{"n": 5}', ("get_most_recent_transactions", {"n": 5})),
+    ('{"name": "final_answer", "arguments": {"answer": 1}}', None),   # smolagents parses this shape itself
+    ('{"recipient": "x"}', None),                                     # matches no tool
+    ("", None),
+])
+def test_smolagents_recovers_tool_call_from_content(content, expected):
+    pytest.importorskip("smolagents")
+    from smolagents import FinalAnswerTool, Tool
+
+    from agentgate.agents.frameworks.smolagents_adapter import recover_tool_call
+
+    class Tx(Tool):
+        name = "get_most_recent_transactions"
+        description = "recent transactions"
+        inputs = {"n": {"type": "integer", "description": "count", "nullable": True}}
+        output_type = "string"
+        skip_forward_signature_validation = True
+
+        def forward(self, n=None):
+            return ""
+
+    assert recover_tool_call(content, [Tx(), FinalAnswerTool()]) == expected
+
+
+def test_smolagents_model_parses_content_final_answer():
+    pytest.importorskip("smolagents")
+    from smolagents import FinalAnswerTool
+    from smolagents.models import ChatMessage, MessageRole
+
+    from agentgate.agents.frameworks.smolagents_adapter import make_model
+    model = make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
+    model._prepare_completion_kwargs(messages=[{"role": "user", "content": [{"type": "text", "text": "hi"}]}],
+                                     tools_to_call_from=[FinalAnswerTool()], model="openai/x")
+    message = model.parse_tool_calls(ChatMessage(role=MessageRole.ASSISTANT, content='{"answer": "done"}'))
+    assert message.tool_calls[0].function.name == "final_answer"
+    assert message.tool_calls[0].function.arguments == {"answer": "done"}
+
+
+def test_smolagents_model_drops_arguments_outside_schema():
+    pytest.importorskip("smolagents")
+    from smolagents import FinalAnswerTool, Tool
+    from smolagents.models import ChatMessage, ChatMessageToolCall, ChatMessageToolCallFunction, MessageRole
+    from smolagents.tools import validate_tool_arguments
+
+    from agentgate.agents.frameworks.smolagents_adapter import make_model
+
+    class Scheduled(Tool):
+        name = "get_scheduled_transactions"
+        description = "scheduled transactions"
+        inputs = {}
+        output_type = "string"
+        skip_forward_signature_validation = True
+
+        def forward(self):
+            return ""
+
+    tool = Scheduled()
+    model = make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
+    model._prepare_completion_kwargs(messages=[{"role": "user", "content": [{"type": "text", "text": "hi"}]}],
+                                     tools_to_call_from=[tool, FinalAnswerTool()], model="openai/x")
+
+    def call(arguments):
+        return ChatMessage(role=MessageRole.ASSISTANT, content="", tool_calls=[ChatMessageToolCall(
+            id="c", type="function", function=ChatMessageToolCallFunction(name=tool.name, arguments=arguments))])
+
+    # recorded from gpt-oss:120b on banking user_task_0; AgentDojo's runtime ignores these keys too
+    for recorded in ('{"n":null}', {"n": {}}, {"n": 0}, {"n": 10}):
+        fixed = model._drop_unknown_arguments(call(recorded)).tool_calls[0].function.arguments
+        assert fixed == {}
+        validate_tool_arguments(tool, fixed)
+    tx = model._tools[1]   # final_answer: arguments inside the schema are kept as they are
+    kept = ChatMessage(role=MessageRole.ASSISTANT, content="", tool_calls=[ChatMessageToolCall(
+        id="c", type="function", function=ChatMessageToolCallFunction(name=tx.name, arguments={"answer": None, "x": 1}))])
+    assert model._drop_unknown_arguments(kept).tool_calls[0].function.arguments == {"answer": None}
+
+    # recorded step: prose final answer with no tool call
+    prose = "The bill for December 2023 has been paid. The payment of 200 units was sent."
+    message = model.parse_tool_calls(ChatMessage(role=MessageRole.ASSISTANT, content=prose))
+    assert (message.tool_calls[0].function.name, message.tool_calls[0].function.arguments) == \
+        ("final_answer", {"answer": prose})
