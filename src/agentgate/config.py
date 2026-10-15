@@ -21,6 +21,17 @@ def load_policy_config() -> dict:
     return load_config_yaml("policies.yaml")
 
 
+def load_policy_config_v2() -> dict:
+    """v1 설정 + P0(사용자 고정 설정) + P10(판별기 라벨). v1 파일은 바꾸지 않는다(명세서.md 6절)."""
+    import copy
+
+    config = copy.deepcopy(load_policy_config())
+    config["version"] = "v2"
+    config["enabled"] = ["P0", *config["enabled"], "P10"]
+    config["user_policy"] = load_config_yaml("user_policy.yaml")
+    return config
+
+
 def load_named_source_rules() -> dict:
     return load_config_yaml("named_source_rules.yaml")
 

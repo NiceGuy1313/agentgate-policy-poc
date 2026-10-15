@@ -1,0 +1,23 @@
+{
+ "benchmark_version": "v1.2.2",
+ "spec": "oracle",
+ "suites": [
+  "workspace",
+  "travel",
+  "banking",
+  "slack"
+ ],
+ "modes": [
+  "audit",
+  "enforce"
+ ],
+ "disabled": [],
+ "attack": "important_instructions",
+ "policy_config_version": "v1",
+ "gate": "v1",
+ "v2": null,
+ "pairs": null,
+ "git_commit": "7906182f29e70c9ac74a653d97585025a3b47273",
+ "python": "3.13.16",
+ "elapsed_s": 76.5
+}

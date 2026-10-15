@@ -39,6 +39,7 @@ class TraceEvent:
     phase: str = ""                   # replay bookkeeping: "user" | "injection" | "agent"
     decision: dict | None = None      # serialized EngineResult
     decide_ms: float = 0.0
+    detection: dict | None = None     # v2: detector label summary of this response
     env_hash_before: str | None = None
 
 
@@ -83,6 +84,7 @@ class GatedRuntime(FunctionsRuntime):
         escalate_action: str | None = None,
         judge: EscalationJudgeFn | None = None,
         record_env_hash: bool = False,
+        detector=None,
     ):
         super().__init__(functions)
         if mode not in ("audit", "enforce"):
@@ -93,6 +95,7 @@ class GatedRuntime(FunctionsRuntime):
         self.escalate_action = escalate_action or self.config["runtime"]["escalate_action"]
         self.judge = judge
         self.record_env_hash = record_env_hash
+        self.detector = detector          # v2: labels every tool response; None keeps v1 behaviour exactly
         self.trace: list[TraceEvent] = []
         self.phase = ""
         self.session = SessionState()
@@ -146,6 +149,11 @@ class GatedRuntime(FunctionsRuntime):
                 effective = Verdict.ALLOW
             elif self.escalate_action == "judge" and self.judge is not None:
                 judgement = self.judge(ToolCall(function, args), result, self.context)
+                # ④ (명세서.md 2절): an irreversible call stays with a human when its sources carry a detector
+                # warning, even if the judge allowed it.
+                if (judgement.get("final") == "ALLOW" and judgement.get("detector_warning")
+                        and judgement.get("reversibility") == "irreversible"):
+                    judgement = {**judgement, "final": "HUMAN", "verdict": "BLOCK", "human": True, "rule4": True}
                 event.decision["judge"] = judgement
                 effective = Verdict(judgement["verdict"])
             else:
@@ -174,6 +182,13 @@ class GatedRuntime(FunctionsRuntime):
             event.output_text = str(output)
         if error is None and self.index is not None:
             source = self.index.add_response(step, function, args, output, event.output_text)
+            if self.detector is not None:
+                detection = self.detector.detect(event.output_text)
+                source.detection, source.detected_text = detection, event.output_text
+                event.detection = {"detector": detection.detector, "mode": detection.mode,
+                                   "score": round(detection.score, 4), "flagged": detection.flagged,
+                                   "suspicious_spans": len(detection.suspicious_spans()),
+                                   "latency_ms": round(detection.latency_ms, 1), "cached": detection.cached}
             self.session.record_call(function, args, output, source.sensitive_categories, source.source_id)
         self.trace.append(event)
         return output, error
@@ -197,5 +212,6 @@ class GatedRuntime(FunctionsRuntime):
                 "decide_ms": round(event.decide_ms, 3),
                 "output_excerpt": (event.output_text or "")[:300],
                 "env_hash_before": event.env_hash_before,
+                **({"detection": event.detection} if self.detector is not None else {}),
             })
         return records

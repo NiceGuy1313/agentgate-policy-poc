@@ -44,6 +44,8 @@ dashboard/runs/
 # caches from other models that people try locally stay out of git
 data/judge_cache/*/
 !data/judge_cache/claude-sonnet-5-5/
+data/judge_cache_v2/*/
+!data/judge_cache_v2/claude-sonnet-5-5/
 data/specs/llm_cache/*/
 !data/specs/llm_cache/claude-sonnet-5-5/
 
