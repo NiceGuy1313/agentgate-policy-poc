@@ -1,0 +1,27 @@
+{
+ "benchmark_version": "v1.2.2",
+ "spec": "oracle",
+ "suites": [
+  "workspace",
+  "travel",
+  "banking",
+  "slack"
+ ],
+ "modes": [
+  "audit",
+  "enforce"
+ ],
+ "disabled": [],
+ "attack": "important_instructions",
+ "policy_config_version": "v2",
+ "gate": "v2",
+ "v2": {
+  "detector": "piguard",
+  "detector_mode": "chunks",
+  "escalate": "block"
+ },
+ "pairs": null,
+ "git_commit": "695e37000bba186486039ecd890d7ba762925561",
+ "python": "3.13.16",
+ "elapsed_s": 1289.8
+}
