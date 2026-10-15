@@ -42,6 +42,8 @@ class Completion:
     output_tokens: int
     stop_reason: str | None = None
     served_model: str | None = None
+    cache_read_input_tokens: int = 0       # anthropic prompt caching (0 elsewhere)
+    cache_creation_input_tokens: int = 0
 
 
 class LLMClient:
@@ -72,10 +74,15 @@ class LLMClient:
             import openai
             self._client = openai.OpenAI()
 
-    def complete(self, system: str, user: str, max_tokens: int = 16000) -> Completion:
+    def complete(self, system: str, user: str, max_tokens: int = 16000, cache_system: bool = False) -> Completion:
+        """`cache_system`: mark the system prompt as a prompt-cache breakpoint (anthropic only). Worth it only when
+        the system prompt is identical across calls and above the model's minimum cacheable length."""
         start = time.perf_counter()
+        cache_read = cache_creation = 0
         if self.provider == "anthropic":
-            request_kwargs = dict(model=self.model, system=system, max_tokens=max_tokens,
+            system_param = ([{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+                            if cache_system else system)
+            request_kwargs = dict(model=self.model, system=system_param, max_tokens=max_tokens,
                                   messages=[{"role": "user", "content": user}])
             if supports_temperature(self.model):
                 request_kwargs["temperature"] = self.temperature
@@ -88,6 +95,8 @@ class LLMClient:
                 response = self._client.messages.create(**request_kwargs)
             text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
             input_tokens, output_tokens = response.usage.input_tokens, response.usage.output_tokens
+            cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+            cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
             stop_reason, served_model = response.stop_reason, getattr(response, "model", self.model)
         elif self.provider == "ollama":
             data = self._client.chat({"model": self.model, "options": {"temperature": self.temperature, "seed": 0},
@@ -105,7 +114,7 @@ class LLMClient:
             input_tokens, output_tokens = response.usage.prompt_tokens, response.usage.completion_tokens
             stop_reason, served_model = response.choices[0].finish_reason, self.model
         return Completion(text, self.model, (time.perf_counter() - start) * 1000, input_tokens, output_tokens,
-                          stop_reason, served_model)
+                          stop_reason, served_model, cache_read, cache_creation)
 
 
 class OllamaClient:
