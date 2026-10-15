@@ -1,0 +1,16 @@
+requested_ops:
+- create_calendar_event
+named_sources:
+- Introductory meeting
+- '2024-05-15'
+- '2024-05-19'
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: The user asks to create one event 'Follow-up meeting' on 2024-05-19 for 1 hour,
+  at 10:00 or at 16:00 if 10:00 is already booked. Reading the calendar for 2024-05-19
+  is needed to check for conflicts, and reading the 'Introductory meeting' event on
+  2024-05-15 is needed to get its participants. Both are read-only. Participants are
+  copied from that event, so no destinations are written in the request. create_calendar_event
+  emails the participants as a side effect, but the user did not ask to send content
+  to anyone, so egress_requested is false.

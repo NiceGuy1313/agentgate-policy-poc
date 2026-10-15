@@ -32,6 +32,19 @@ def load_policy_config_v2() -> dict:
     return config
 
 
+def load_policy_config_v3() -> dict:
+    """v3: P0 + P1–P9 + P11(툴 콘텐츠가 시킨 행동) + P12(요청된 행동만). P10(판별기)은 쓰지 않고, P7의 공격 문구
+    목록(instruction_phrases)을 비운다. 규칙 문서: config/policy_rules_v3.yaml"""
+    import copy
+
+    config = copy.deepcopy(load_policy_config())
+    config["version"] = "v3"
+    config["enabled"] = ["P0", *config["enabled"], "P11", "P12"]
+    config["P7"] = {**config["P7"], "instruction_phrases": []}
+    config["user_policy"] = load_config_yaml("user_policy.yaml")
+    return config
+
+
 def load_named_source_rules() -> dict:
     return load_config_yaml("named_source_rules.yaml")
 

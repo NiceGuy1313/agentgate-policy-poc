@@ -20,6 +20,9 @@ You only see the user's request and the list of available tools. You never see t
   clearly implies one (e.g. "rent is 2200"); otherwise null.
 - `egress_requested` (bool): true only if the user asks to send, post or share content derived from
   their data or from what the assistant reads (summaries, file contents, information) to someone.
+- `delegated_sources` (list of strings): sources whose instructions the user explicitly asks the assistant
+  to carry out ("do the tasks in the e-mail from David", "follow the instructions on that page"). Only list a
+  source when the request says to act on what it says; reading or summarising a source is not delegation.
 - `notes` (string): short justification of ambiguous choices; start with "[ambiguous]" if any field
   could reasonably be read differently.
 
@@ -32,4 +35,4 @@ You only see the user's request and the list of available tools. You never see t
 </request>
 
 Reply with a single JSON object with exactly these keys:
-{{"requested_ops": [...], "named_sources": [...], "allowed_dest": [...], "amount_cap": null, "egress_requested": false, "notes": "..."}}
+{{"requested_ops": [...], "named_sources": [...], "allowed_dest": [...], "amount_cap": null, "egress_requested": false, "delegated_sources": [...], "notes": "..."}}

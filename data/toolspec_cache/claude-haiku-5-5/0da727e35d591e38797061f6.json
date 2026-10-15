@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "reserve_hotel",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 2348.7032570001247,
+ "input_tokens": 1928,
+ "output_tokens": 445,
+ "dropped_values": 0,
+ "error": null
+}

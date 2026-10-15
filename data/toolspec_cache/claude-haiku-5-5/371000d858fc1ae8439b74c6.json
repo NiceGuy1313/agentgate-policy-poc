@@ -1,0 +1,88 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r3",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r4",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r5",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r6",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r7",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r8",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r9",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Riverside View Hotel",
+     "2024-05-13",
+     "2024-05-17"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Riverside View Hotel",
+     "2024-05-13",
+     "2024-05-17"
+    ]
+   },
+   {
+    "record": "r7",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Riverside View Hotel",
+     "2024-05-13",
+     "2024-05-17"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4652.762595999775,
+ "input_tokens": 3522,
+ "output_tokens": 1109,
+ "dropped_values": 0,
+ "error": null
+}

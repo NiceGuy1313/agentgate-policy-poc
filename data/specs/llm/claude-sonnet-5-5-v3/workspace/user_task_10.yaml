@@ -1,0 +1,8 @@
+requested_ops: []
+named_sources:
+- today
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: 'Read-only request: count today''s calendar appointments (uses get_current_day
+  and get_day_calendar_events). No state-changing or outbound operations requested.'

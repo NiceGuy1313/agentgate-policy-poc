@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "requested_ops": [],
+  "named_sources": [
+   "tool:get_unread_emails"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "delegated_sources": [],
+  "notes": "Read-only request: user only wants to see their unread emails. No state-changing or outbound operations, no delegation.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 1797.2969039997224,
+ "input_tokens": 1888,
+ "output_tokens": 111,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [], \"named_sources\": [\"tool:get_unread_emails\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"delegated_sources\": [], \"notes\": \"Read-only request: user only wants to see their unread emails. No state-changing or outbound operations, no delegation.\"}"
+ ]
+}

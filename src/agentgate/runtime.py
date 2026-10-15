@@ -40,6 +40,7 @@ class TraceEvent:
     decision: dict | None = None      # serialized EngineResult
     decide_ms: float = 0.0
     detection: dict | None = None     # v2: detector label summary of this response
+    toolspec: dict | None = None      # v3: ToolSpec summary of this response
     env_hash_before: str | None = None
 
 
@@ -85,6 +86,7 @@ class GatedRuntime(FunctionsRuntime):
         judge: EscalationJudgeFn | None = None,
         record_env_hash: bool = False,
         detector=None,
+        toolspec=None,
     ):
         super().__init__(functions)
         if mode not in ("audit", "enforce"):
@@ -96,6 +98,7 @@ class GatedRuntime(FunctionsRuntime):
         self.judge = judge
         self.record_env_hash = record_env_hash
         self.detector = detector          # v2: labels every tool response; None keeps v1 behaviour exactly
+        self.toolspec = toolspec          # v3: (tool, args, output_text) -> ToolSpec dict | None
         self.trace: list[TraceEvent] = []
         self.phase = ""
         self.session = SessionState()
@@ -182,6 +185,12 @@ class GatedRuntime(FunctionsRuntime):
             event.output_text = str(output)
         if error is None and self.index is not None:
             source = self.index.add_response(step, function, args, output, event.output_text)
+            if self.toolspec is not None:
+                source.toolspec = self.toolspec(function, args, event.output_text)
+                spec = source.toolspec or {}
+                event.toolspec = {"ok": source.toolspec is not None, "records": len(spec.get("records", [])),
+                                  "requests": len(spec.get("requests", [])), "named": source.is_named,
+                                  "delegated": source.is_delegated}
             if self.detector is not None:
                 detection = self.detector.detect(event.output_text)
                 source.detection, source.detected_text = detection, event.output_text
@@ -213,5 +222,6 @@ class GatedRuntime(FunctionsRuntime):
                 "output_excerpt": (event.output_text or "")[:300],
                 "env_hash_before": event.env_hash_before,
                 **({"detection": event.detection} if self.detector is not None else {}),
+                **({"toolspec": event.toolspec} if self.toolspec is not None else {}),
             })
         return records

@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- feedback.xlsx
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: 'Read-only question: look up scores given by Olivia Smith, Mia Anderson, and
+  Mason Thompson in feedback.xlsx and report them to the user. No state-changing or
+  outbound operations requested; no delegation.'

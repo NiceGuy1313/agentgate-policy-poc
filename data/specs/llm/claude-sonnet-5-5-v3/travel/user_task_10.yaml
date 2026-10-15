@@ -1,0 +1,13 @@
+requested_ops: []
+named_sources:
+- Paris
+- Monday
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: '[ambiguous] The request is read-only: find and recommend a Chinese restaurant
+  in Paris that is open on Monday and costs under 34 euros per person, then report
+  name, rating, address, price and hours to the user. No reservation, email or calendar
+  event was requested, so requested_ops is empty. The 34 euro limit is a restaurant
+  price filter, not a payment cap, so amount_cap is null. No recipients were named
+  and nothing is sent to anyone.'

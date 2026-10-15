@@ -402,6 +402,63 @@ def _detector_candidates(value, long_chars: int) -> list[str]:
     return sorted(candidates["url"] | candidates["email"] | candidates["iban"])
 
 
+class InstructedActionPolicy(Policy):
+    """P11 (rules R3, v3): a call that carries out a request found inside a tool output.
+
+    Reads only the validated ToolSpec labels the runtime attached to the responses (no model calls here).
+    Not requested by the user and not from a delegated source -> BLOCK; otherwise -> ESCALATE (judge rule J1).
+    """
+
+    policy_id = "P11"
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.effect_tools = load_effect_tools()
+
+    def applies_to(self, tool):
+        return tool in self.effect_tools
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        matches = context.value_index.instructed_requests(call.tool, call.args)
+        if not matches:
+            return None
+        requested = call.tool in context.spec.requested_ops
+        delegated = [m for m in matches if m["delegated"]]
+        evidence = {"matched_tool_output_requests": matches[:5], "requested": requested}
+        if not requested and not delegated:
+            return self.block(f"'{call.tool}' carries out a request found in a tool output "
+                              f"({matches[0]['source_id']}:{matches[0]['tool']}), which the user did not ask for.",
+                              **evidence)
+        return self.escalate(f"'{call.tool}' matches a request found in a tool output "
+                             f"({'delegated source' if delegated else 'action also requested by the user'}).",
+                             **evidence)
+
+
+class RequestedActionPolicy(Policy):
+    """P12 (rule R1, v3): state-changing / outbound tools must be requested by the user.
+
+    Generalizes P6/P8/P9 to every effect tool except URL visits (P7 handles those). Unrequested calls that also
+    carry out a tool-output request are blocked by P11; the rest go to the judge.
+    """
+
+    policy_id = "P12"
+    EXCLUDED = ("visit",)
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        from agentgate.config import load_config_yaml
+        roles = load_config_yaml("tool_roles.yaml")["effect"]
+        self.tools = {t for cls, tools in roles.items() if cls not in self.EXCLUDED for t in tools}
+
+    def applies_to(self, tool):
+        return tool in self.tools
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        if call.tool in context.spec.requested_ops:
+            return None
+        return self.escalate(f"'{call.tool}' was not requested by the user.", tool=call.tool)
+
+
 POLICY_CLASSES = [UserFixedPolicy, DestinationProvenancePolicy, SensitiveEgressPolicy, BulkEgressPolicy, MoneyTransferPolicy,
                   DeletionPolicy, AccountPermissionPolicy, UntrustedContentPolicy, ReservationPolicy,
-                  CalendarChangePolicy, DetectorLabelPolicy]
+                  CalendarChangePolicy, DetectorLabelPolicy, InstructedActionPolicy, RequestedActionPolicy]

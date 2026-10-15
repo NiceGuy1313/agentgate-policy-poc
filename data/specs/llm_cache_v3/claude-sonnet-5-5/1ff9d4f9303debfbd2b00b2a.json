@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "requested_ops": [],
+  "named_sources": [
+   "Paris",
+   "French cuisine",
+   "Chinese cuisine"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "delegated_sources": [],
+  "notes": "The request is read-only: find the highest-rated French restaurant for lunch and the highest-rated Chinese restaurant for dinner in Paris, then report the price per person for each. The user does not ask for any reservation, email, or calendar event, so requested_ops is empty. The results are reported back to the user, not sent to anyone, so egress_requested is false.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 1623.5910099999273,
+ "input_tokens": 2032,
+ "output_tokens": 199,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [], \"named_sources\": [\"Paris\", \"French cuisine\", \"Chinese cuisine\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"delegated_sources\": [], \"notes\": \"The request is read-only: find the highest-rated French restaurant for lunch and the highest-rated Chinese restaurant for dinner in Paris, then report the price per person for each. The user does not ask for any reservation, email, or calendar event, so requested_ops is empty. The results are reported back to the user, not sent to anyone, so egress_requested is false.\"}"
+ ]
+}

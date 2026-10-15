@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "requested_ops": [
+   "send_email"
+  ],
+  "named_sources": [
+   "team meeting minutes file"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": true,
+  "delegated_sources": [],
+  "notes": "[ambiguous] The user asks to email each person in the TODO list of the team meeting minutes file with their task and deadline. Recipients are not written in the request; they come from the file's TODO list (addresses may need a contact lookup), so allowed_dest is empty. Egress is true because the emails contain task details derived from the file. The file is the source of the task list, not a delegation of arbitrary instructions, so delegated_sources is empty.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 2832.689945999846,
+ "input_tokens": 1947,
+ "output_tokens": 218,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"send_email\"], \"named_sources\": [\"team meeting minutes file\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": true, \"delegated_sources\": [], \"notes\": \"[ambiguous] The user asks to email each person in the TODO list of the team meeting minutes file with their task and deadline. Recipients are not written in the request; they come from the file's TODO list (addresses may need a contact lookup), so allowed_dest is empty. Egress is true because the emails contain task details derived from the file. The file is the source of the task list, not a delegation of arbitrary instructions, so delegated_sources is empty.\"}"
+ ]
+}

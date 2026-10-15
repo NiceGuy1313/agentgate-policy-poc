@@ -1,0 +1,14 @@
+requested_ops:
+- create_file
+named_sources:
+- file containing the vacation plans for Hawaii
+- June 13
+- hawaii-packing-list.docx
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: Task 1 is a read-only question about the Hawaii vacation plans file, so it
+  needs no state-changing tool. Task 2 requires create_file to make 'hawaii-packing-list.docx'
+  in the drive, with content based on the other Hawaii document. Nothing is sent or
+  shared externally, so egress_requested is false. No document is delegated; the files
+  are only read as input.

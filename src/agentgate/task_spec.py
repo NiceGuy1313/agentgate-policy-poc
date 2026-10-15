@@ -22,6 +22,9 @@ class TaskSpec(BaseModel):
     """Upper bound for any single money transfer stated or implied by the prompt."""
     egress_requested: bool = False
     """True if the user asks to send content derived from their data to someone."""
+    delegated_sources: list[str] = Field(default_factory=list)
+    """v3: sources whose instructions the user explicitly asks the assistant to carry out ("do what the e-mail
+    from David says"). Requests found inside other tool outputs are never the user's."""
     notes: str | None = None
     status: str | None = None
     """draft | reviewed (oracle specs only)."""

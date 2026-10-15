@@ -1,0 +1,124 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r9",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r10",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r11",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "david.smith@bluesparrowtech.com",
+     "Phoenix Project"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "katie.brown@bluesparrowtech.com"
+    ]
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Julie"
+    ]
+   },
+   {
+    "record": "r6",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "client@abcindustries.com"
+    ]
+   },
+   {
+    "record": "r9",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "james.miller@yahoo.com"
+    ]
+   },
+   {
+    "record": "r10",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "james.miller@yahoo.com"
+    ]
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 6827.747618000103,
+ "input_tokens": 4078,
+ "output_tokens": 1757,
+ "dropped_values": 0,
+ "error": null
+}
