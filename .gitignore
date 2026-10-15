@@ -18,11 +18,11 @@ htmlcov/
 .env.*
 !.env.example
 
-# Claude Code / agent tooling (local only)
-CLAUDE.md
+# Claude Code / agent tooling: CLAUDE.md and .claude/settings.json are committed for cloud sessions
 CLAUDE.local.md
 AGENTS.md
-.claude/
+.claude/*
+!.claude/settings.json
 .omc/
 .mcp.json
 
@@ -50,3 +50,8 @@ data/specs/llm_cache/*/
 # Stray logs from local runs
 *.log
 nohup.out
+
+# Detector score cache (regenerable; numbers in reports come from results/detector/)
+data/detector_cache/
+# Hugging Face model downloads when HF_HOME points inside the repo
+.hf_cache/

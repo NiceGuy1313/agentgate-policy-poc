@@ -2,6 +2,8 @@
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)를 따라 송금·반출·삭제를 하지 않도록, 모든 툴 호출을 **실행 직전에 결정론 정책(P1–P9)으로 검사**하는 Gate다. AgentDojo v1.2.2(`agentdojo==0.1.35`)와 외부 에이전트 프레임워크(smolagents 등)에서 검증한다.
 
+> **v2 작업 중**: 툴 응답 ML 판별기(PIGuard)와 Trusted LLM으로 게이트를 보완한다. 명세와 클라우드 실행 방법은 [`명세서.md`](명세서.md).
+
 자세한 내용은 [`docs/architecture.md`](docs/architecture.md)(구조·Wrapper 규약), [`docs/policy_spec.md`](docs/policy_spec.md)(정책 상세), [`docs/final_report.md`](docs/final_report.md)(평가 결과)에 있다. 정적 결과 요약은 [`results/dashboard.html`](results/dashboard.html)이다.
 
 ## 1. 설치
@@ -110,13 +112,14 @@ python scripts/reporting/build_report.py
 src/agentgate/
   policy/        정책과 판정 결합 (LLM 호출 없음)
   llm/           TaskSpec 추출기, ESCALATE 판정 LLM
+  detector/      툴 응답 인젝션 판별기 래퍼 (v2, PIGuard·ProtectAI)
   agents/        평가 대상 에이전트 (frameworks/: smolagents 어댑터)
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
   evaluation/    재생 평가, 지표
-config/          정책 설정, 프레임워크 등록(frameworks.yaml)
+config/          정책 설정, 프레임워크 등록(frameworks.yaml), 판별기 설정(detector.yaml)
 dashboard/       실시간 Gate 대시보드 (FastAPI)
 prompts/         LLM 프롬프트
-scripts/         benchmark · taskspec · evaluation · analysis · reporting
+scripts/         benchmark · taskspec · evaluation · analysis · reporting · cloud(클라우드 세션 준비)
 tests/           pytest
 data/
   benchmark/     AgentDojo에서 추출한 태스크·툴 목록, 공격 유형 레이블, 인자 출처 분석
