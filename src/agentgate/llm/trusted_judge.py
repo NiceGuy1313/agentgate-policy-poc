@@ -20,7 +20,7 @@ import json
 import os
 import re
 
-from agentgate.config import PROJECT_ROOT, load_dotenv
+from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient
 from agentgate.normalization import iterate_leaf_values
 from agentgate.policy.base import PolicyContext, ToolCall, Verdict
@@ -167,7 +167,7 @@ class TrustedJudgeV2:
                       "cache_creation_input_tokens": completion.cache_creation_input_tokens,
                       "layout": PROMPT_LAYOUT, "cached": False}
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({k: v for k, v in record.items() if k != "cached"}, indent=1))
+            write_text_atomic(path, json.dumps({k: v for k, v in record.items() if k != "cached"}, indent=1))
         final = record["answer"]
         return {**base, "answer": record["answer"], "final": final, "verdict": "ALLOW" if final == "ALLOW" else "BLOCK",
                 "human": final == "HUMAN", "text": record["text"][:200], "cached": record["cached"],

@@ -64,6 +64,14 @@ def load_dotenv(path: Path | None = None) -> None:
             os.environ[key] = value
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write via a temporary file + rename, so a concurrent reader never sees a half-written cache file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{id(text)}.tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
 def require_env_vars(*names: str) -> dict[str, str]:
     load_dotenv()
     missing = [name for name in names if not os.environ.get(name)]

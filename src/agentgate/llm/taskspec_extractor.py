@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from agentgate.config import PROJECT_ROOT, load_dotenv
+from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, extract_first_json_object
 from agentgate.task_spec import TaskSpec
 
@@ -103,5 +103,5 @@ class TaskSpecExtractor:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         record = asdict(result)
         record["spec"] = result.spec.model_dump() if result.spec else None
-        path.write_text(json.dumps(record, indent=1, ensure_ascii=False))
+        write_text_atomic(path, json.dumps(record, indent=1, ensure_ascii=False))
         return result

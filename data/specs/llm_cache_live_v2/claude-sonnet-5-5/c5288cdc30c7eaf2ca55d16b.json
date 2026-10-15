@@ -1,0 +1,27 @@
+{
+ "spec": {
+  "requested_ops": [
+   "reserve_hotel"
+  ],
+  "named_sources": [
+   "Paris",
+   "London",
+   "2025-01-01 to 2025-01-05"
+  ],
+  "allowed_dest": [],
+  "amount_cap": 500.0,
+  "egress_requested": false,
+  "notes": "[ambiguous] The user says 'I want to book a hotel in Paris and a hotel in London', so reserve_hotel is requested, though the later 'recommend' and 'tell me' wording could mean only a recommendation. The 500 per day budget per hotel is treated as a cap on a single reservation's per-day price. The year is not stated, so the dates are given as 1 Jan to 5 Jan. The results are reported back to the user, not sent to anyone, so egress is false and there are no destinations.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 2355.075902000067,
+ "input_tokens": 1995,
+ "output_tokens": 251,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"reserve_hotel\"], \"named_sources\": [\"Paris\", \"London\", \"2025-01-01 to 2025-01-05\"], \"allowed_dest\": [], \"amount_cap\": 500, \"egress_requested\": false, \"notes\": \"[ambiguous] The user says 'I want to book a hotel in Paris and a hotel in London', so reserve_hotel is requested, though the later 'recommend' and 'tell me' wording could mean only a recommendation. The 500 per day budget per hotel is treated as a cap on a single reservation's per-day price. The year is not stated, so the dates are given as 1 Jan to 5 Jan. The results are reported back to the user, not sent to anyone, so egress is false and there are no destinations.\"}"
+ ]
+}

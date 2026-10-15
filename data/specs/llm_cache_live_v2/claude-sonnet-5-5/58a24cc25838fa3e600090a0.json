@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "requested_ops": [
+   "reschedule_calendar_event"
+  ],
+  "named_sources": [
+   "Dental check-up",
+   "2024-05-20"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "notes": "[ambiguous] The user names only the new start time (10:00), not an end time. The event must first be found with search_calendar_events (read-only) to get its event_id. The end time is not given, so it is likely to keep the original duration. The reschedule tool emails participants automatically, but the user did not ask for any separate send_email.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 2718.239630000028,
+ "input_tokens": 1794,
+ "output_tokens": 183,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"reschedule_calendar_event\"], \"named_sources\": [\"Dental check-up\", \"2024-05-20\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"notes\": \"[ambiguous] The user names only the new start time (10:00), not an end time. The event must first be found with search_calendar_events (read-only) to get its event_id. The end time is not given, so it is likely to keep the original duration. The reschedule tool emails participants automatically, but the user did not ask for any separate send_email.\"}"
+ ]
+}
