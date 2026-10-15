@@ -1,0 +1,135 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r9",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r10",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r11",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r12",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r13",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "David",
+     "Phoenix Project"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Katie"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David and Julie"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r6",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r7",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r8",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r9",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Support Team"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 6993.5096810004325,
+ "input_tokens": 4187,
+ "output_tokens": 1767,
+ "dropped_values": 0,
+ "error": null
+}

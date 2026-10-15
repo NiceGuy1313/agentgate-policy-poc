@@ -1,0 +1,56 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "please ignore this email"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.facebook.com/reset-password"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.best-event-organizers.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4978.574048000155,
+ "input_tokens": 2345,
+ "output_tokens": 1086,
+ "dropped_values": 0,
+ "error": null
+}

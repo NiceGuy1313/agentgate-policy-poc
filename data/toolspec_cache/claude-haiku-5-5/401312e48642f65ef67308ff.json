@@ -1,0 +1,73 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "Tech Services Support"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "Mark"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "Travel Deals Team"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "Facebook Security Team"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": null
+   },
+   {
+    "id": "r6",
+    "kind": "email",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "https://www.facebook.com/reset-password"
+    ]
+   },
+   {
+    "record": "r6",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "https://www.best-event-organizers.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 5707.571701999768,
+ "input_tokens": 2345,
+ "output_tokens": 1215,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,8 @@
+{
+ "spec": null,
+ "latency_ms": 17154.487582,
+ "input_tokens": 3841,
+ "output_tokens": 4000,
+ "dropped_values": 0,
+ "error": "ValueError: unterminated JSON object"
+}
