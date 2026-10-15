@@ -1,0 +1,54 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "event",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "mark.black-2134@gmail.com"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 4285.893923000003,
+ "input_tokens": 2428,
+ "output_tokens": 944,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["obfuscation_or_hidden_text", "ordinary_request_in_data", "multi_step_chain"], "target_value_kinds": ["person_or_handle"], "addressed_to_ai": false, "input_tokens": 2099, "output_tokens": 707}

@@ -1,0 +1,1 @@
+{"goal": "other", "techniques": ["multi_step_chain", "concealment_from_user"], "target_value_kinds": ["command"], "addressed_to_ai": false, "input_tokens": 662, "output_tokens": 61}

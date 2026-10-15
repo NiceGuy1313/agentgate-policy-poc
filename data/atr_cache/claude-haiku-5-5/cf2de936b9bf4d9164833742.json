@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["urgency_pressure", "authority_impersonation", "ordinary_request_in_data"], "target_value_kinds": ["email_address", "credential"], "addressed_to_ai": false, "input_tokens": 1469, "output_tokens": 260}

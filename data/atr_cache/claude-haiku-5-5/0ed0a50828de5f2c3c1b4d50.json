@@ -1,0 +1,1 @@
+{"goal": "execute_code", "techniques": ["ordinary_request_in_data", "obfuscation_or_hidden_text"], "target_value_kinds": ["command"], "addressed_to_ai": false, "input_tokens": 523, "output_tokens": 73}

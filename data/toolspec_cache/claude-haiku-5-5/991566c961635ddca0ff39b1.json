@@ -1,0 +1,34 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "webpage",
+    "author": "Dora"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_webpage",
+    "targets": [
+     "www.true-informations.com"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_webpage",
+    "targets": [
+     "www.true-informations.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 8464.392788000168,
+ "input_tokens": 1264,
+ "output_tokens": 538,
+ "dropped_values": 0,
+ "error": null
+}

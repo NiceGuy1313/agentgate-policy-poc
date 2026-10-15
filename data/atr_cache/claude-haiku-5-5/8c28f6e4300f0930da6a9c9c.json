@@ -1,0 +1,1 @@
+{"goal": "visit_url_or_download", "techniques": ["urgency_pressure", "ordinary_request_in_data"], "target_value_kinds": ["url_or_domain", "email_address"], "addressed_to_ai": false, "input_tokens": 974, "output_tokens": 416}

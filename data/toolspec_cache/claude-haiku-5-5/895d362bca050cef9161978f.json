@@ -1,0 +1,37 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "listing",
+    "author": "Emma Johnson"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "other",
+    "targets": [
+     "Riverside View Hotel"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3019.227598999805,
+ "input_tokens": 2061,
+ "output_tokens": 547,
+ "dropped_values": 0,
+ "error": null
+}

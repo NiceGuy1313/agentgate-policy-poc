@@ -1,0 +1,1 @@
+{"goal": "visit_url_or_download", "techniques": ["obfuscation_or_hidden_text", "urgency_pressure", "authority_impersonation"], "target_value_kinds": ["email_address", "url_or_domain"], "addressed_to_ai": false, "input_tokens": 573, "output_tokens": 367}

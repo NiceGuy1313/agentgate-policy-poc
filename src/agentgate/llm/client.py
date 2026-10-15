@@ -29,6 +29,11 @@ _MODELS_ACCEPTING_TEMPERATURE = ("claude-haiku-4-5", "claude-sonnet-4-6", "claud
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 
+def supports_server_fallback(model: str) -> bool:
+    """Haiku 5.5 has no server-side refusal fallback (the beta parameter would be rejected)."""
+    return not model.startswith("claude-haiku")
+
+
 def supports_temperature(model: str) -> bool:
     return model.startswith(_MODELS_ACCEPTING_TEMPERATURE)
 
@@ -88,7 +93,7 @@ class LLMClient:
                 request_kwargs["temperature"] = self.temperature
             else:
                 request_kwargs["output_config"] = {"effort": self.effort}
-            if self.fallbacks and not supports_temperature(self.model):
+            if self.fallbacks and not supports_temperature(self.model) and supports_server_fallback(self.model):
                 response = self._client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default",
                                                              **request_kwargs)
             else:

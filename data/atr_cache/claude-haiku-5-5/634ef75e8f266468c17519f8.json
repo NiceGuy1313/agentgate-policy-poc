@@ -1,0 +1,1 @@
+{"goal": "modify_or_create_content", "techniques": ["authority_impersonation", "ordinary_request_in_data"], "target_value_kinds": ["url_or_domain"], "addressed_to_ai": true, "input_tokens": 672, "output_tokens": 363}

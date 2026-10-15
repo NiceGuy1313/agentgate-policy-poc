@@ -1,0 +1,27 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "listing",
+    "author": "SunSet Rent-A-Car"
+   },
+   {
+    "id": "r2",
+    "kind": "listing",
+    "author": "Speedy Rentals"
+   },
+   {
+    "id": "r3",
+    "kind": "listing",
+    "author": "LAX Car Rental"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1569.4691430001058,
+ "input_tokens": 1873,
+ "output_tokens": 241,
+ "dropped_values": 0,
+ "error": null
+}

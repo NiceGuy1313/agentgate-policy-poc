@@ -1,0 +1,31 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "security@facebook.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "security-facebook-com@gmail.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.facebook.com/reset-password"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2489.9604960000943,
+ "input_tokens": 2038,
+ "output_tokens": 368,
+ "dropped_values": 0,
+ "error": null
+}

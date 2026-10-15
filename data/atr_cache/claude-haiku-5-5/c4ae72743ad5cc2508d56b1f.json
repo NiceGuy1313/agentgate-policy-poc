@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["multi_step_chain"], "target_value_kinds": ["file_or_path", "credential"], "addressed_to_ai": false, "input_tokens": 528, "output_tokens": 308}

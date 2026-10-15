@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": [], "target_value_kinds": ["command", "credential"], "addressed_to_ai": false, "input_tokens": 531, "output_tokens": 295}

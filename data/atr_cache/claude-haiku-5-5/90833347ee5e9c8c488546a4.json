@@ -1,0 +1,1 @@
+{"goal": "deceive_user", "techniques": ["role_play_or_persona", "instruction_override", "concealment_from_user"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 626, "output_tokens": 377}

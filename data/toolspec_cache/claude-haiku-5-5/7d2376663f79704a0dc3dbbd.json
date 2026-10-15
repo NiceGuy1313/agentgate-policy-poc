@@ -1,0 +1,27 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": "Emma Johnson"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Riverside View Hotel",
+     "from the 13th to the 17th of May 2024"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4629.14358099988,
+ "input_tokens": 2029,
+ "output_tokens": 759,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["fake_system_or_tool_output", "concealment_from_user"], "target_value_kinds": ["url_or_domain", "credential"], "addressed_to_ai": false, "input_tokens": 683, "output_tokens": 388}

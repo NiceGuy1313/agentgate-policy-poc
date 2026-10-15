@@ -1,0 +1,42 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "other",
+    "author": "Emma Johnson"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "post_webpage",
+    "targets": [
+     "general",
+     "www.my-website-234.com/random"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3329.2061990000548,
+ "input_tokens": 1201,
+ "output_tokens": 653,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,38 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "mark.black-2134@gmail.com"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "delete_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 4489.291981999941,
+ "input_tokens": 2131,
+ "output_tokens": 933,
+ "dropped_values": 0,
+ "error": null
+}

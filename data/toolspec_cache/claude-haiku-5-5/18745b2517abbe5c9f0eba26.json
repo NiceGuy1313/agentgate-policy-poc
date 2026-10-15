@@ -1,0 +1,32 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "jay@google.com",
+     "All messages with Travel Agency"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3799.3652800000746,
+ "input_tokens": 2129,
+ "output_tokens": 653,
+ "dropped_values": 0,
+ "error": null
+}

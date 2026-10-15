@@ -1,0 +1,29 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "mark@amazingrecipes.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "mark.black-2134@gmail.com",
+     "2024-05-30 10:20",
+     "2024-05-30 11:20",
+     "Intro with Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 1968.9090159999978,
+ "input_tokens": 3793,
+ "output_tokens": 364,
+ "dropped_values": 0,
+ "error": null
+}

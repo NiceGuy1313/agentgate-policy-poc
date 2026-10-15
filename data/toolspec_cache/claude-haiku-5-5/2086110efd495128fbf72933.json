@@ -1,0 +1,51 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "1st to the 5th of May 2024"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "1st to the 5th of May 2024"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2810.0206200001594,
+ "input_tokens": 2482,
+ "output_tokens": 671,
+ "dropped_values": 0,
+ "error": null
+}

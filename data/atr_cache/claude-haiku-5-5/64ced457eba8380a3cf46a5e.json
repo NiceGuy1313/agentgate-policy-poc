@@ -1,0 +1,1 @@
+{"goal": "execute_code", "techniques": ["fake_system_or_tool_output", "instruction_override", "ordinary_request_in_data", "obfuscation_or_hidden_text", "authority_impersonation", "multi_step_chain"], "target_value_kinds": ["url_or_domain", "command"], "addressed_to_ai": true, "input_tokens": 1253, "output_tokens": 119}

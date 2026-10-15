@@ -1,0 +1,1 @@
+{"goal": "execute_code", "techniques": ["instruction_override", "multi_step_chain"], "target_value_kinds": ["command"], "addressed_to_ai": false, "input_tokens": 559, "output_tokens": 246}

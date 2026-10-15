@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["conditional_or_delayed_trigger", "obfuscation_or_hidden_text", "value_substitution"], "target_value_kinds": ["credential"], "addressed_to_ai": true, "input_tokens": 628, "output_tokens": 422}

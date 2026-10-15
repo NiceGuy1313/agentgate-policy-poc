@@ -1,0 +1,1 @@
+{"goal": "execute_code", "techniques": ["instruction_override", "urgency_pressure"], "target_value_kinds": ["command"], "addressed_to_ai": true, "input_tokens": 696, "output_tokens": 277}

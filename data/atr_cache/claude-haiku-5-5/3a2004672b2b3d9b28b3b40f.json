@@ -1,0 +1,1 @@
+{"goal": "deceive_user", "techniques": ["conditional_or_delayed_trigger", "instruction_override"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 577, "output_tokens": 389}

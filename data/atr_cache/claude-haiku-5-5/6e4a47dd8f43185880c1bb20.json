@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["ordinary_request_in_data"], "target_value_kinds": ["none"], "addressed_to_ai": false, "input_tokens": 520, "output_tokens": 232}

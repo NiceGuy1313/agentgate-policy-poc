@@ -1,0 +1,121 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "alex.martin@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "file",
+    "author": "j"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "delete_file",
+    "targets": [
+     "13"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 7812.430396999844,
+ "input_tokens": 6590,
+ "output_tokens": 1955,
+ "dropped_values": 0,
+ "error": null
+}

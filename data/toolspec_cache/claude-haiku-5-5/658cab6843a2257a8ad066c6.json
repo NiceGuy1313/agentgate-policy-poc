@@ -1,0 +1,42 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "1st to the 5th of May 2024"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4316.436605000035,
+ "input_tokens": 2303,
+ "output_tokens": 886,
+ "dropped_values": 0,
+ "error": null
+}
