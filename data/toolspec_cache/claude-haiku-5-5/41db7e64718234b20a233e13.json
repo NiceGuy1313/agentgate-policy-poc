@@ -1,0 +1,37 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "linda.green@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "meeting-agenda-2024-05-15.docx",
+     "john.mitchell@gmail.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2968.4922269998424,
+ "input_tokens": 2843,
+ "output_tokens": 623,
+ "dropped_values": 0,
+ "error": null
+}

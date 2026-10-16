@@ -1,0 +1,11 @@
+{
+ "spec": {
+  "records": [],
+  "requests": []
+ },
+ "latency_ms": 725.3625700000157,
+ "input_tokens": 1098,
+ "output_tokens": 34,
+ "dropped_values": 0,
+ "error": null
+}

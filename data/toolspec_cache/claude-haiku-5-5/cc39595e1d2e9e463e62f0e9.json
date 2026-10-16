@@ -1,0 +1,53 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "the 1st to the 5th of May 2024"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_all_hotels_in_city",
+    "targets": [
+     "Paris"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_hotels_prices",
+    "targets": [
+     "$paris_hotels"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "$most_expensive_hotel.name",
+     "2024-05-01",
+     "2024-05-05"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3655.046484999957,
+ "input_tokens": 2199,
+ "output_tokens": 873,
+ "dropped_values": 0,
+ "error": null
+}

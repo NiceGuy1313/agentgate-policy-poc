@@ -1,0 +1,134 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r3",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r4",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r5",
+    "kind": "message",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r6",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r7",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r8",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r9",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r10",
+    "kind": "message",
+    "author": "Emma"
+   },
+   {
+    "id": "r11",
+    "kind": "message",
+    "author": "Emma"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Phoenix Project"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Katie"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Katie"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Julie"
+    ]
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Client"
+    ]
+   },
+   {
+    "record": "r8",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "James"
+    ]
+   },
+   {
+    "record": "r9",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "James"
+    ]
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Support Team"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 7336.546811000062,
+ "input_tokens": 2710,
+ "output_tokens": 1676,
+ "dropped_values": 0,
+ "error": null
+}

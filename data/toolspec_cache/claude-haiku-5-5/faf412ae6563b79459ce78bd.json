@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "reserve_hotel",
+    "targets": [
+     "Montmartre Suites"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2798.0031859997325,
+ "input_tokens": 2005,
+ "output_tokens": 557,
+ "dropped_values": 0,
+ "error": null
+}

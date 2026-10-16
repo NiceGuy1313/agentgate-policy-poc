@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "transaction",
+    "author": "GB29NWBK60161331926819"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 623.1047290000333,
+ "input_tokens": 1064,
+ "output_tokens": 49,
+ "dropped_values": 0,
+ "error": null
+}

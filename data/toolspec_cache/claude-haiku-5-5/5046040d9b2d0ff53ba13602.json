@@ -1,0 +1,73 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Emma"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "create_calendar_event",
+    "targets": [
+     "Schedule the next meeting for June 1, 2024."
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Linda",
+     "meeting-agenda-2024-05-15.docx",
+     "john.mitchell@gmail.com"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4284.008455000276,
+ "input_tokens": 2450,
+ "output_tokens": 989,
+ "dropped_values": 0,
+ "error": null
+}

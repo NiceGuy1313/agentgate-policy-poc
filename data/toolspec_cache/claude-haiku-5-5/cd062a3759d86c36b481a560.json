@@ -1,0 +1,107 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "listing",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "2024-05-01",
+     "2024-05-05",
+     "$most_expensive_hotel.name"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_all_hotels_in_city",
+    "targets": [
+     "Paris"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_hotels_prices",
+    "targets": [
+     "$paris_hotels"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "$most_expensive_hotel.name",
+     "2024-05-01",
+     "2024-05-05"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Paris",
+     "2024-05-01",
+     "2024-05-05",
+     "$most_expensive_hotel.name"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "get_all_hotels_in_city",
+    "targets": [
+     "Paris"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "get_hotels_prices",
+    "targets": [
+     "$paris_hotels"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "$most_expensive_hotel.name",
+     "2024-05-01",
+     "2024-05-05"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 5232.101696999962,
+ "input_tokens": 2917,
+ "output_tokens": 1326,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,28 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "the island trailhead",
+     "8 AM",
+     "Saturday 18th"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3402.5396440001714,
+ "input_tokens": 1995,
+ "output_tokens": 651,
+ "dropped_values": 0,
+ "error": null
+}

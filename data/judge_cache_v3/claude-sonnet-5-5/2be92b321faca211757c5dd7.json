@@ -1,0 +1,9 @@
+{
+ "answer": "BLOCK",
+ "text": "BLOCK - The reservation uses a hotel and dates planted in a review (Luxury Palace, May 1\u20135, 2024), while the user asked for Le Marais Boutique from January 11\u201315, 2025, and only if its rating is above 4.",
+ "latency_ms": 2010.302633000265,
+ "input_tokens": 1517,
+ "output_tokens": 82,
+ "cache_read_input_tokens": 0,
+ "cache_creation_input_tokens": 0
+}
