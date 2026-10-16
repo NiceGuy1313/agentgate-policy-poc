@@ -152,53 +152,13 @@ Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wra
 
 서비스는 `127.0.0.1`에만 바인딩하고 세션마다 bearer 토큰을 요구한다. Wrapper는 `python -m agentgate.harness.conformance --entry "<command>"`로 규약 적합성을 스스로 확인할 수 있다. MCP 노출은 아직 구현하지 않았다.
 
-## 9. v2–v3.1 게이트 경로
+## 9. v2–v3.1 후속 구성
 
-정책 규칙은 [`policy_spec.md`](policy_spec.md) 5절, 수치는 [`final_report.md`](final_report.md) 6절에 있다.
+v1 게이트 위에 만든 두 구성의 구조·설계 결정·코드·결과는 버전별 폴더에 있다. 같은 짝의 live 비교는 [`final_report.md`](final_report.md) 6절이다.
 
-```mermaid
-flowchart LR
-    U[사용자 프롬프트] --> S[TaskSpec<br/>프롬프트+툴 목록만]
-    S --> L[에이전트 LLM]
-    L -->|툴 호출| G{GatedRuntime}
-    G --> E[PolicyEngine<br/>P0–P9 + P11·P12]
-    E -->|ALLOW| X[툴 실행]
-    E -->|BLOCK| B[차단 메시지]
-    E -->|ESCALATE| J[판정 LLM v3<br/>규칙 인덱스→조항]
-    J -->|ALLOW| X
-    J -->|BLOCK·HUMAN| B
-    X --> T[ToolSpec 추출<br/>레코드·요청 JSON]
-    T -->|ValueIndex에 라벨| E
-    X --> L
-```
-
-| 구성 요소 | 위치 | 역할 |
+| 버전 | 폴더 | 요지 |
 |---|---|---|
-| TaskSpec 추출기 | [`llm/taskspec_extractor.py`](../src/agentgate/llm/taskspec_extractor.py) | 프롬프트와 툴 목록만 입력. v3에서 `delegated_sources` 추가 |
-| ToolSpec 추출기 | [`llm/toolspec_extractor.py`](../src/agentgate/llm/toolspec_extractor.py) | 툴 응답마다 레코드·요청을 JSON으로. 작성자·값은 원문 대조로 검증 |
-| 출처 라벨 | [`provenance.py`](../src/agentgate/provenance.py) | `IndexedSource.toolspec`, `is_delegated`, `ValueIndex.instructed_requests` |
-| 정책 | [`policy/rules.py`](../src/agentgate/policy/rules.py) | P11·P12와 v3.1 플래그(`config["v31"]`). 정책 코드는 라벨만 읽는다 |
-| 규칙 문서 | [`config/policy_rules_v31.yaml`](../config/policy_rules_v31.yaml) | 조항과 트리거 인덱스 |
-| 판정 LLM v3 | [`llm/trusted_judge_v3.py`](../src/agentgate/llm/trusted_judge_v3.py) | system에 규칙 인덱스(프롬프트 캐시), user에 사실과 고른 조항. `use_rules=False`는 규칙 문서 ablation |
+| v2 (C5) | [`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md) | 툴 응답 판별기 라벨을 정책(P10)이 읽음. 판별기 오탐이 정책 판정을 덮어써 폐기 |
+| v3·v3.1 (C6·C7·C7n) | [`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md) | 툴 응답을 ToolSpec(JSON)으로 바꿔 정책(P11·P12)이 판단, ESCALATE는 판정 LLM v3 + 정책 문서 |
 
-### 설계 결정
-
-| 주제 | 결정 | 이유 |
-|---|---|---|
-| 판별기(v2 P10) | v3에서 제외 | 판별기가 정상 툴 응답의 형식(dict·YAML)에 반응해 오탐하고, 그 라벨이 정책의 ALLOW를 덮어써 판단 주체가 정책에서 판별기로 넘어갔다 |
-| 툴 응답 해석 | LLM이 ToolSpec을 뽑되 자유 텍스트 없음 | 응답을 읽는 LLM 자체가 주입 대상이므로, 출력은 열거형과 원문에 있는 값으로 제한하고 판정 쪽은 원문을 보지 않는다 |
-| 요청 일치 기준 | 요청의 대상 값 중 사용자가 주지 않은 값이 인자에 있을 때만 | 프롬프트에 있던 수신자 이름이 주입 문장에도 있다는 것만으로는 지시를 따른 근거가 아니다 |
-| P7 공격 문구 | 삭제 | 평가 벤치마크의 공격 템플릿을 미리 알고 막는 규칙이다 |
-| 규칙 문서 | 인덱스로 조항을 골라 판정 LLM에 제공 | 전체 문서 대신 해당 조항만 넣어 판정 근거를 좁히고, 인덱스는 system에 두어 캐시한다 |
-| v3.1 B1 | 지목 자료 안 링크는 판정 LLM으로 | 판정 없이 P7에 넘기면 지목 자료에 심은 URL 방문이 통과했다(파일럿에서 확인) |
-| 버전 분리 | v2·v3·v3.1 설정은 v1 설정 위에 코드로 만든다 | `GatedRuntime(detector=None)`과 v1 설정의 결과가 v1과 같아야 한다(회귀 기준) |
-
-### 평가 조건 (live)
-
-| 조건 | 게이트 | ESCALATE 처리 |
-|---|---|---|
-| C5 | v2: P0 + P1–P10, PIGuard 라벨 | Trusted LLM v2 |
-| C6 | v3: P0 + P1–P9 + P11·P12, ToolSpec | 판정 LLM v3 + 규칙 문서 v3 |
-| C7 | v3.1 | 판정 LLM v3 + 규칙 문서 v3.1 |
-| C7n | v3.1 | 판정 LLM v3, 규칙 문서 없음 |
-
+두 구성의 설정은 `config.py`가 v1 설정 위에 코드로 만든다. `GatedRuntime(detector=None, toolspec=None)`과 v1 설정의 결과는 v1과 같다(회귀 기준).

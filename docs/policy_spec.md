@@ -59,43 +59,4 @@ v3부터 P7의 인젝션 문구 목록(`instruction_phrases`)은 비운다. Agen
 
 ## 5. v2–v3.1 확장
 
-설정은 `config.py`의 `load_policy_config_v2` / `load_policy_config_v3` / `load_policy_config_v31`이 v1 설정 위에 만든다. `config/policies.yaml`은 바꾸지 않으므로 v1 결과는 그대로 재현된다.
-
-### 추가 정책
-
-| 정책 | 클래스 | 버전 | 규칙 → 판정 |
-|---|---|---|---|
-| P0 사용자 고정 설정 | `UserFixedPolicy` | v2– | [`config/user_policy.yaml`](../config/user_policy.yaml)의 `always_block` 툴 → BLOCK · `always_human` 툴 → ESCALATE(판정 없이 HUMAN) |
-| P10 판별기 라벨 | `DetectorLabelPolicy` | v2만 | 판별기가 flag한 응답에서 온 값 → ESCALATE, 지목하지 않은 응답의 의심 조각 안 값 → BLOCK. 판별기 오탐이 정책 판정을 덮어써 v3에서 제외 |
-| P11 툴 콘텐츠가 시킨 행동 | `InstructedActionPolicy` | v3– | 호출이 툴 응답 속 요청(ToolSpec)과 일치하면, 사용자가 요청하지도 위임하지도 않은 행동 → BLOCK, 그 밖 → ESCALATE. 사용자가 준 값(프롬프트·본인·신뢰 디렉터리)은 일치 근거에서 뺀다 |
-| P12 요청된 행동만 | `RequestedActionPolicy` | v3– | `requested_ops`에 없는 상태 변경·외부 전송 툴 → ESCALATE (URL 방문은 P7) |
-
-### ToolSpec — 툴 응답이 담은 것 ([`llm/toolspec_extractor.py`](../src/agentgate/llm/toolspec_extractor.py))
-
-툴 응답마다 claude-haiku-5-5가 만든다. 자유 텍스트 필드는 없다.
-
-| 필드 | 내용 |
-|---|---|
-| `records[]` | `id`, `kind`(email·message·file·event·review·transaction·webpage·contact·listing·other), `author`(원문에 있는 값만) |
-| `requests[]` | `record`, `addressed_to`(assistant·user·unclear), `action`(툴 이름 또는 other), `targets`(원문에 있는 값만) |
-
-원문에 없는 작성자·값은 코드가 버린다. 정책과 판정 LLM은 툴 응답 원문이 아니라 이 JSON만 본다.
-
-### v3.1 변경 (`config["v31"]`)
-
-| 표시 | 대상 | 변경 |
-|---|---|---|
-| A1 | P6·P8·P9 | 요청되지 않은 행동이라도 위임 자료의 요청과 일치하면 BLOCK 대신 ESCALATE |
-| A2 | 규칙 문서 J1 | 위임 자료에서 와야 하는 것은 요청 자체이고, 수행에 필요한 내용은 다른 자료에서 와도 됨 |
-| A3 | 판정 LLM 입력 | 위임 자료의 ToolSpec을 항상 넣음 |
-| B1 | P11 | 지목 자료 안의 링크를 여는 호출은 BLOCK 대신 ESCALATE |
-| B2 | 지목 자료 일치 | 이름 비교 최소 길이 4 → 3 (`runtime.named_match_min_len`) |
-| C1 | P3 | 전송을 요청했고 수신자가 신뢰 출처나 지목 자료에서 왔으면 BLOCK 대신 ESCALATE |
-| D2 | P0 | `always_human` 툴이라도 `requested_ops`에 있으면 사람 확인 생략 |
-
-### 규칙 문서와 판정 LLM v3
-
-- 규칙 문서 [`config/policy_rules_v31.yaml`](../config/policy_rules_v31.yaml)(v3는 `policy_rules_v3.yaml`): 코드 집행 조항 R1–R8과 판정 LLM 조항 J1–J7, 조항별 트리거(`policy:<id>`, `tool_class:<분류>`, `signal:<신호>`). AgentDojo 문구는 쓰지 않고, ATR test-corpora의 공격 사례 분류(`results/rules/v1`)를 근거로 했다.
-- 판정 LLM v3([`llm/trusted_judge_v3.py`](../src/agentgate/llm/trusted_judge_v3.py))는 규칙 인덱스 전체와, 사실에서 계산한 트리거로 고른 조항만 받는다. 입력 사실은 TaskSpec, 사용자 고정 설정, 호출과 ESCALATE 이유, 인자별 출처, 관련 응답의 ToolSpec이다.
-- 답은 ALLOW / BLOCK / HUMAN을 그대로 쓰고, 해석에 실패하면 HUMAN이다. P0의 `always_human`은 LLM을 부르지 않고 HUMAN이다. HUMAN은 BLOCK으로 집행하고 따로 센다.
-
+추가 정책은 버전별 폴더에 정의한다. P0(사용자 고정 설정)·P10(판별기 라벨)은 [`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md), P11(툴 콘텐츠가 시킨 행동)·P12(요청된 행동만)·v3.1 변경·정책 문서는 [`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md)에 있다. v3부터 P7의 공격 문구 목록을 쓰지 않고 P10은 제외한다.

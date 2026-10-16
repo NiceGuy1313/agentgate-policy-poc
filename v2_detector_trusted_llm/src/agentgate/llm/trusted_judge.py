@@ -33,7 +33,6 @@ CACHE_DIR = PROJECT_ROOT / "data" / "judge_cache_v2"
 PROMPT_LAYOUT = "cached"   # static instructions in a cached system prompt; c5_judge_piguard used "inline"
 VALUE_CHARS, EXCERPT_CHARS, MAX_EXCERPTS, MAX_VALUES_PER_ARG = 400, 240, 3, 5
 LONG_VALUE_CHARS = 200
-ANSWERS = ("ALLOW", "BLOCK", "HUMAN")
 
 
 def _data(text: str, limit: int) -> str:
