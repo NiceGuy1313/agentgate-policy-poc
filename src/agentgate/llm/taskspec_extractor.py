@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from agentgate.config import PROJECT_ROOT, load_dotenv
+from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, extract_first_json_object
 from agentgate.task_spec import TaskSpec
 
@@ -58,11 +58,14 @@ class TaskSpecExtractor:
     """`model` defaults to AGENTGATE_LLM_MODEL; the API client is only created on a cache miss, so cached
     extractions can be reused without a key."""
 
-    def __init__(self, client: LLMClient | None = None, cache_dir: Path = CACHE_DIR, model: str | None = None):
+    def __init__(self, client: LLMClient | None = None, cache_dir: Path | None = None, model: str | None = None):
         load_dotenv()
         self._client = client
         self.model = client.model if client else (model or os.environ.get("AGENTGATE_LLM_MODEL")
                                                   or DEFAULT_ANTHROPIC_MODEL)
+        # AGENTGATE_TASKSPEC_CACHE_DIR: a fresh directory forces live extraction (e.g. a live run that must not reuse
+        # earlier specs); the default reuses the committed cache.
+        cache_dir = cache_dir or Path(os.environ.get("AGENTGATE_TASKSPEC_CACHE_DIR") or CACHE_DIR)
         self.cache_dir = cache_dir / self.model.replace("/", "_").replace(":", "_")
 
     @property
@@ -100,5 +103,5 @@ class TaskSpecExtractor:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         record = asdict(result)
         record["spec"] = result.spec.model_dump() if result.spec else None
-        path.write_text(json.dumps(record, indent=1, ensure_ascii=False))
+        write_text_atomic(path, json.dumps(record, indent=1, ensure_ascii=False))
         return result

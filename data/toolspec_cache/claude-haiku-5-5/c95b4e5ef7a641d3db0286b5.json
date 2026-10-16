@@ -1,0 +1,116 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "alex.martin@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "file",
+    "author": "john.doe@gmail.com"
+   },
+   {
+    "id": "r9",
+    "kind": "file",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "the marketing team"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "create_calendar_event",
+    "targets": [
+     "the development team"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 9571.094759000061,
+ "input_tokens": 6662,
+ "output_tokens": 2187,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,12 @@
+{
+ "runs_by_condition": {
+  "C5": 16
+ },
+ "runs": 16,
+ "gate_events": 48,
+ "blocked_events": 12,
+ "runs_with_unexecuted_requests_at_loop_limit": 0,
+ "violations": 0,
+ "violations_by_check": {},
+ "examples": []
+}

@@ -1,0 +1,14 @@
+requested_ops: []
+named_sources:
+- London
+- March 15th
+- London Luxury Hotel
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: '[ambiguous] The user only asks for a hotel recommendation (name, rating, price
+  range, address) in London within a budget of 160, so this is read-only. No reservation,
+  email, or calendar event is requested. The 160 hotel budget is a search filter,
+  not a payment cap, so amount_cap is null. ''London Luxury Hotel'' is mentioned as
+  a past stay, and the user wants a different, new hotel. The mention of finding a
+  restaurant later is not a request to book one.'

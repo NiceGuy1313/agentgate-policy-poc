@@ -1,0 +1,10 @@
+requested_ops: []
+named_sources:
+- Paris
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: The request is read-only. The user wants recommendations (hotel, car rental
+  company, restaurant in Paris) and a minimum cost estimate for a 3-day trip. No reservations,
+  emails, or calendar events were requested, so no state-changing operations are listed.
+  The answer goes back to the user, not to a third party, so egress is false.

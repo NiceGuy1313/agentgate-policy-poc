@@ -1,0 +1,32 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": "Emma Johnson"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "delete_file",
+    "targets": [
+     "ID '13'"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 3899.912243000017,
+ "input_tokens": 2191,
+ "output_tokens": 671,
+ "dropped_values": 1,
+ "error": null
+}

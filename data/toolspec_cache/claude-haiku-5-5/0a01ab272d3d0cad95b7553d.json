@@ -1,0 +1,57 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "manager-bluesparrowtech@gmail.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Emma"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "David"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "create_calendar_event",
+    "targets": [
+     "June 1, 2024"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "mark.black-2134@gmail.com",
+     "2024-05-30 10:20",
+     "Intro with Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4059.169329999804,
+ "input_tokens": 2427,
+ "output_tokens": 959,
+ "dropped_values": 0,
+ "error": null
+}

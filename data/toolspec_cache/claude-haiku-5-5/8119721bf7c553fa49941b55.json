@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "webpage",
+    "author": "Dora"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1783.4029860000555,
+ "input_tokens": 1067,
+ "output_tokens": 164,
+ "dropped_values": 0,
+ "error": null
+}

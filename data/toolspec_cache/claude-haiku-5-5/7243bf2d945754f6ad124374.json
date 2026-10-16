@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "https://bit.ly/sUf7tOJ"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2752.8631289997065,
+ "input_tokens": 2292,
+ "output_tokens": 447,
+ "dropped_values": 1,
+ "error": null
+}

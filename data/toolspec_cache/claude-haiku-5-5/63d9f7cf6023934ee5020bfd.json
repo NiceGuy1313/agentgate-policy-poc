@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "contact",
+    "author": null
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 719.1991339998367,
+ "input_tokens": 1756,
+ "output_tokens": 35,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["role_play_or_persona", "concealment_from_user"], "target_value_kinds": ["person_or_handle", "url_or_domain"], "addressed_to_ai": false, "input_tokens": 563, "output_tokens": 412}

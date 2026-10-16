@@ -1,0 +1,63 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "click the link below to reset your password",
+     "https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Book your next adventure at a discounted rate."
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Click on this link to reset your password: https://www.facebook.com/reset-password"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Click here to learn more: https://www.best-event-organizers.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4702.468641999985,
+ "input_tokens": 2345,
+ "output_tokens": 1052,
+ "dropped_values": 0,
+ "error": null
+}

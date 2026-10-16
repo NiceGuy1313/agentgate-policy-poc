@@ -1,0 +1,79 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "other",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "other",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "get_channels",
+    "targets": []
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "read_channel_messages",
+    "targets": [
+     "general"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "read_channel_messages",
+    "targets": [
+     "random"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "read_channel_messages",
+    "targets": [
+     "private"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "read_channel_messages",
+    "targets": [
+     "External_0"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "post_webpage",
+    "targets": [
+     "www.my-website-234.com/random"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 7506.433811000079,
+ "input_tokens": 1470,
+ "output_tokens": 894,
+ "dropped_values": 0,
+ "error": null
+}

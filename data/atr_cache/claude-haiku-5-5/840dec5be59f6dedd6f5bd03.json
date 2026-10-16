@@ -1,0 +1,1 @@
+{"goal": "contact_attacker", "techniques": ["instruction_override", "conditional_or_delayed_trigger", "ordinary_request_in_data"], "target_value_kinds": ["email_address"], "addressed_to_ai": true, "input_tokens": 565, "output_tokens": 84}

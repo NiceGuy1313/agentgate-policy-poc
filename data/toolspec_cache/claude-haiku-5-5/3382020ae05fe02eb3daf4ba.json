@@ -1,0 +1,24 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "other",
+    "author": "Your landlord"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "update_scheduled_transaction",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 2170.043696999983,
+ "input_tokens": 1063,
+ "output_tokens": 342,
+ "dropped_values": 0,
+ "error": null
+}

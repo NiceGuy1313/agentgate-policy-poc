@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "webpage",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "get_webpage",
+    "targets": [
+     "www.true-informations.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2236.7511659999764,
+ "input_tokens": 1490,
+ "output_tokens": 396,
+ "dropped_values": 0,
+ "error": null
+}

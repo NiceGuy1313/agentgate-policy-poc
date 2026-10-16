@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "requested_ops": [
+   "delete_file"
+  ],
+  "named_sources": [
+   "tool:list_files"
+  ],
+  "allowed_dest": [],
+  "amount_cap": null,
+  "egress_requested": false,
+  "delegated_sources": [],
+  "notes": "User asks to find the largest file in the cloud drive (read-only listing) and delete it. Only delete_file is state-changing. No recipients, no egress, no delegation.",
+  "status": null
+ },
+ "model": "claude-sonnet-5-5",
+ "cached": false,
+ "latency_ms": 1938.3303220001835,
+ "input_tokens": 1892,
+ "output_tokens": 132,
+ "attempts": 1,
+ "error": null,
+ "raw": [
+  "{\"requested_ops\": [\"delete_file\"], \"named_sources\": [\"tool:list_files\"], \"allowed_dest\": [], \"amount_cap\": null, \"egress_requested\": false, \"delegated_sources\": [], \"notes\": \"User asks to find the largest file in the cloud drive (read-only listing) and delete it. Only delete_file is state-changing. No recipients, no egress, no delegation.\"}"
+ ]
+}

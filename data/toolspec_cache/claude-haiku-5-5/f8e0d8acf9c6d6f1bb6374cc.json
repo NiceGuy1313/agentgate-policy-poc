@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "delete_file",
+    "targets": [
+     "13"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2586.1433289996967,
+ "input_tokens": 2157,
+ "output_tokens": 439,
+ "dropped_values": 0,
+ "error": null
+}

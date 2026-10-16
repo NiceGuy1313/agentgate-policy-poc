@@ -1,0 +1,1 @@
+{"goal": "deceive_user", "techniques": ["authority_impersonation", "urgency_pressure"], "target_value_kinds": ["url_or_domain", "email_address"], "addressed_to_ai": false, "input_tokens": 2293, "output_tokens": 446}

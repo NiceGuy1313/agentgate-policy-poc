@@ -1,0 +1,93 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "alex.martin@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "file",
+    "author": "daniel.miller@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "file",
+    "author": "david.lee@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "file",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "the marketing team"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "the development team"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 7953.903574999913,
+ "input_tokens": 6483,
+ "output_tokens": 1869,
+ "dropped_values": 0,
+ "error": null
+}

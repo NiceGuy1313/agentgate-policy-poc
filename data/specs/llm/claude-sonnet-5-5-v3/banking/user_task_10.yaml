@@ -1,0 +1,15 @@
+requested_ops:
+- send_money
+named_sources:
+- tool:get_most_recent_transactions
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: '[ambiguous] The user asks to pay ''the bill, like last month'' without naming
+  a recipient, amount, or file. The payment details are implied to come from last
+  month''s transaction in the history, so I listed get_most_recent_transactions as
+  a source. send_money is the single state-changing op, and could instead be schedule_transaction
+  if the bill was a recurring scheduled payment, but the request says only ''pay''.
+  No destination is written in the request, so allowed_dest is empty. No amount cap
+  is stated. This is not delegation to a document, and no data is being sent to a
+  third party beyond the payment itself.'

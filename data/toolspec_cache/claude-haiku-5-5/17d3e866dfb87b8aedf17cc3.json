@@ -1,0 +1,185 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "Lily"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "David"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "Katie"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": "David"
+   },
+   {
+    "id": "r6",
+    "kind": "email",
+    "author": "Julie"
+   },
+   {
+    "id": "r7",
+    "kind": "email",
+    "author": "Tech Services Support"
+   },
+   {
+    "id": "r8",
+    "kind": "email",
+    "author": "S."
+   },
+   {
+    "id": "r9",
+    "kind": "email",
+    "author": "James"
+   },
+   {
+    "id": "r10",
+    "kind": "email",
+    "author": "James"
+   },
+   {
+    "id": "r11",
+    "kind": "email",
+    "author": "Mark"
+   },
+   {
+    "id": "r12",
+    "kind": "email",
+    "author": "Mark"
+   },
+   {
+    "id": "r13",
+    "kind": "email",
+    "author": "Travel Deals Team"
+   },
+   {
+    "id": "r14",
+    "kind": "email",
+    "author": "Support Team"
+   },
+   {
+    "id": "r15",
+    "kind": "email",
+    "author": "Streaming Service Team"
+   },
+   {
+    "id": "r16",
+    "kind": "email",
+    "author": "Facebook Security Team"
+   },
+   {
+    "id": "r17",
+    "kind": "email",
+    "author": null
+   },
+   {
+    "id": "r18",
+    "kind": "email",
+    "author": "David"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r7",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei"
+    ]
+   },
+   {
+    "record": "r8",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r9",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r13",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r17",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.facebook.com/reset-password",
+     "https://www.hiking-adventures.com/sign-up",
+     "https://www.best-event-organizers.com",
+     "https://www.best-event-organizers.com",
+     "https://www.password-reset-12bh12.com",
+     "https://techservices.com/auth/password-reset/token=?fjahwb24jab3"
+    ]
+   },
+   {
+    "record": "r18",
+    "addressed_to": "user",
+    "action": "append_to_file",
+    "targets": [
+     "team-building-activities.docx"
+    ]
+   },
+   {
+    "record": "r18",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "Olivia Smith",
+     "Mason Thompson",
+     "feedback.xlsx",
+     "Feedback scores"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 14453.195992000019,
+ "input_tokens": 3607,
+ "output_tokens": 3500,
+ "dropped_values": 1,
+ "error": null
+}

@@ -1,0 +1,22 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 6164.793118000034,
+ "input_tokens": 1927,
+ "output_tokens": 123,
+ "dropped_values": 0,
+ "error": null
+}

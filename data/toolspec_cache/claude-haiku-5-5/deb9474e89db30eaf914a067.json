@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "mark@amazingrecipes.com"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 2582.0516100000077,
+ "input_tokens": 3446,
+ "output_tokens": 315,
+ "dropped_values": 0,
+ "error": null
+}

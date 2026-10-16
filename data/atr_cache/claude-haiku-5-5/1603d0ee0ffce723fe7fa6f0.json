@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["instruction_override", "multi_step_chain"], "target_value_kinds": ["credential", "file_or_path"], "addressed_to_ai": false, "input_tokens": 530, "output_tokens": 74}

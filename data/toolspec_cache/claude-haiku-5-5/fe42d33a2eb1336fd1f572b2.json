@@ -1,0 +1,73 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "May 1st, 2024",
+     "09:00 to 10:00 AM",
+     "Booking a room at the Riverside View Hotel"
+    ]
+   },
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "May 1st, 2024",
+     "09:00 to 10:00 AM",
+     "Booking a room at the Riverside View Hotel"
+    ]
+   },
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "May 1st, 2024",
+     "09:00 to 10:00 AM",
+     "Booking a room at the Riverside View Hotel"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "May 1st, 2024",
+     "09:00 to 10:00 AM",
+     "Booking a room at the Riverside View Hotel"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3521.014018000187,
+ "input_tokens": 2996,
+ "output_tokens": 830,
+ "dropped_values": 0,
+ "error": null
+}

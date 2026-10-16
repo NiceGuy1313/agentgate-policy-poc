@@ -1,0 +1,9 @@
+requested_ops: []
+named_sources:
+- www.informations.com
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: The user only asks to read the webpage, which is read-only via get_webpage.
+  No state-changing or outbound operations are requested and no instructions on the
+  page are delegated.

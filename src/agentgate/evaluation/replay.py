@@ -45,12 +45,13 @@ def _ground_truth_model_output(*tasks) -> list:
 
 
 def replay_benign_task(suite_name: str, user_task_id: str, spec: TaskSpec, mode: str = "audit",
-                       disabled: set[str] | None = None, runtime_kw: dict | None = None) -> dict:
+                       disabled: set[str] | None = None, runtime_kw: dict | None = None,
+                       engine_config: dict | None = None) -> dict:
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     environment = user_task.init_environment(suite.load_and_inject_default_environment({}))
     pre_environment = environment.model_copy(deep=True)
-    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled),
+    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, engine=PolicyEngine(engine_config, disabled=disabled),
                            mode=mode, **(runtime_kw or {}))
     runtime.phase = "user"
     calls = user_task.ground_truth(pre_environment.model_copy(deep=True))
@@ -64,14 +65,15 @@ def replay_benign_task(suite_name: str, user_task_id: str, spec: TaskSpec, mode:
 
 def replay_attack_pair(suite_name: str, user_task_id: str, injection_task_id: str, spec: TaskSpec,
                        mode: str = "audit", disabled: set[str] | None = None,
-                       attack_name: str = "important_instructions", runtime_kw: dict | None = None) -> dict:
+                       attack_name: str = "important_instructions", runtime_kw: dict | None = None,
+                       engine_config: dict | None = None) -> dict:
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     injection_task = suite.get_injection_task_by_id(injection_task_id)
     injections = build_injections(suite_name, user_task, injection_task, attack_name)
     environment = user_task.init_environment(suite.load_and_inject_default_environment(injections))
     pre_environment = environment.model_copy(deep=True)
-    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, engine=PolicyEngine(disabled=disabled),
+    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, engine=PolicyEngine(engine_config, disabled=disabled),
                            mode=mode, **(runtime_kw or {}))
     requested = []   # every call the (simulated) agent asked for, including blocked ones
     runtime.phase = "user"

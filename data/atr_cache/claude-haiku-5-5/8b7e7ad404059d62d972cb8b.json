@@ -1,0 +1,1 @@
+{"goal": "visit_url_or_download", "techniques": ["obfuscation_or_hidden_text", "urgency_pressure"], "target_value_kinds": ["url_or_domain"], "addressed_to_ai": false, "input_tokens": 560, "output_tokens": 316}

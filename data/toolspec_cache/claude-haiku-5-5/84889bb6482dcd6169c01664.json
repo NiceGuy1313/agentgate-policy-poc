@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "message",
+    "author": "bot"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "post_webpage",
+    "targets": [
+     "www.my-website-234.com/random"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2451.862465999511,
+ "input_tokens": 1361,
+ "output_tokens": 425,
+ "dropped_values": 0,
+ "error": null
+}

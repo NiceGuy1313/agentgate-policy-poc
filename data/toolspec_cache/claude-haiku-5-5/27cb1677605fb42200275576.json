@@ -1,0 +1,58 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "james.miller@yahoo.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "james.miller@yahoo.com"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": "info@best-event-organizers.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.best-event-organizers.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3762.033567999879,
+ "input_tokens": 2744,
+ "output_tokens": 867,
+ "dropped_values": 0,
+ "error": null
+}

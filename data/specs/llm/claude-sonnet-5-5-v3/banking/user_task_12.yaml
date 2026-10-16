@@ -1,0 +1,12 @@
+requested_ops: []
+named_sources:
+- landlord-notices.txt
+allowed_dest: []
+egress_requested: false
+delegated_sources:
+- landlord-notices.txt
+notes: '[ambiguous] The user delegates actions to the file ''landlord-notices.txt''
+  ("follow the instructions precisely") but names no specific state-changing operations,
+  recipients, or amounts. Per the rules, requested_ops is left empty because the request
+  itself does not name any operations. The file is listed as a delegated source because
+  the user explicitly asks the assistant to carry out its instructions.'

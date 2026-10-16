@@ -1,0 +1,197 @@
+{
+ "atr_repo": "https://github.com/Agent-Threat-Rule/agent-threat-rules",
+ "atr_commit": "5eb6dba810fb307b43d5ab1ce7732067930c6283",
+ "model": "claude-haiku-5-5",
+ "samples": 1140,
+ "errors": 1,
+ "by_source": {
+  "llmail-inject": 299,
+  "browsesafe-bench": 300,
+  "owasp-llm-top10": 49,
+  "mitre-atlas": 103,
+  "promptfoo": 44,
+  "llm-guard": 44,
+  "promptinject": 300
+ },
+ "by_kind": {
+  "indirect": {
+   "n": 599,
+   "goal": {
+    "contact_attacker": 270,
+    "exfiltrate_data": 216,
+    "visit_url_or_download": 83,
+    "other": 14,
+    "deceive_user": 11,
+    "account_or_permission_change": 3,
+    "change_behavior_only": 1,
+    "modify_or_create_content": 1
+   },
+   "techniques": {
+    "ordinary_request_in_data": 398,
+    "authority_impersonation": 347,
+    "instruction_override": 332,
+    "urgency_pressure": 322,
+    "fake_system_or_tool_output": 277,
+    "obfuscation_or_hidden_text": 192,
+    "multi_step_chain": 128,
+    "concealment_from_user": 77,
+    "role_play_or_persona": 36,
+    "conditional_or_delayed_trigger": 25,
+    "value_substitution": 24
+   },
+   "target_value_kinds": {
+    "email_address": 558,
+    "url_or_domain": 247,
+    "credential": 57,
+    "person_or_handle": 25,
+    "bank_account_or_payment": 10,
+    "none": 7,
+    "file_or_path": 7,
+    "command": 4
+   },
+   "addressed_to_ai": 457
+  },
+  "scenario": {
+   "n": 49,
+   "goal": {
+    "other": 29,
+    "change_behavior_only": 7,
+    "exfiltrate_data": 6,
+    "deceive_user": 2,
+    "execute_code": 2,
+    "visit_url_or_download": 1,
+    "delete_or_conceal": 1,
+    "modify_or_create_content": 1
+   },
+   "techniques": {
+    "obfuscation_or_hidden_text": 6,
+    "instruction_override": 5,
+    "multi_step_chain": 4,
+    "ordinary_request_in_data": 4,
+    "concealment_from_user": 3,
+    "conditional_or_delayed_trigger": 2
+   },
+   "target_value_kinds": {
+    "none": 40,
+    "command": 5,
+    "url_or_domain": 3,
+    "credential": 1
+   },
+   "addressed_to_ai": 2
+  },
+  "procedure": {
+   "n": 103,
+   "goal": {
+    "other": 47,
+    "exfiltrate_data": 22,
+    "execute_code": 13,
+    "change_behavior_only": 10,
+    "delete_or_conceal": 3,
+    "modify_or_create_content": 3,
+    "deceive_user": 2,
+    "contact_attacker": 1,
+    "account_or_permission_change": 1,
+    "visit_url_or_download": 1
+   },
+   "techniques": {
+    "ordinary_request_in_data": 23,
+    "obfuscation_or_hidden_text": 19,
+    "conditional_or_delayed_trigger": 15,
+    "instruction_override": 15,
+    "concealment_from_user": 14,
+    "multi_step_chain": 12,
+    "authority_impersonation": 6,
+    "fake_system_or_tool_output": 5,
+    "value_substitution": 3,
+    "role_play_or_persona": 2,
+    "urgency_pressure": 1
+   },
+   "target_value_kinds": {
+    "none": 59,
+    "command": 18,
+    "url_or_domain": 15,
+    "credential": 10,
+    "file_or_path": 10,
+    "email_address": 4,
+    "person_or_handle": 1
+   },
+   "addressed_to_ai": 23
+  },
+  "direct": {
+   "n": 388,
+   "goal": {
+    "change_behavior_only": 323,
+    "exfiltrate_data": 32,
+    "other": 17,
+    "visit_url_or_download": 4,
+    "execute_code": 3,
+    "modify_or_create_content": 3,
+    "deceive_user": 3,
+    "delete_or_conceal": 2,
+    "account_or_permission_change": 1
+   },
+   "techniques": {
+    "instruction_override": 344,
+    "ordinary_request_in_data": 110,
+    "urgency_pressure": 62,
+    "concealment_from_user": 14,
+    "obfuscation_or_hidden_text": 13,
+    "role_play_or_persona": 11,
+    "fake_system_or_tool_output": 8,
+    "value_substitution": 8,
+    "multi_step_chain": 5,
+    "authority_impersonation": 4,
+    "conditional_or_delayed_trigger": 3
+   },
+   "target_value_kinds": {
+    "none": 351,
+    "url_or_domain": 18,
+    "command": 14,
+    "credential": 11,
+    "file_or_path": 4,
+    "person_or_handle": 4,
+    "email_address": 2
+   },
+   "addressed_to_ai": 374
+  },
+  "all": {
+   "n": 1139,
+   "goal": {
+    "change_behavior_only": 341,
+    "exfiltrate_data": 276,
+    "contact_attacker": 271,
+    "other": 107,
+    "visit_url_or_download": 89,
+    "deceive_user": 18,
+    "execute_code": 18,
+    "modify_or_create_content": 8,
+    "delete_or_conceal": 6,
+    "account_or_permission_change": 5
+   },
+   "techniques": {
+    "instruction_override": 696,
+    "ordinary_request_in_data": 535,
+    "urgency_pressure": 385,
+    "authority_impersonation": 357,
+    "fake_system_or_tool_output": 290,
+    "obfuscation_or_hidden_text": 230,
+    "multi_step_chain": 149,
+    "concealment_from_user": 108,
+    "role_play_or_persona": 49,
+    "conditional_or_delayed_trigger": 45,
+    "value_substitution": 35
+   },
+   "target_value_kinds": {
+    "email_address": 564,
+    "none": 457,
+    "url_or_domain": 283,
+    "credential": 79,
+    "command": 41,
+    "person_or_handle": 30,
+    "file_or_path": 21,
+    "bank_account_or_payment": 10
+   },
+   "addressed_to_ai": 856
+  }
+ }
+}

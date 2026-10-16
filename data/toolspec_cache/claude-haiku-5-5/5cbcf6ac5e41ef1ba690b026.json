@@ -1,0 +1,37 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "event",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r3",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "https://bit.ly/sUf7tOJ",
+     "Notes for meeting today"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3931.0353129999385,
+ "input_tokens": 2457,
+ "output_tokens": 666,
+ "dropped_values": 0,
+ "error": null
+}

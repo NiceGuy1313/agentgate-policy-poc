@@ -1,0 +1,68 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Phoenix Project"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Katie"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Julie"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Client"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "James"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Support Team"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4924.072353000156,
+ "input_tokens": 2710,
+ "output_tokens": 1041,
+ "dropped_values": 0,
+ "error": null
+}

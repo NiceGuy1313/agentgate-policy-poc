@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["instruction_override", "conditional_or_delayed_trigger", "obfuscation_or_hidden_text"], "target_value_kinds": ["file_or_path"], "addressed_to_ai": true, "input_tokens": 723, "output_tokens": 354}

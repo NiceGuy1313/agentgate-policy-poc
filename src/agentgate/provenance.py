@@ -48,6 +48,10 @@ class IndexedSource:
     kgram_hashes: set[int] | None = None                  # computed lazily by find_overlapping_sources
     record_texts: list[str] | None = None                 # per-record strings for list-shaped responses (P3)
     exact_values: set[str] = field(default_factory=set)   # normalized exact string fields (short IDs)
+    detection: Any = None                                  # v2: DetectionResult label set by GatedRuntime
+    detected_text: str = ""                                # v2: text the detector scored (= output_text)
+    toolspec: dict | None = None                           # v3: validated ToolSpec JSON (records, requests)
+    is_delegated: bool = False                             # v3: matches TaskSpec.delegated_sources
 
 
 @dataclass
@@ -83,7 +87,7 @@ def compute_kgram_hashes(text: str, k: int) -> set[int]:
     return {hash(normalized[i : i + k]) for i in range(len(normalized) - k + 1)}
 
 
-def is_named_source_response(tool: str, args: dict, spec: TaskSpec) -> bool:
+def is_named_source_response(tool: str, args: dict, spec: TaskSpec, min_len: int = 4) -> bool:
     if f"tool:{tool}" in spec.named_sources:
         return True
     argument_names = load_named_source_rules()["by_argument"].get(tool, [])
@@ -96,16 +100,25 @@ def is_named_source_response(tool: str, args: dict, spec: TaskSpec) -> bool:
                 continue
             for named_source in spec.named_sources:
                 normalized_named = normalize_value(named_source)
-                if normalized_named and _names_match(normalized_named, normalized_argument):
+                if normalized_named and _names_match(normalized_named, normalized_argument, min_len):
                     return True
     return False
 
 
-def _names_match(named: str, arg: str) -> bool:
+def is_delegated_source_response(tool: str, args: dict, spec: TaskSpec, min_len: int = 4) -> bool:
+    """v3: the response comes from a source whose instructions the user asked the assistant to carry out."""
+    delegated = getattr(spec, "delegated_sources", None) or []
+    if not delegated:
+        return False
+    return is_named_source_response(tool, args, spec.model_copy(update={"named_sources": list(delegated)}), min_len)
+
+
+def _names_match(named: str, arg: str, min_len: int = 4) -> bool:
     """Named source `named` matches tool argument `arg` if one contains the other on token
-    boundaries; the contained side must be at least 4 characters (so query "x" is not a match)."""
+    boundaries; the contained side must be at least `min_len` characters (so query "x" is not a match).
+    v3.1 uses min_len 3 so that a short identifier ("Bob") matches a named source written as "Bob's inbox"."""
     def within(small, big):
-        if len(small) < 4:
+        if len(small) < min_len:
             return small == big
         return re.search(r"(?<![a-z0-9])" + re.escape(small) + r"(?![a-z0-9])", big) is not None
     return within(named, arg) or within(arg, named)
@@ -119,9 +132,10 @@ class ValueIndex:
     """
 
     def __init__(self, prompt: str, spec: TaskSpec, self_identifiers: list[str] | None = None,
-                 min_string_field_len: int = 4):
+                 min_string_field_len: int = 4, named_match_min_len: int = 4):
         self.spec = spec
         self.min_string_field_length = min_string_field_len
+        self.named_match_min_len = named_match_min_len
         self.self_identifiers = [normalize_value(s) for s in (self_identifiers or [])]
         self.sources: list[IndexedSource] = []
         self.allowed_destination_haystack = build_haystack("\n".join(spec.allowed_dest))
@@ -144,10 +158,12 @@ class ValueIndex:
         text = output_text + "\n" + "\n".join(string_fields)
         source = self._add_source(
             f"step{step}", step, tool, args, text,
-            is_named=is_named_source_response(tool, args, self.spec),
+            is_named=(is_named_source_response(tool, args, self.spec, self.named_match_min_len)
+                      or is_delegated_source_response(tool, args, self.spec, self.named_match_min_len)),
             is_trusted=tool in self.trusted_tools,
             sensitive_categories=sensitive_categories_for_tool(tool),
         )
+        source.is_delegated = is_delegated_source_response(tool, args, self.spec, self.named_match_min_len)
         source.exact_values = (
             {normalize_value(f) for f in flatten_string_fields(raw_output, 1)} | _collect_dict_keys(raw_output)
         )
@@ -207,6 +223,63 @@ class ValueIndex:
                 hits.append(source)
         return hits
 
+    # ------------------------------------------------------------------ detector labels (v2)
+    def source_by_id(self, source_id: str | None) -> IndexedSource | None:
+        return next((s for s in self.sources if s.source_id == source_id), None)
+
+    def value_detection(self, value: Any, source_id: str | None) -> dict | None:
+        """Detector label of the response `source_id` as seen from `value` (명세서 3.2).
+
+        The value is located in the scored text; the score of the chunks covering it is used. If it cannot be
+        located, the whole-response score stands in. None when the response has no label.
+        """
+        source = self.source_by_id(source_id)
+        if source is None or source.detection is None:
+            return None
+        detection = source.detection
+        positions = _locate(source.detected_text, value)
+        value_score = max(detection.covers(a, b) for a, b in positions) if positions else detection.score
+        return {"source_id": source.source_id, "tool": source.tool, "response_score": round(detection.score, 4),
+                "flagged": bool(detection.flagged), "threshold": detection.threshold,
+                "value_score": round(value_score, 4), "value_located": bool(positions),
+                "in_suspicious_span": value_score >= detection.threshold,
+                "suspicious_spans": len(detection.suspicious_spans())}
+
+    def instructed_requests(self, tool: str, args: dict) -> list[dict]:
+        """v3: ToolSpec requests (from any tool response) that this call carries out.
+
+        A request matches when its action is this tool, or its action is unknown ("other"), and one of its target
+        values that the user did not supply occurs in the call's arguments (normalized, either direction).
+        """
+        argument_values = [normalize_value(v) for v in iterate_leaf_values(args) if str(v).strip()]
+        matches = []
+        for source in self.sources[1:]:
+            spec = source.toolspec
+            if not spec:
+                continue
+            authors = {r["id"]: r.get("author") for r in spec.get("records", [])}
+            for request in spec.get("requests", []):
+                if request["action"] not in (tool, "other"):
+                    continue
+                # a value the user supplied (prompt, own identity, trusted directory) is no evidence that the call
+                # follows the tool output, so only untrusted target values count
+                hit = [t for t in request["targets"] if _target_in_args(normalize_value(t), argument_values)
+                       and self.origin_of(t).origin not in TRUSTED_ORIGINS]
+                if not hit:
+                    continue
+                matches.append({"source_id": source.source_id, "tool": source.tool, "record": request["record"],
+                                "author": authors.get(request["record"]), "addressed_to": request["addressed_to"],
+                                "action": request["action"], "targets": hit, "named": source.is_named,
+                                "delegated": source.is_delegated})
+        return matches
+
+    def suspicious_excerpts(self, source_id: str | None, limit: int = 3, width: int = 240) -> list[str]:
+        source = self.source_by_id(source_id)
+        if source is None or source.detection is None:
+            return []
+        spans = sorted(source.detection.suspicious_spans(), key=lambda s: -s.score)[:limit]
+        return [source.detected_text[s.start : s.end][:width] for s in spans]
+
     def count_same_kind_candidates(self, value: Any, source_id: str | None) -> int:
         """Number of same-kind candidate values in the source that contains `value` (judge input)."""
         source = next((s for s in self.sources if s.source_id == source_id), None)
@@ -230,6 +303,27 @@ class ValueIndex:
             snippets.append(source.text[max(0, i - width) : i + len(key) + width])
             start = i + 1
         return snippets
+
+
+def _target_in_args(target: str, argument_values: list[str]) -> bool:
+    if len(target) < 3:
+        return False
+    return any(target == v or (len(v) >= 3 and (target in v or v in target)) for v in argument_values)
+
+
+def _locate(text: str, value: Any) -> list[tuple[int, int]]:
+    """Case-insensitive [start, end) positions of `value` in `text` (raw form, then normalized form)."""
+    lowered = text.lower()
+    for key in dict.fromkeys([str(value).strip().lower(), normalize_value(value)]):
+        if not key:
+            continue
+        positions, start = [], 0
+        while (i := lowered.find(key, start)) >= 0:
+            positions.append((i, i + len(key)))
+            start = i + 1
+        if positions:
+            return positions
+    return []
 
 
 def join_argument_text(args: dict, names: list[str]) -> str:

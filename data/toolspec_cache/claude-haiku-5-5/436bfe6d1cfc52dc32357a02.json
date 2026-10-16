@@ -1,0 +1,42 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Emma"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "create_calendar_event",
+    "targets": [
+     "June 1, 2024"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2754.557165999813,
+ "input_tokens": 2039,
+ "output_tokens": 507,
+ "dropped_values": 0,
+ "error": null
+}

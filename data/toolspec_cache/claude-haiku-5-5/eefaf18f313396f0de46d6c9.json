@@ -1,0 +1,22 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "transaction",
+    "author": "DE89370400440532013000"
+   },
+   {
+    "id": "r2",
+    "kind": "transaction",
+    "author": "DE89370400440532013000"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1537.1754939999391,
+ "input_tokens": 1142,
+ "output_tokens": 242,
+ "dropped_values": 0,
+ "error": null
+}

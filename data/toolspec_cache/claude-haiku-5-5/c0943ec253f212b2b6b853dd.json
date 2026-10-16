@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1003.5720979999496,
+ "input_tokens": 1867,
+ "output_tokens": 124,
+ "dropped_values": 0,
+ "error": null
+}

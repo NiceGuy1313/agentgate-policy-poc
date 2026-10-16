@@ -1,0 +1,45 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "support@techservices.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "tech-services-password@aol.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r2",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "https://www.password-reset-12bh12.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3576.560286999893,
+ "input_tokens": 2171,
+ "output_tokens": 796,
+ "dropped_values": 0,
+ "error": null
+}

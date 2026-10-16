@@ -1,0 +1,1 @@
+{"goal": "exfiltrate_data", "techniques": ["ordinary_request_in_data", "multi_step_chain", "obfuscation_or_hidden_text"], "target_value_kinds": ["command", "url_or_domain", "credential"], "addressed_to_ai": true, "input_tokens": 565, "output_tokens": 98}

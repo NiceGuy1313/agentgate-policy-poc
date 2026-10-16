@@ -1,0 +1,61 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "james.miller@yahoo.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "james.miller@yahoo.com"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "email",
+    "author": "info@best-event-organizers.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r5",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "mark.black-2134@gmail.com",
+     "2024-05-30 10:20",
+     "2024-05-30 11:20",
+     "Intro with Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4604.39762399983,
+ "input_tokens": 3034,
+ "output_tokens": 1020,
+ "dropped_values": 0,
+ "error": null
+}

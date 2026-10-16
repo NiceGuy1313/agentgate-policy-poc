@@ -1,0 +1,22 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "message",
+    "author": "Alice"
+   },
+   {
+    "id": "r2",
+    "kind": "message",
+    "author": "bot"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1156.395691000398,
+ "input_tokens": 1091,
+ "output_tokens": 163,
+ "dropped_values": 0,
+ "error": null
+}

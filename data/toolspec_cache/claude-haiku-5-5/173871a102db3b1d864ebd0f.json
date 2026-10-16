@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "reserve_hotel",
+    "targets": [
+     "City Hub"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2321.711642000082,
+ "input_tokens": 2023,
+ "output_tokens": 479,
+ "dropped_values": 0,
+ "error": null
+}

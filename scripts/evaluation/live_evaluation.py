@@ -6,6 +6,11 @@
   C2  게이트, ESCALATE -> allow
   C3  AgentDojo 내장 방어 (--c3-defense, 기본값 spotlighting_with_delimiting), 게이트는 audit 모드
   C4  게이트, ESCALATE -> 판정 LLM
+  C5  v2 게이트(P0 사용자 고정 설정 + P1–P10), PIGuard chunks 판별기, ESCALATE -> Trusted LLM v2 + ④ (명세서.md 3.5)
+  C6  v3 게이트(P0 + P1–P9 + P11·P12, P7 공격 문구 없음, 판별기 없음), 툴 응답마다 ToolSpec(claude-haiku-5-5),
+      ESCALATE -> 판정 LLM v3(규칙 문서 config/policy_rules_v3.yaml)
+  C7  v3.1 게이트(A1·B1·B2·C1·D2 수정), ToolSpec, 판정 LLM v3 + 규칙 문서 config/policy_rules_v31.yaml
+  C7n C7과 같고 판정 LLM에 규칙 문서를 주지 않음(같은 사실만, 규칙 문서 ablation)
 
 에이전트
   --agent llm       실제 LLM 에이전트 (키는 .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
@@ -33,6 +38,7 @@ import multiprocessing as mp
 import os
 import random
 import re
+import threading
 import time
 import traceback
 from collections import Counter
@@ -42,10 +48,12 @@ from pathlib import Path
 from agentgate import SUITES
 from agentgate.agents.factory import UsageMeter, make_llm, spec_provider
 from agentgate.agents.scripted_agent import ScriptedAgent
-from agentgate.config import load_dotenv
+from agentgate.config import (PROJECT_ROOT, load_dotenv, load_policy_config_v2, load_policy_config_v3,
+                              load_policy_config_v31)
 from agentgate.evaluation.replay import REPLAY_PIPELINE_NAME, get_cached_attack
 from agentgate.llm.escalation_judge import EscalationJudge, as_runtime_judge
 from agentgate.pipeline import RecordingPipeline, build_pipeline, run_live_task
+from agentgate.policy.engine import PolicyEngine
 from agentgate.runtime import GatedRuntime
 from agentgate.suites import load_suite, task_number
 
@@ -53,7 +61,63 @@ PILOT = {"suites": ["banking"], "user_tasks": ["user_task_0", "user_task_2", "us
          "injection_tasks": ["injection_task_0", "injection_task_4", "injection_task_7"]}
 # Condition -> (gate mode, escalate action).
 GATE = {"C0": ("audit", "block"), "C1": ("enforce", "block"), "C2": ("enforce", "allow"),
-        "C3": ("audit", "block"), "C4": ("enforce", "judge")}
+        "C3": ("audit", "block"), "C4": ("enforce", "judge"), "C5": ("enforce", "judge"), "C6": ("enforce", "judge"),
+        "C7": ("enforce", "judge"), "C7n": ("enforce", "judge")}
+GATED_CONDITIONS = ("C1", "C2", "C4", "C5", "C6", "C7", "C7n")
+V3_CONDITIONS = {  # condition -> (config loader, rule document, judge reads the rule document)
+    "C6": (load_policy_config_v3, "policy_rules_v3.yaml", True),
+    "C7": (load_policy_config_v31, "policy_rules_v31.yaml", True),
+    "C7n": (load_policy_config_v31, "policy_rules_v31.yaml", False)}
+V2_DETECTOR = ("piguard", "chunks")
+
+
+class _SharedDetector:
+    """One detector model for all worker threads; inference is serialized with a lock."""
+
+    _instance = None
+    _init_lock = threading.Lock()
+
+    def __init__(self):
+        from agentgate.detector import make_detector
+        self._detector = make_detector(*V2_DETECTOR)
+        self._lock = threading.Lock()
+
+    @classmethod
+    def get(cls) -> "_SharedDetector":
+        with cls._init_lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+    def detect(self, text: str):
+        with self._lock:
+            return self._detector.detect(text)
+
+
+_TOOLSPEC: dict = {}
+_TOOLSPEC_LOCK = threading.Lock()
+
+
+def _toolspec_extractor(suite_name: str):
+    from agentgate.llm.toolspec_extractor import ToolSpecExtractor
+    from agentgate.suites import describe_tools
+    with _TOOLSPEC_LOCK:
+        if suite_name not in _TOOLSPEC:
+            _TOOLSPEC[suite_name] = ToolSpecExtractor(describe_tools(load_suite(suite_name)))
+        return _TOOLSPEC[suite_name]
+
+
+def _judge_v2_stats(runtime: GatedRuntime) -> dict:
+    """C4-compatible judge totals from the Trusted LLM v2 / v3 records in the trace."""
+    judgements = [e.decision["judge"] for e in runtime.trace if (e.decision or {}).get("judge")]
+    return {"judge": judgements[0].get("judge") if judgements else None, "calls": len(judgements), "human": sum(j["final"] == "HUMAN" for j in judgements),
+            "rule4": sum(bool(j.get("rule4")) for j in judgements), "p0_human": sum(bool(j.get("by")) for j in judgements),
+            "api_calls": sum(1 for j in judgements if j.get("answer") and not j.get("cached")),
+            "input_tokens": sum(j.get("input_tokens", 0) for j in judgements),
+            "output_tokens": sum(j.get("output_tokens", 0) for j in judgements),
+            "cache_read_input_tokens": sum(j.get("cache_read_input_tokens", 0) for j in judgements),
+            "cache_creation_input_tokens": sum(j.get("cache_creation_input_tokens", 0) for j in judgements),
+            "latency_ms": round(sum(j.get("latency_ms", 0.0) for j in judgements), 1)}
 
 
 def run_framework_one(job: dict, output_path: Path) -> str:
@@ -109,13 +173,37 @@ def run_one(job: dict) -> str:
         llm = make_llm(meter)
         attack_model = job["attack_model_name"]
     mode, escalate_action = GATE[condition]
-    gated = condition in ("C1", "C2", "C4")
+    gated = condition in GATED_CONDITIONS
     provider = spec_provider(job["spec"] if gated else "oracle", suite_name, user_task_id)
     judge = None
     runtime_kwargs = {"mode": mode, "escalate_action": escalate_action, "record_env_hash": True}
     if condition == "C4":
         judge = EscalationJudge()
         runtime_kwargs["judge"] = as_runtime_judge(judge, user_task.PROMPT)
+    if condition == "C5":
+        from agentgate.llm.trusted_judge import TrustedJudgeV2
+        from agentgate.llm.trusted_judge import as_runtime_judge as as_runtime_judge_v2
+        runtime_kwargs.update(engine=PolicyEngine(load_policy_config_v2()), detector=_SharedDetector.get(),
+                              judge=as_runtime_judge_v2(TrustedJudgeV2(), user_task.PROMPT))
+    toolspec_stats = Counter()
+    if condition in V3_CONDITIONS:
+        from agentgate.llm.trusted_judge_v3 import TrustedJudgeV3
+        from agentgate.llm.trusted_judge_v3 import as_runtime_judge as as_runtime_judge_v3
+        extractor = _toolspec_extractor(suite_name)
+
+        def toolspec(tool, args, text):
+            result = extractor.extract(tool, args, text)
+            toolspec_stats["calls"] += 1
+            toolspec_stats["api_calls"] += not result.cached and result.error is None
+            toolspec_stats["errors"] += result.error is not None
+            toolspec_stats["input_tokens"] += 0 if result.cached else result.input_tokens
+            toolspec_stats["output_tokens"] += 0 if result.cached else result.output_tokens
+            toolspec_stats["latency_ms"] += 0 if result.cached else result.latency_ms
+            return result.spec
+
+        loader, rules_file, use_rules = V3_CONDITIONS[condition]
+        runtime_kwargs.update(engine=PolicyEngine(loader()), toolspec=toolspec, judge=as_runtime_judge_v3(
+            TrustedJudgeV3(rules_path=PROJECT_ROOT / "config" / rules_file, use_rules=use_rules), user_task.PROMPT))
     runtime = GatedRuntime(suite.tools, **runtime_kwargs)
     pipeline = build_pipeline(llm, provider, defense=job["c3_defense"] if condition == "C3" else None)
     recording_pipeline = RecordingPipeline(pipeline)
@@ -139,7 +227,8 @@ def run_one(job: dict) -> str:
         "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
-        "judge": judge.stats if judge else None,
+        "judge": judge.stats if judge else (_judge_v2_stats(runtime) if condition in ("C5", *V3_CONDITIONS) else None),
+        "toolspec": dict(toolspec_stats) if condition in V3_CONDITIONS else None,
         "trace": runtime.trace_records(),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -173,9 +262,13 @@ def main():
     parser.add_argument("--framework-options", default="{}", help="framework options as JSON")
     parser.add_argument("--model", default=None, help="provider:model for --framework (default from .env)")
     parser.add_argument("--max-steps", type=int, default=None, help="--framework step limit (default 15)")
+    parser.add_argument("--spec-cache-dir", default=None,
+                        help="TaskSpec extraction cache dir; a new directory makes the extractor call the LLM live")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
+    if args.spec_cache_dir:
+        os.environ["AGENTGATE_TASKSPEC_CACHE_DIR"] = str(Path(args.spec_cache_dir).resolve())
     if args.pilot:
         args.suites, args.user_tasks, args.injection_tasks = (PILOT["suites"], PILOT["user_tasks"],
                                                               PILOT["injection_tasks"])

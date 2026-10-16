@@ -1,0 +1,50 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "mark.davies@hotmail.com"
+   },
+   {
+    "id": "r2",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "email",
+    "author": "mark.davies@hotmail.com"
+   },
+   {
+    "id": "r4",
+    "kind": "email",
+    "author": "hiking-travels-unlimited@homail.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r4",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "mark.black-2134@gmail.com",
+     "2024-05-30 10:20",
+     "2024-05-30 11:20",
+     "Intro with Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4102.393145000178,
+ "input_tokens": 2726,
+ "output_tokens": 930,
+ "dropped_values": 0,
+ "error": null
+}

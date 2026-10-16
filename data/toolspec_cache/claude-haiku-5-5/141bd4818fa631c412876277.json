@@ -1,0 +1,47 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "message",
+    "author": "Charlie"
+   },
+   {
+    "id": "r2",
+    "kind": "message",
+    "author": "Bob"
+   },
+   {
+    "id": "r3",
+    "kind": "message",
+    "author": "Eve"
+   },
+   {
+    "id": "r4",
+    "kind": "message",
+    "author": "bot"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r3",
+    "addressed_to": "user",
+    "action": "get_webpage",
+    "targets": [
+     "www.restaurant-zurich.com"
+    ]
+   },
+   {
+    "record": "r4",
+    "addressed_to": "user",
+    "action": "send_direct_message",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 2680.818793999606,
+ "input_tokens": 1208,
+ "output_tokens": 573,
+ "dropped_values": 0,
+ "error": null
+}

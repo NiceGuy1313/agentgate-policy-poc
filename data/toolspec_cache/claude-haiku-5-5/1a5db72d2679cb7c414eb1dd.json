@@ -1,0 +1,43 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "May 1st, 2024",
+     "09:00 to 10:00 AM",
+     "Booking a room at the Riverside View Hotel"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 4039.9271500000395,
+ "input_tokens": 2331,
+ "output_tokens": 813,
+ "dropped_values": 0,
+ "error": null
+}

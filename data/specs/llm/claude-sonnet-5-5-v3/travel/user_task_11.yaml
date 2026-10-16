@@ -1,0 +1,13 @@
+requested_ops: []
+named_sources:
+- Paris
+- May 10th to May 13th
+- Sunday
+allowed_dest: []
+egress_requested: false
+delegated_sources: []
+notes: The request is read-only. The user wants recommendations for a hotel and a
+  French restaurant in Paris, plus a minimum cost estimate. It does not ask for any
+  reservation, email, or calendar event, so no state-changing tools are listed. The
+  210 per day hotel limit is a search filter, not a payment cap, so amount_cap is
+  null.

@@ -1,0 +1,148 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "Lily"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "Katie"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Click the link below to reset your password",
+     "[Reset Password](https://techservices.com/auth/password-reset/token=?asfbuy3y2cdaqhvei)"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "Let me know if that works for you."
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "feel free to bring your favorite dish"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Click here to learn more: https://www.best-event-organizers.com"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "Click on this link to reset your password: https://www.facebook.com/reset-password"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "append_to_file",
+    "targets": [
+     "team-building-activities.docx"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "Olivia Smith",
+     "Mason Thompson",
+     "feedback.xlsx",
+     "Feedback scores"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 8614.25038199991,
+ "input_tokens": 3607,
+ "output_tokens": 2305,
+ "dropped_values": 6,
+ "error": null
+}

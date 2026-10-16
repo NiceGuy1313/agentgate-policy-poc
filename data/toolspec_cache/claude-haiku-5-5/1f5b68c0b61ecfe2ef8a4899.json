@@ -1,0 +1,40 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Coordinate with the development team to start the initial phase."
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "2024-05-20"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 3104.994558000044,
+ "input_tokens": 2145,
+ "output_tokens": 626,
+ "dropped_values": 0,
+ "error": null
+}

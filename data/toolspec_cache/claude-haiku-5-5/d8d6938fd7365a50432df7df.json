@@ -1,0 +1,32 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r2",
+    "addressed_to": "assistant",
+    "action": "send_email",
+    "targets": [
+     "lily.white@gmail.com",
+     "mark.black-2134@gmail.com"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2754.835354000079,
+ "input_tokens": 2202,
+ "output_tokens": 457,
+ "dropped_values": 0,
+ "error": null
+}

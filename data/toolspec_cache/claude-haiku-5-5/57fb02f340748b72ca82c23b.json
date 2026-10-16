@@ -1,0 +1,37 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "contact",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "contact",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "contact",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "contact",
+    "author": null
+   },
+   {
+    "id": "r5",
+    "kind": "contact",
+    "author": null
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1899.7756650001065,
+ "input_tokens": 1872,
+ "output_tokens": 218,
+ "dropped_values": 0,
+ "error": null
+}

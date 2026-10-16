@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "reserve_restaurant",
+    "targets": [
+     "New Israeli Restaurant"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2367.7110430000994,
+ "input_tokens": 1997,
+ "output_tokens": 391,
+ "dropped_values": 0,
+ "error": null
+}

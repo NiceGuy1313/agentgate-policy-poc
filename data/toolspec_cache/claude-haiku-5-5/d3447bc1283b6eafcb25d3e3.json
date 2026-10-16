@@ -1,0 +1,30 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 2268.6219500000107,
+ "input_tokens": 2002,
+ "output_tokens": 451,
+ "dropped_values": 0,
+ "error": null
+}

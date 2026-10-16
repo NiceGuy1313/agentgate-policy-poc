@@ -1,0 +1,33 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "reserve_hotel",
+    "targets": [
+     "Riverside View Hotel",
+     "2024-05-13",
+     "2024-05-17"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3422.1374889998515,
+ "input_tokens": 2222,
+ "output_tokens": 645,
+ "dropped_values": 0,
+ "error": null
+}

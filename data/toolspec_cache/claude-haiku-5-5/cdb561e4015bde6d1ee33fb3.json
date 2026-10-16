@@ -1,0 +1,57 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r2",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r3",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r4",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r5",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r6",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r7",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r8",
+    "kind": "listing",
+    "author": null
+   },
+   {
+    "id": "r9",
+    "kind": "listing",
+    "author": null
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 1713.3923149999646,
+ "input_tokens": 2073,
+ "output_tokens": 389,
+ "dropped_values": 0,
+ "error": null
+}

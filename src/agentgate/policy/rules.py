@@ -1,10 +1,12 @@
-"""P1–P9를 결정론적 규칙으로 구현한다(docs/policy_spec.md 2절)."""
+"""P1–P9를 결정론적 규칙으로 구현한다(docs/policy_spec.md 2절). P0·P10은 v2(명세서.md 2절)이다."""
 
 from __future__ import annotations
 
 import re
 
+from agentgate.config import load_effect_tools
 from agentgate.normalization import (
+    extract_typed_candidates,
     haystack_contains,
     iterate_leaf_values,
     normalize_value,
@@ -29,6 +31,23 @@ def _decide_by_origin(policy: Policy, context: PolicyContext, arg: str, value, *
     if provenance.origin == Origin.OTHER_TOOL:
         return policy.block(f"{label} '{value}' only appears in an unrequested tool response.", **evidence)
     return policy.block(f"{label} '{value}' appears neither in the prompt nor in any tool response.", **evidence)
+
+
+def _v31(context: PolicyContext, flag: str) -> bool:
+    """v3.1 behaviour switches (config "v31"); absent in v1/v2/v3 configs, so those keep their decisions."""
+    return bool((context.config.get("v31") or {}).get(flag))
+
+
+def _delegated_request_match(call: ToolCall, context: PolicyContext) -> bool:
+    """A1: the call carries out a request found in a source the user delegated (TaskSpec.delegated_sources)."""
+    return any(m["delegated"] for m in context.value_index.instructed_requests(call.tool, call.args))
+
+
+def _unrequested(policy: Policy, call: ToolCall, context: PolicyContext, label: str) -> PolicyDecision:
+    if _v31(context, "delegation_escalates") and _delegated_request_match(call, context):
+        return policy.escalate(f"{label} '{call.tool}' was not requested directly but matches a request in a "
+                               "source the user delegated.", tool=call.tool, delegated=True)
+    return policy.block(f"{label} '{call.tool}' was not requested by the user.", tool=call.tool)
 
 
 def _strictest_decision(decisions: list[PolicyDecision]) -> PolicyDecision | None:
@@ -125,12 +144,31 @@ class BulkEgressPolicy(Policy):
                        if self.policy_config.get("count_attachments", True) and call.tool != "share_file" else [])
         count = max(len(distinct_source_ids), matched_record_count) + len(attachments)
         if count >= self.policy_config.get("min_distinct_reads", 3):
+            if _v31(context, "requested_egress_escalates") and _requested_egress_to_known_destination(
+                    self.config, call, context):
+                return self.escalate(
+                    f"One outgoing call carries {count} distinct read results, but the user asked to send data "
+                    "to this destination.", matched_reads=sorted(distinct_source_ids),
+                    matched_items=matched_record_count, attachments=attachments, count=count)
             return self.block(
                 f"One outgoing call carries {count} distinct read results (bulk export).",
                 matched_reads=sorted(distinct_source_ids), matched_items=matched_record_count,
                 attachments=attachments, count=count,
             )
         return None
+
+
+def _requested_egress_to_known_destination(config: dict, call: ToolCall, context: PolicyContext) -> bool:
+    """C1: the user asked to send data, and every destination comes from the prompt / user / directory or a
+    source the user named."""
+    if not context.spec.egress_requested:
+        return False
+    destinations = [v for arg in (config.get("P1") or {}).get("targets", {}).get(call.tool, [])
+                    for v in iterate_leaf_values(call.args.get(arg)) if str(v).strip()]
+    if not destinations:
+        return False
+    allowed = TRUSTED_ORIGINS | {Origin.NAMED_SOURCE}
+    return all(context.value_index.origin_of(v).origin in allowed for v in destinations)
 
 
 def _count_matched_records(sink: str, hits, k: int) -> int:
@@ -228,8 +266,7 @@ class AccountPermissionPolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Account/permission change '{call.tool}' was not requested by the user.",
-                              tool=call.tool)
+            return _unrequested(self, call, context, "Account/permission change")
         for arg in (self.policy_config.get("password_args") or {}).get(call.tool, []):
             value = call.args.get(arg)
             if value is not None:
@@ -300,7 +337,7 @@ class ReservationPolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Reservation '{call.tool}' was not requested by the user.", tool=call.tool)
+            return _unrequested(self, call, context, "Reservation")
         target = call.args.get(self.policy_config["tools"][call.tool])
         if target is None:
             return None
@@ -322,10 +359,151 @@ class CalendarChangePolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Calendar change '{call.tool}' was not requested by the user.", tool=call.tool)
+            return _unrequested(self, call, context, "Calendar change")
         return None
 
 
-POLICY_CLASSES = [DestinationProvenancePolicy, SensitiveEgressPolicy, BulkEgressPolicy, MoneyTransferPolicy,
+class UserFixedPolicy(Policy):
+    """P0: the user's fixed settings (config/user_policy.yaml) apply to every task, on top of the TaskSpec."""
+
+    policy_id = "P0"
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        user_policy = config.get("user_policy") or {}
+        self.always_block = set(user_policy.get("always_block") or [])
+        self.always_human = set(user_policy.get("always_human") or [])
+
+    def applies_to(self, tool):
+        return tool in self.always_block or tool in self.always_human
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        if call.tool in self.always_block:
+            return self.block(f"User policy blocks '{call.tool}' in every task.", layer="user_policy",
+                              rule="always_block")
+        if _v31(context, "human_unless_requested") and call.tool in context.spec.requested_ops:
+            return None   # D2: the prompt itself asked for this action
+        return self.escalate(f"User policy requires human confirmation for '{call.tool}'.", layer="user_policy",
+                             rule="always_human", force_human=True)
+
+
+class DetectorLabelPolicy(Policy):
+    """P10: an argument value taken from a response the detector flagged needs review (명세서.md 2절).
+
+    Reads only the DetectionResult labels the runtime attached to the responses; never runs a model.
+    A value from a NAMED_SOURCE / OTHER_TOOL response that is flagged, or that sits inside a suspicious chunk,
+    gives ESCALATE; an OTHER_TOOL value inside a suspicious chunk gives BLOCK.
+    """
+
+    policy_id = "P10"
+    LONG_VALUE_CHARS = 200    # longer values (message bodies) are checked through the typed values inside them
+    MIN_VALUE_CHARS = 3
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.effect_tools = load_effect_tools()
+
+    def applies_to(self, tool):
+        return tool in self.effect_tools
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        decisions = []
+        for arg, raw in call.args.items():
+            for value in iterate_leaf_values(raw):
+                for candidate in _detector_candidates(value, self.LONG_VALUE_CHARS):
+                    if len(candidate.strip()) < self.MIN_VALUE_CHARS:
+                        continue
+                    provenance = context.value_index.origin_of(candidate)
+                    if provenance.origin not in (Origin.NAMED_SOURCE, Origin.OTHER_TOOL):
+                        continue
+                    label = context.value_index.value_detection(candidate, provenance.source_id)
+                    if label is None or not (label["flagged"] or label["in_suspicious_span"]):
+                        continue
+                    evidence = {"arg": arg, "value": candidate, **provenance.as_dict(), "detection": label}
+                    if provenance.origin == Origin.OTHER_TOOL and label["in_suspicious_span"]:
+                        decisions.append(self.block(
+                            f"'{candidate}' sits in a chunk the detector flagged, in an unrequested response.",
+                            **evidence))
+                    else:
+                        decisions.append(self.escalate(
+                            f"'{candidate}' comes from a response the detector flagged "
+                            f"(score {label['response_score']}, value chunk {label['value_score']}).", **evidence))
+        return _strictest_decision(decisions)
+
+
+def _detector_candidates(value, long_chars: int) -> list[str]:
+    text = str(value)
+    if len(text) <= long_chars:
+        return [text]
+    candidates = extract_typed_candidates(text)
+    return sorted(candidates["url"] | candidates["email"] | candidates["iban"])
+
+
+class InstructedActionPolicy(Policy):
+    """P11 (rules R3, v3): a call that carries out a request found inside a tool output.
+
+    Reads only the validated ToolSpec labels the runtime attached to the responses (no model calls here).
+    Not requested by the user and not from a delegated source -> BLOCK; otherwise -> ESCALATE (judge rule J1).
+    """
+
+    policy_id = "P11"
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.effect_tools = load_effect_tools()
+
+    def applies_to(self, tool):
+        return tool in self.effect_tools
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        matches = context.value_index.instructed_requests(call.tool, call.args)
+        if not matches:
+            return None
+        visit_arg = (self.config.get("P7") or {}).get("visit_tools", {}).get(call.tool)
+        if visit_arg and _v31(context, "visit_named_defers_to_p7"):
+            origin = context.value_index.origin_of(call.args.get(visit_arg)).origin
+            if origin in TRUSTED_ORIGINS or origin == Origin.NAMED_SOURCE:
+                # B1: opening a link inside a named source is reading, not an action the tool output imposed;
+                # it may still be a planted request, so the judge decides (J3, J5) instead of a hard BLOCK
+                return self.escalate(f"'{call.tool}' opens a link that a tool output asks to open, inside a source "
+                                     "the user named.", matched_tool_output_requests=matches[:5], requested=False)
+        requested = call.tool in context.spec.requested_ops
+        delegated = [m for m in matches if m["delegated"]]
+        evidence = {"matched_tool_output_requests": matches[:5], "requested": requested}
+        if not requested and not delegated:
+            return self.block(f"'{call.tool}' carries out a request found in a tool output "
+                              f"({matches[0]['source_id']}:{matches[0]['tool']}), which the user did not ask for.",
+                              **evidence)
+        return self.escalate(f"'{call.tool}' matches a request found in a tool output "
+                             f"({'delegated source' if delegated else 'action also requested by the user'}).",
+                             **evidence)
+
+
+class RequestedActionPolicy(Policy):
+    """P12 (rule R1, v3): state-changing / outbound tools must be requested by the user.
+
+    Generalizes P6/P8/P9 to every effect tool except URL visits (P7 handles those). Unrequested calls that also
+    carry out a tool-output request are blocked by P11; the rest go to the judge.
+    """
+
+    policy_id = "P12"
+    EXCLUDED = ("visit",)
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        from agentgate.config import load_config_yaml
+        roles = load_config_yaml("tool_roles.yaml")["effect"]
+        self.tools = {t for cls, tools in roles.items() if cls not in self.EXCLUDED for t in tools}
+
+    def applies_to(self, tool):
+        return tool in self.tools
+
+    def evaluate(self, call: ToolCall, context: PolicyContext):
+        if call.tool in context.spec.requested_ops:
+            return None
+        return self.escalate(f"'{call.tool}' was not requested by the user.", tool=call.tool)
+
+
+POLICY_CLASSES = [UserFixedPolicy, DestinationProvenancePolicy, SensitiveEgressPolicy, BulkEgressPolicy, MoneyTransferPolicy,
                   DeletionPolicy, AccountPermissionPolicy, UntrustedContentPolicy, ReservationPolicy,
-                  CalendarChangePolicy]
+                  CalendarChangePolicy, DetectorLabelPolicy, InstructedActionPolicy, RequestedActionPolicy]

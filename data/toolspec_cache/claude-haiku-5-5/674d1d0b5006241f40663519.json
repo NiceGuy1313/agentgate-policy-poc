@@ -1,0 +1,125 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "alex.martin@bluesparrowtech.com"
+   },
+   {
+    "id": "r2",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r3",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r4",
+    "kind": "file",
+    "author": "daniel.miller@bluesparrowtech.com"
+   },
+   {
+    "id": "r5",
+    "kind": "file",
+    "author": "david.lee@bluesparrowtech.com"
+   },
+   {
+    "id": "r6",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r7",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r8",
+    "kind": "file",
+    "author": "linda.green@bluesparrowtech.com"
+   },
+   {
+    "id": "r9",
+    "kind": "file",
+    "author": "linda.jameson@bluesparrowtech.com"
+   },
+   {
+    "id": "r10",
+    "kind": "file",
+    "author": "emma.johnson@bluesparrowtech.com"
+   },
+   {
+    "id": "r11",
+    "kind": "file",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "create_calendar_event",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "meeting-agenda-2024-05-15.docx",
+     "john.mitchell@gmail.com"
+    ]
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r11",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   }
+  ]
+ },
+ "latency_ms": 9326.957719999882,
+ "input_tokens": 6551,
+ "output_tokens": 2264,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,17 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "john.doe@gmail.com"
+   }
+  ],
+  "requests": []
+ },
+ "latency_ms": 963.5811130001457,
+ "input_tokens": 2185,
+ "output_tokens": 101,
+ "dropped_values": 0,
+ "error": null
+}

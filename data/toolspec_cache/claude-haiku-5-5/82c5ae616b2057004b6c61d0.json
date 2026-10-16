@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "unclear",
+    "action": "other",
+    "targets": [
+     "island trailhead"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2920.9447520006506,
+ "input_tokens": 1966,
+ "output_tokens": 522,
+ "dropped_values": 0,
+ "error": null
+}

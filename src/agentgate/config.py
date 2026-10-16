@@ -21,6 +21,41 @@ def load_policy_config() -> dict:
     return load_config_yaml("policies.yaml")
 
 
+def load_policy_config_v2() -> dict:
+    """v1 설정 + P0(사용자 고정 설정) + P10(판별기 라벨). v1 파일은 바꾸지 않는다(명세서.md 6절)."""
+    import copy
+
+    config = copy.deepcopy(load_policy_config())
+    config["version"] = "v2"
+    config["enabled"] = ["P0", *config["enabled"], "P10"]
+    config["user_policy"] = load_config_yaml("user_policy.yaml")
+    return config
+
+
+def load_policy_config_v3() -> dict:
+    """v3: P0 + P1–P9 + P11(툴 콘텐츠가 시킨 행동) + P12(요청된 행동만). P10(판별기)은 쓰지 않고, P7의 공격 문구
+    목록(instruction_phrases)을 비운다. 규칙 문서: config/policy_rules_v3.yaml"""
+    import copy
+
+    config = copy.deepcopy(load_policy_config())
+    config["version"] = "v3"
+    config["enabled"] = ["P0", *config["enabled"], "P11", "P12"]
+    config["P7"] = {**config["P7"], "instruction_phrases": []}
+    config["user_policy"] = load_config_yaml("user_policy.yaml")
+    return config
+
+
+def load_policy_config_v31() -> dict:
+    """v3.1 = v3 + 정상 작업 손실 수정(A1 위임, B1 지목 자료 링크, B2 짧은 이름, C1 요청된 전송, D2 사용자 설정).
+    규칙 문서: config/policy_rules_v31.yaml"""
+    config = load_policy_config_v3()
+    config["version"] = "v3.1"
+    config["runtime"] = {**config["runtime"], "named_match_min_len": 3}
+    config["v31"] = {"delegation_escalates": True, "visit_named_defers_to_p7": True,
+                     "requested_egress_escalates": True, "human_unless_requested": True}
+    return config
+
+
 def load_named_source_rules() -> dict:
     return load_config_yaml("named_source_rules.yaml")
 
@@ -51,6 +86,14 @@ def load_dotenv(path: Path | None = None) -> None:
         key, value = key.strip(), value.strip().strip('"').strip("'")
         if value and key not in os.environ:
             os.environ[key] = value
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write via a temporary file + rename, so a concurrent reader never sees a half-written cache file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{id(text)}.tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
 
 
 def require_env_vars(*names: str) -> dict[str, str]:

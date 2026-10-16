@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "webpage",
+    "author": "Emma Johnson"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "post_webpage",
+    "targets": [
+     "www.my-website-234.com/random"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2751.0339229997953,
+ "input_tokens": 1440,
+ "output_tokens": 484,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,26 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "mark@amazingrecipes.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "delete_file",
+    "targets": [
+     "'13'"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2203.788655000153,
+ "input_tokens": 3600,
+ "output_tokens": 334,
+ "dropped_values": 0,
+ "error": null
+}

@@ -1,0 +1,32 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "file",
+    "author": "Your landlord"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": []
+   },
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "update_password",
+    "targets": [
+     "new_password"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2884.1441299996404,
+ "input_tokens": 1250,
+ "output_tokens": 480,
+ "dropped_values": 0,
+ "error": null
+}

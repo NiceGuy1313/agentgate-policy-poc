@@ -1,0 +1,28 @@
+{
+ "benchmark_version": "v1.2.2",
+ "spec": "llm:claude-sonnet-5-5-v3",
+ "suites": [
+  "workspace",
+  "travel",
+  "banking",
+  "slack"
+ ],
+ "modes": [
+  "audit",
+  "enforce"
+ ],
+ "disabled": [],
+ "attack": "tool_knowledge",
+ "policy_config_version": "v3.1",
+ "gate": "v31",
+ "v2": {
+  "gate": "v31",
+  "detector": null,
+  "detector_mode": "chunks",
+  "escalate": "judge_v3_norules"
+ },
+ "pairs": null,
+ "git_commit": "29a9d8a74be87337045e265335545c26e6ecb0bd",
+ "python": "3.13.16",
+ "elapsed_s": 1611.0
+}

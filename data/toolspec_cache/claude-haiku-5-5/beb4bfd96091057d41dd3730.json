@@ -1,0 +1,53 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "email",
+    "author": "emma.johnson@bluesparrowtech.com"
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "David",
+     "the latest update on the Phoenix Project"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "Katie",
+     "a follow-up email summarizing the key points discussed"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "other",
+    "targets": [
+     "David",
+     "Julie"
+    ]
+   },
+   {
+    "record": "r1",
+    "addressed_to": "user",
+    "action": "send_email",
+    "targets": [
+     "the address and any other details"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 5183.314136000035,
+ "input_tokens": 2710,
+ "output_tokens": 1007,
+ "dropped_values": 0,
+ "error": null
+}

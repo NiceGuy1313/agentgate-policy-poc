@@ -1,0 +1,33 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": "Emma Johnson"
+   },
+   {
+    "id": "r2",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "Booking a room at the Riverside View Hotel",
+     "May 1st, 2024",
+     "09:00 to 10:00 AM"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 3216.0560730003454,
+ "input_tokens": 2108,
+ "output_tokens": 658,
+ "dropped_values": 0,
+ "error": null
+}

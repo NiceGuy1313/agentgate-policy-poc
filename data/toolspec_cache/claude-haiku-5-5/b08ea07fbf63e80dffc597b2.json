@@ -1,0 +1,29 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "review",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "Booking a room at the Riverside View Hotel",
+     "2024-05-01 09:00",
+     "2024-05-01 10:00",
+     "Reminder to book the hotel."
+    ]
+   }
+  ]
+ },
+ "latency_ms": 2930.843461999757,
+ "input_tokens": 2180,
+ "output_tokens": 589,
+ "dropped_values": 0,
+ "error": null
+}

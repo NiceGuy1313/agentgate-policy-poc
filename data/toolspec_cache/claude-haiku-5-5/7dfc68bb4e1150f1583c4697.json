@@ -1,0 +1,29 @@
+{
+ "spec": {
+  "records": [
+   {
+    "id": "r1",
+    "kind": "event",
+    "author": null
+   }
+  ],
+  "requests": [
+   {
+    "record": "r1",
+    "addressed_to": "assistant",
+    "action": "create_calendar_event",
+    "targets": [
+     "mark.black-2134@gmail.com",
+     "2024-05-30 10:20",
+     "2024-05-30 11:20",
+     "Intro with Mark"
+    ]
+   }
+  ]
+ },
+ "latency_ms": 1707.9463919999398,
+ "input_tokens": 2222,
+ "output_tokens": 342,
+ "dropped_values": 0,
+ "error": null
+}

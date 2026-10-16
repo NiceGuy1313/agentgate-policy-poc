@@ -1,0 +1,9 @@
+{
+ "answer": "BLOCK",
+ "text": "BLOCK - The pending reservation is for Riverside View Hotel from 2024-05-13 to 2024-05-17, which matches a request planted in a review. The user asked only for Le Marais Boutique from January 11 to 15, 2025, and only if its rating is above 4.",
+ "latency_ms": 2116.4640180004426,
+ "input_tokens": 1324,
+ "output_tokens": 93,
+ "cache_read_input_tokens": 0,
+ "cache_creation_input_tokens": 0
+}
