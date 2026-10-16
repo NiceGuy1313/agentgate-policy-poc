@@ -33,6 +33,23 @@ def _decide_by_origin(policy: Policy, context: PolicyContext, arg: str, value, *
     return policy.block(f"{label} '{value}' appears neither in the prompt nor in any tool response.", **evidence)
 
 
+def _v31(context: PolicyContext, flag: str) -> bool:
+    """v3.1 behaviour switches (config "v31"); absent in v1/v2/v3 configs, so those keep their decisions."""
+    return bool((context.config.get("v31") or {}).get(flag))
+
+
+def _delegated_request_match(call: ToolCall, context: PolicyContext) -> bool:
+    """A1: the call carries out a request found in a source the user delegated (TaskSpec.delegated_sources)."""
+    return any(m["delegated"] for m in context.value_index.instructed_requests(call.tool, call.args))
+
+
+def _unrequested(policy: Policy, call: ToolCall, context: PolicyContext, label: str) -> PolicyDecision:
+    if _v31(context, "delegation_escalates") and _delegated_request_match(call, context):
+        return policy.escalate(f"{label} '{call.tool}' was not requested directly but matches a request in a "
+                               "source the user delegated.", tool=call.tool, delegated=True)
+    return policy.block(f"{label} '{call.tool}' was not requested by the user.", tool=call.tool)
+
+
 def _strictest_decision(decisions: list[PolicyDecision]) -> PolicyDecision | None:
     """The first decision with the highest severity, or None."""
     if not decisions:
@@ -127,12 +144,31 @@ class BulkEgressPolicy(Policy):
                        if self.policy_config.get("count_attachments", True) and call.tool != "share_file" else [])
         count = max(len(distinct_source_ids), matched_record_count) + len(attachments)
         if count >= self.policy_config.get("min_distinct_reads", 3):
+            if _v31(context, "requested_egress_escalates") and _requested_egress_to_known_destination(
+                    self.config, call, context):
+                return self.escalate(
+                    f"One outgoing call carries {count} distinct read results, but the user asked to send data "
+                    "to this destination.", matched_reads=sorted(distinct_source_ids),
+                    matched_items=matched_record_count, attachments=attachments, count=count)
             return self.block(
                 f"One outgoing call carries {count} distinct read results (bulk export).",
                 matched_reads=sorted(distinct_source_ids), matched_items=matched_record_count,
                 attachments=attachments, count=count,
             )
         return None
+
+
+def _requested_egress_to_known_destination(config: dict, call: ToolCall, context: PolicyContext) -> bool:
+    """C1: the user asked to send data, and every destination comes from the prompt / user / directory or a
+    source the user named."""
+    if not context.spec.egress_requested:
+        return False
+    destinations = [v for arg in (config.get("P1") or {}).get("targets", {}).get(call.tool, [])
+                    for v in iterate_leaf_values(call.args.get(arg)) if str(v).strip()]
+    if not destinations:
+        return False
+    allowed = TRUSTED_ORIGINS | {Origin.NAMED_SOURCE}
+    return all(context.value_index.origin_of(v).origin in allowed for v in destinations)
 
 
 def _count_matched_records(sink: str, hits, k: int) -> int:
@@ -230,8 +266,7 @@ class AccountPermissionPolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Account/permission change '{call.tool}' was not requested by the user.",
-                              tool=call.tool)
+            return _unrequested(self, call, context, "Account/permission change")
         for arg in (self.policy_config.get("password_args") or {}).get(call.tool, []):
             value = call.args.get(arg)
             if value is not None:
@@ -302,7 +337,7 @@ class ReservationPolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Reservation '{call.tool}' was not requested by the user.", tool=call.tool)
+            return _unrequested(self, call, context, "Reservation")
         target = call.args.get(self.policy_config["tools"][call.tool])
         if target is None:
             return None
@@ -324,7 +359,7 @@ class CalendarChangePolicy(Policy):
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
         if call.tool not in context.spec.requested_ops:
-            return self.block(f"Calendar change '{call.tool}' was not requested by the user.", tool=call.tool)
+            return _unrequested(self, call, context, "Calendar change")
         return None
 
 
@@ -346,6 +381,8 @@ class UserFixedPolicy(Policy):
         if call.tool in self.always_block:
             return self.block(f"User policy blocks '{call.tool}' in every task.", layer="user_policy",
                               rule="always_block")
+        if _v31(context, "human_unless_requested") and call.tool in context.spec.requested_ops:
+            return None   # D2: the prompt itself asked for this action
         return self.escalate(f"User policy requires human confirmation for '{call.tool}'.", layer="user_policy",
                              rule="always_human", force_human=True)
 
@@ -422,6 +459,14 @@ class InstructedActionPolicy(Policy):
         matches = context.value_index.instructed_requests(call.tool, call.args)
         if not matches:
             return None
+        visit_arg = (self.config.get("P7") or {}).get("visit_tools", {}).get(call.tool)
+        if visit_arg and _v31(context, "visit_named_defers_to_p7"):
+            origin = context.value_index.origin_of(call.args.get(visit_arg)).origin
+            if origin in TRUSTED_ORIGINS or origin == Origin.NAMED_SOURCE:
+                # B1: opening a link inside a named source is reading, not an action the tool output imposed;
+                # it may still be a planted request, so the judge decides (J3, J5) instead of a hard BLOCK
+                return self.escalate(f"'{call.tool}' opens a link that a tool output asks to open, inside a source "
+                                     "the user named.", matched_tool_output_requests=matches[:5], requested=False)
         requested = call.tool in context.spec.requested_ops
         delegated = [m for m in matches if m["delegated"]]
         evidence = {"matched_tool_output_requests": matches[:5], "requested": requested}

@@ -32,7 +32,7 @@ def check_run(run: dict) -> list[dict]:
             hash_after = trace[i + 1]["env_hash_before"] if i + 1 < len(trace) else run.get("final_env_hash")
             if event.get("env_hash_before") is None or hash_after != event["env_hash_before"]:
                 issues.append({"check": "env_changed_on_block", "step": i, "tool": event["tool"]})
-        if event["executed"] and event.get("effective") == "BLOCK" and run["condition"] in ("C1", "C2", "C4", "C5", "C6"):
+        if event["executed"] and event.get("effective") == "BLOCK" and run["condition"] in ("C1", "C2", "C4", "C5", "C6", "C7", "C7n"):
             issues.append({"check": "enforce_block_executed", "step": i, "tool": event["tool"]})
     # Every tool result the agent received must come from exactly one gate event (same tool, same order).
     tool_messages = [m for m in run.get("messages", []) if m["role"] == "tool"]

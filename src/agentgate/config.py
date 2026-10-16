@@ -45,6 +45,17 @@ def load_policy_config_v3() -> dict:
     return config
 
 
+def load_policy_config_v31() -> dict:
+    """v3.1 = v3 + 정상 작업 손실 수정(A1 위임, B1 지목 자료 링크, B2 짧은 이름, C1 요청된 전송, D2 사용자 설정).
+    규칙 문서: config/policy_rules_v31.yaml"""
+    config = load_policy_config_v3()
+    config["version"] = "v3.1"
+    config["runtime"] = {**config["runtime"], "named_match_min_len": 3}
+    config["v31"] = {"delegation_escalates": True, "visit_named_defers_to_p7": True,
+                     "requested_egress_escalates": True, "human_unless_requested": True}
+    return config
+
+
 def load_named_source_rules() -> dict:
     return load_config_yaml("named_source_rules.yaml")
 

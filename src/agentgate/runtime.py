@@ -124,8 +124,10 @@ class GatedRuntime(FunctionsRuntime):
     def configure(self, prompt: str, spec: TaskSpec, meta: dict | None = None) -> None:
         self.spec = spec
         self.spec_meta = meta or {}
+        engine_runtime = (getattr(self.engine, "config", None) or {}).get("runtime", {})
         self.index = ValueIndex(prompt, spec, self.config.get("self_identifiers"),
-                                self.config["runtime"].get("min_string_field_len", 4))
+                                self.config["runtime"].get("min_string_field_len", 4),
+                                engine_runtime.get("named_match_min_len", 4))
 
     @property
     def context(self) -> PolicyContext:
