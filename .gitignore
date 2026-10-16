@@ -36,6 +36,7 @@ AGENTS.md
 logs/
 # Raw live-run directories; each run is committed as runs.tar.gz instead
 results/live/*/*/C[0-9]/
+results/live/*/*/C[0-9]n/
 
 # Dashboard run history (inspection only)
 dashboard/runs/
