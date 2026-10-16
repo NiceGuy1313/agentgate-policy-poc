@@ -2,7 +2,7 @@
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)를 따라 송금·반출·삭제를 하지 않도록, 모든 툴 호출을 **실행 직전에 결정론 정책(P1–P9)으로 검사**하는 Gate다. AgentDojo v1.2.2(`agentdojo==0.1.35`)와 외부 에이전트 프레임워크(smolagents 등)에서 검증한다.
 
-> **v2 작업 중**: 툴 응답 ML 판별기(PIGuard)와 Trusted LLM으로 게이트를 보완한다. 명세와 클라우드 실행 방법은 [`명세서.md`](명세서.md).
+> **후속 구성**: [`v2_detector_trusted_llm/`](v2_detector_trusted_llm/README.md)(판별기 + Trusted LLM, 폐기)와 [`v3_trusted_llm_policy_doc/`](v3_trusted_llm_policy_doc/README.md)(ToolSpec + 정책 문서 + 판정 LLM)에 버전별 구조·코드·결과를 나눠 두었다. 작업 명세는 [`명세서.md`](명세서.md).
 
 자세한 내용은 [`docs/architecture.md`](docs/architecture.md)(구조·Wrapper 규약), [`docs/policy_spec.md`](docs/policy_spec.md)(정책 상세), [`docs/final_report.md`](docs/final_report.md)(평가 결과)에 있다. 정적 결과 요약은 [`results/dashboard.html`](results/dashboard.html)이다.
 
@@ -111,8 +111,8 @@ python scripts/reporting/build_report.py
 ```
 src/agentgate/
   policy/        정책과 판정 결합 (LLM 호출 없음)
-  llm/           TaskSpec 추출기, ESCALATE 판정 LLM
-  detector/      툴 응답 인젝션 판별기 래퍼 (v2, PIGuard·ProtectAI)
+  llm/           TaskSpec·ToolSpec 추출기, ESCALATE 판정 LLM (v1, v2, v3)
+  detector/      툴 응답 인젝션 판별기 래퍼 (v2만, PIGuard·ProtectAI)
   agents/        평가 대상 에이전트 (frameworks/: smolagents 어댑터)
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
   evaluation/    재생 평가, 지표
@@ -126,6 +126,8 @@ data/
   specs/         태스크별 TaskSpec (oracle, LLM 추출)
   pairs/         live 평가용 층화 표본 쌍
   judge_cache/   판정 LLM 응답 캐시 (키 없이 재현)
-docs/            구조·정책 사양·평가 보고서
+docs/            구조·정책 사양·평가 보고서 (v1 중심, 6절·9절·5절에서 버전별 폴더로 연결)
+v2_detector_trusted_llm/    v2 구조·결과(README, RESULTS)와 코드 읽기용 사본
+v3_trusted_llm_policy_doc/  v3·v3.1 구조·결과(README, RESULTS)와 코드 읽기용 사본
 results/         평가 결과 (replay, live, judge)
 ```

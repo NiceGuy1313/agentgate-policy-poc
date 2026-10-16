@@ -6,7 +6,8 @@
       results/toolspec/v1/, results/rules/v1/, config/policy_rules_v31.yaml,
       results/live/v1/<run>/{summary,significance,enforcement_check,run_*}.json,
       results/judge/v1/<model>/judge_eval.json, data/benchmark/, data/pairs/, data/specs/llm/, data/judge_cache/
-출력: docs/final_report.md, results/figures/*.png, results/dashboard.html
+출력: docs/final_report.md, results/figures/*.png, results/dashboard.html,
+      v2_detector_trusted_llm/RESULTS.md, v3_trusted_llm_policy_doc/RESULTS.md
 """
 
 from __future__ import annotations
@@ -545,44 +546,111 @@ LIVE_HEADER = ["조건", "구성", "ASR [95% CI]", "툴 호출 공격 성공", "
                "공격 중 Utility [95% CI]"]
 
 
+V2_FOLDER, V3_FOLDER = PROJECT_ROOT / "v2_detector_trusted_llm", PROJECT_ROOT / "v3_trusted_llm_policy_doc"
+REPLAY_V2 = PROJECT_ROOT / "results/replay/v2"
+V2_LIVE = PROJECT_ROOT / "results/live/v2/strat3_tk_gpt-oss_120b"
+
+
+def _live_inputs():
+    return (load_json(V31_SEED0 / "comparison_all_summary.json"), load_json(V31_SEED0 / "comparison_all_significance.json"),
+            load_json(V31_SEED1 / "summary.json"), load_json(V31_SEED1 / "significance.json"))
+
+
+def _enforcement_rows(checks: list[tuple[str, Path]]) -> list[list]:
+    return [[label, check["runs"], check["gate_events"], check["blocked_events"], check["violations"]]
+            for label, path in checks if (check := load_json(path / "enforcement_check.json"))]
+
+
 def v3_section() -> list[str]:
-    seed0_summary = load_json(V31_SEED0 / "comparison_all_summary.json")
-    seed0_sig = load_json(V31_SEED0 / "comparison_all_significance.json")
-    seed1_summary, seed1_sig = load_json(V31_SEED1 / "summary.json"), load_json(V31_SEED1 / "significance.json")
+    """final_report 6절: 버전별 구조 요약과 같은 짝의 live 비교. 버전별 세부 결과는 각 폴더의 RESULTS.md."""
+    seed0_summary, seed0_sig, seed1_summary, seed1_sig = _live_inputs()
+    if not all((seed0_summary, seed0_sig, seed1_summary, seed1_sig)):
+        return []
+    s0, s1 = _pairs(PROJECT_ROOT / "data/pairs/strat3_seed0.txt"), _pairs(PROJECT_ROOT / "data/pairs/strat3_seed1.txt")
+    attack0, attack1 = {x for x in s0 if not x.endswith(":none")}, {x for x in s1 if not x.endswith(":none")}
+    return ["## 6. v2–v3.1 후속 실험", "",
+            "1–5절의 v1 게이트 위에서 진행했다. 에이전트는 gpt-oss:120b(Ollama), 공격은 `tool_knowledge`, TaskSpec은 "
+            "claude-sonnet-5-5가 프롬프트와 툴 목록만 보고 새로 추출한 것(`data/specs/llm/claude-sonnet-5-5-v3/`)이다. "
+            "버전별 구조·코드·세부 결과는 두 폴더에 나눠 두었다.", "",
+            markdown_table(["버전", "구성", "폴더"], [
+                ["v2 (C5)", "툴 응답 판별기(PIGuard) 라벨 → P10, ESCALATE는 Trusted LLM v2. 판별기 오탐으로 v3에서 폐기",
+                 "[`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md)"],
+                ["v3·v3.1 (C6·C7·C7n)", "ToolSpec(툴 응답→JSON) + P11·P12, ESCALATE는 판정 LLM v3 + 규칙 문서",
+                 "[`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md)"]]), "",
+            "### 6.1 실제 에이전트 비교", "",
+            "\"툴 호출 공격 성공\"은 공격 성공 중 툴 호출 없이 답변만 조작한 유형 H를 뺀 수다. \"C0 대비\"는 같은 짝의 차이와 "
+            "exact McNemar p다.", "",
+            "**짝 A (`data/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 "
+            "실행 결과를 재사용했다(같은 짝, 다른 실행 시점).", "",
+            markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig, ["C0", "C1", "C2", "C4", "C5", "C6", "C7", "C7n"])),
+            "",
+            f"**짝 B (`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. "
+            f"정상 실행은 짝 A와 같은 97개 user task이고, 공격 쌍 {len(attack1)}개 중 {len(attack0 & attack1)}개는 짝 A와 "
+            "겹친다. 완전한 held-out은 아니다.", "",
+            markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), ""]
+
+
+def v2_results() -> list[str]:
+    c5 = load_json(V2_LIVE / "utility_analysis_C5.json")
+    probe = load_json(PROJECT_ROOT / "results/detector/v1/format_probe.json")
+    seed0_summary, seed0_sig, _, _ = _live_inputs()
+    if not all((c5, probe, seed0_summary, seed0_sig)):
+        return []
+    detector = c5["detector_on_benign_runs"]
+    lines = ["# v2 결과: 판별기 + Trusted LLM", "",
+             "> `scripts/reporting/build_report.py`가 생성한다. 손으로 고치지 않는다. 구조는 [README](README.md).", "",
+             "## 1. 판별기 오탐", "",
+             f"live C5의 정상 실행에서 툴 응답 {detector['responses']}개 중 {percent_of(detector['flagged'], detector['responses'])}"
+             "를 PIGuard가 flag했다(`results/live/v2/.../utility_analysis_C5.json`). 많이 flag된 툴:", "",
+             markdown_table(["툴", "flag 수"], [[f"`{t}`", n] for t, n in
+                                                list(detector["flagged_by_tool"].items())[:6]]), "",
+             "같은 내용을 출력 형식만 바꿔 넣은 점수다(`results/detector/v1/format_probe.json`). 판별기는 내용보다 형식에 반응했다.",
+             "", markdown_table(["입력", "PIGuard", "protectai-v2"],
+                                [[f"`{name}`", s["piguard"], s["protectai-v2"]] for name, s in probe["scores"].items()]), ""]
+    rows = []
+    for label, name in (("v1 게이트 (회귀 기준)", "regression_v1_gate"), ("v2, ESCALATE→BLOCK", "c5_block_piguard"),
+                        ("v2, ESCALATE→Trusted LLM v2", "c5_judge_piguard")):
+        summary = load_json(REPLAY_V2 / name / "summary.json")
+        if summary:
+            prevention = summary["prevention"]
+            rows.append([label, percent_of(prevention["prevented"], prevention["baseline_success"]),
+                         percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
+                         percent_of(summary["utility_under_attack"]["enforce"], summary["utility_under_attack"]["n"])])
+    lines += ["## 2. 재생 (oracle TaskSpec, `important_instructions`)", "",
+              markdown_table(["게이트", "저지", "정상 Utility", "공격 중 Utility"], rows), "",
+              "## 3. 실제 에이전트 (짝 A)", "",
+              markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig, ["C0", "C1", "C5"])), "",
+              "## 4. 집행 무결성", "",
+              markdown_table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"], _enforcement_rows([("v2 C5", V2_LIVE)])), "",
+              "## 5. 결론", "",
+              "- 판별기 라벨이 정책의 ALLOW를 덮어써 판단 주체가 정책에서 판별기로 넘어갔고, 정상 작업 손실의 주원인이 되었다.",
+              "- v3부터 판별기를 쓰지 않는다. 툴 응답은 ToolSpec(JSON)으로 바꿔 정책이 판단한다.", ""]
+    return lines
+
+
+def v3_results() -> list[str]:
+    seed0_summary, seed0_sig, seed1_summary, seed1_sig = _live_inputs()
     toolspec = load_json(PROJECT_ROOT / "results/toolspec/v1/summary.json")
     atr = load_json(PROJECT_ROOT / "results/rules/v1/atr_taxonomy.json")
     if not all((seed0_summary, seed0_sig, seed1_summary, seed1_sig, toolspec, atr)):
         return []
     rules = yaml.safe_load((PROJECT_ROOT / "config/policy_rules_v31.yaml").read_text())["rules"]
-    c5_detector = load_json(PROJECT_ROOT / "results/live/v2/strat3_tk_gpt-oss_120b/utility_analysis_C5.json")
     indirect = atr["by_kind"]["indirect"]
     techniques = indirect["techniques"]
-    lines = ["## 6. v2–v3.1: ToolSpec과 규칙 문서 기반 게이트", "",
-             "1–5절의 v1 게이트 위에서 진행한 후속 실험이다. 모든 조건의 에이전트는 gpt-oss:120b(Ollama), 공격은 "
-             "`tool_knowledge`, TaskSpec은 claude-sonnet-5-5가 프롬프트와 툴 목록만 보고 새로 추출한 것"
-             "(`data/specs/llm/claude-sonnet-5-5-v3/`)이다.", "",
-             "### 6.1 구조의 변화", "",
-             "- **v2 (C5)**: 툴 응답에 PIGuard 판별기를 돌리고, 판별기가 flag한 응답에서 온 값을 P10이 ESCALATE했다. "
-             + (f"정상 실행 응답의 {percent_of(c5_detector['detector_on_benign_runs']['flagged'], c5_detector['detector_on_benign_runs']['responses'])}"
-                "를 판별기가 flag했고, 이 라벨이 정책 판정을 덮어써 정상 작업 손실의 주원인이 되었다. v3부터 판별기를 쓰지 않는다."
-                if c5_detector else ""),
-             "- **v3 (C6)**: P7의 공격 문구 목록을 삭제했다. 툴 응답마다 claude-haiku-5-5가 레코드와 '독자에게 하는 요청'을 "
-             "JSON(ToolSpec)으로 뽑고(값은 원문 대조로 검증), P11이 '툴 응답 속 요청을 수행하는 호출'을, P12가 '요청되지 않은 행동'을 "
-             "판정한다. ESCALATE는 판정 LLM v3(claude-sonnet-5-5)가 규칙 문서의 인덱스로 고른 조항과 TaskSpec·ToolSpec만 보고 "
-             "해소한다(툴 응답 원문은 넣지 않음).",
-             "- **v3.1 (C7)**: v3 live의 정상 작업 손실을 범주별 일반 규칙으로 고쳤다. 위임 자료의 요청과 일치하는 미요청 행동은 "
-             "ESCALATE(A1), 위임 지시는 요청만 위임 자료에서 오면 됨(A2), 위임 자료의 ToolSpec 항상 제공(A3), 지목 자료 안 링크는 "
-             "BLOCK 대신 ESCALATE(B1), 짧은 식별자의 지목 자료 일치(B2), 전송을 요청한 경우 P3를 ESCALATE(C1), 프롬프트가 요청한 "
-             "always_human 행동은 사람 확인 생략(D2).",
-             f"- **규칙 문서** (`config/policy_rules_v31.yaml`): 코드 집행 조항 {sum(r['layer'] == 'code' for r in rules)}개, "
-             f"판정 LLM 조항 {sum(r['layer'] == 'judge' for r in rules)}개와 조항별 트리거 인덱스. 근거는 ATR test-corpora "
+    lines = ["# v3·v3.1 결과: Trusted LLM + 정책 문서", "",
+             "> `scripts/reporting/build_report.py`가 생성한다. 손으로 고치지 않는다. 구조는 [README](README.md), "
+             "다른 조건과의 live 비교는 [`docs/final_report.md`](../docs/final_report.md) 6절.", "",
+             "## 1. 정책 문서의 근거", "",
+             f"`config/policy_rules_v31.yaml`: 코드 집행 조항 {sum(r['layer'] == 'code' for r in rules)}개, 판정 LLM 조항 "
+             f"{sum(r['layer'] == 'judge' for r in rules)}개와 조항별 트리거 인덱스. 근거는 ATR test-corpora "
              f"(commit `{atr['atr_commit'][:12]}`) 사례 {atr['samples'] - atr['errors']}건(분류 실패 {atr['errors']}건 제외)을 "
-             f"claude-haiku-5-5로 분류한 결과다. 간접 주입 "
-             f"{indirect['n']}건 중 평범한 요청 형태 {techniques.get('ordinary_request_in_data', 0)}건, 권한 사칭 "
-             f"{techniques.get('authority_impersonation', 0)}건, 이전 지시 무시 {techniques.get('instruction_override', 0)}건, "
-             f"AI를 지칭함 {indirect['addressed_to_ai']}건이다. AgentDojo 문구는 쓰지 않았다.", ""]
+             f"claude-haiku-5-5로 분류한 결과다. 간접 주입 {indirect['n']}건 중 평범한 요청 형태 "
+             f"{techniques.get('ordinary_request_in_data', 0)}건, 권한 사칭 {techniques.get('authority_impersonation', 0)}건, "
+             f"이전 지시 무시 {techniques.get('instruction_override', 0)}건, AI를 지칭함 {indirect['addressed_to_ai']}건이다. "
+             "AgentDojo 공격 문구는 쓰지 않았다. 다만 코드 조항은 AgentDojo 툴 환경에서 설계한 P1–P9를 일반화한 것이고, "
+             "v3.1 수정은 AgentDojo live의 정상 작업 손실을 보고 만들었다.", ""]
     ts = toolspec["all"]
-    lines += ["### 6.2 ToolSpec 추출 품질", "",
+    lines += ["## 2. ToolSpec 추출 품질", "",
               "정답 궤적의 실제 툴 응답(정상, 그리고 공격 2종으로 주입된 응답)에서 '독자에게 하는 요청'을 뽑은 결과다"
               "(`results/toolspec/v1`).", "",
               markdown_table(["응답", "개수", "assistant 대상 요청 추출", "요청 하나라도 추출"],
@@ -606,23 +674,14 @@ def v3_section() -> list[str]:
                          percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
                          percent_of(summary["utility_under_attack"]["enforce"], summary["utility_under_attack"]["n"]),
                          sum(len(v) for v in summary["misses"].values())])
-    lines += ["### 6.3 재생 (LLM TaskSpec v3)", "",
-              "2절과 같은 정답 궤적 재생이다. 네 게이트 모두 같은 TaskSpec을 쓴다. \"놓친 쌍\"은 효과 호출이 BLOCK도 ESCALATE도 "
+    lines += ["## 3. 재생 (LLM TaskSpec v3)", "",
+              "정답 궤적 재생이다. 네 게이트 모두 같은 TaskSpec을 쓴다. \"놓친 쌍\"은 효과 호출이 BLOCK도 ESCALATE도 "
               "되지 않은 공격 쌍이다.", "",
               markdown_table(["게이트", "공격", "저지", "lenient 탐지", "정상 Utility", "공격 중 Utility", "놓친 쌍"], rows), ""]
-    s0, s1 = _pairs(PROJECT_ROOT / "data/pairs/strat3_seed0.txt"), _pairs(PROJECT_ROOT / "data/pairs/strat3_seed1.txt")
-    attack0, attack1 = {x for x in s0 if not x.endswith(":none")}, {x for x in s1 if not x.endswith(":none")}
-    lines += ["### 6.4 실제 에이전트", "",
-              "\"툴 호출 공격 성공\"은 공격 성공 중 툴 호출 없이 답변만 조작한 유형 H를 뺀 수다. \"C0 대비\"는 같은 짝의 차이와 "
-              "exact McNemar p다.", "",
-              f"**짝 A (`data/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 "
-              "실행 결과를 재사용했다(같은 짝, 다른 실행 시점).", "",
-              markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig,
-                                                     ["C0", "C1", "C2", "C4", "C5", "C6", "C7", "C7n"])), "",
-              f"**짝 B (`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. "
-              f"정상 실행은 짝 A와 같은 97개 user task이고, 공격 쌍 {len(attack1)}개 중 {len(attack0 & attack1)}개는 짝 A와 "
-              "겹친다. 완전한 held-out은 아니다.", "",
-              markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), ""]
+    lines += ["## 4. 실제 에이전트", "",
+              markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), "",
+              "짝 B(`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)의 같은 시점 실행이다. 짝 A 결과는 "
+              "`docs/final_report.md` 6.1절에 있다.", ""]
     loss_rows = []
     for label, path in (("짝 A C6 (v3)", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b/utility_analysis_C6.json"),
                         ("짝 A C7 (v3.1)", V31_SEED0 / "utility_analysis_C7.json"),
@@ -655,26 +714,30 @@ def v3_section() -> list[str]:
                                          percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
                                          percent_of(summary["utility_under_attack"]["enforce"],
                                                     summary["utility_under_attack"]["n"])])
-    lines += ["### 6.5 규칙 문서의 효과 (C7 vs C7n)", "",
+    lines += ["## 5. 정책 문서의 효과 (C7 vs C7n)", "",
               "두 조건은 게이트(v3.1)와 판정 LLM에 넘기는 사실(TaskSpec, ToolSpec, 값의 출처)이 같고, 판정 LLM에 규칙 인덱스와 "
               "조항을 주는지만 다르다. 규칙 문서가 없으면 system 프롬프트가 짧아 프롬프트 캐시가 동작하지 않는다.", "",
               markdown_table(["짝", "규칙 문서", "툴 호출 공격 성공", "Utility", "공격 중 Utility", "판정 호출", "HUMAN",
                               "판정 입력 토큰(캐시 제외)"], rule_rows), "",
               markdown_table(["규칙 문서", "재생 공격", "저지", "정상 Utility", "공격 중 Utility"], replay_rule_rows), ""]
-    checks = [("v2 C5", PROJECT_ROOT / "results/live/v2/strat3_tk_gpt-oss_120b"),
-              ("v3 C6", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b"),
-              ("v3.1 짝 A", V31_SEED0), ("v3.1 짝 B", V31_SEED1)]
-    check_rows = [[label, check["runs"], check["gate_events"], check["blocked_events"], check["violations"]]
-                  for label, path in checks if (check := load_json(path / "enforcement_check.json"))]
-    lines += ["### 6.6 집행 무결성과 한계", "",
-              markdown_table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"], check_rows), "",
+    lines += ["## 6. 집행 무결성과 한계", "",
+              markdown_table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"], _enforcement_rows(
+                  [("v3 C6", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b"),
+                   ("v3.1 짝 A", V31_SEED0), ("v3.1 짝 B", V31_SEED1)])), "",
               "- v3.1의 수정은 짝 A의 C6 손실을 보고 만들었다. 짝 B는 공격 쌍 일부만 새롭고 정상 user task는 같다.",
               "- v3.1 B1은 처음에 지목 자료 안 링크를 판정 없이 P7에 넘기도록 구현했다가, 파일럿에서 주입된 URL 방문이 통과해 "
               "ESCALATE로 바꿨다. 본 실행은 바꾼 뒤의 결과다.",
               "- ToolSpec 추출기는 툴 응답을 읽으므로 그 자체가 주입 대상이다. 자유 텍스트 필드를 두지 않고 값은 원문 대조로 검증하지만, "
               "추출기를 겨냥한 적응형 공격은 평가하지 않았다.",
+              "- AgentDojo 밖의 벤치마크로 일반화를 검증하지 않았다.",
               "- 유형 H(툴 호출 없는 출력 조작)는 모든 조건에서 남는다. 조건당 1회 실행이다.", ""]
     return lines
+
+
+def write_version_results():
+    for folder, lines in ((V2_FOLDER, v2_results()), (V3_FOLDER, v3_results())):
+        if lines:
+            (folder / "RESULTS.md").write_text("\n".join(lines) + "\n")
 
 
 def v3_summary_bullets() -> list[str]:
@@ -705,7 +768,7 @@ def write_final_report(replay_summary, llm_replay_summaries, live_summaries, enf
     lines = ["# AgentDojo 툴 호출 정책 게이트 — 결과 보고서", "",
              "> 모든 수치는 `scripts/reporting/build_report.py`가 `results/`와 `data/`의 파일에서 생성한다. "
              "게이트 구조와 설계 결정은 [`docs/architecture.md`](architecture.md), "
-             "정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다.", "",
+             "정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다. v2·v3의 세부 결과는 각 폴더의 RESULTS.md에 있다.", "",
              "## 요약", ""]
     lines += summary_bullets(replay_summary, llm_replay_summaries, live_summaries, enforcement_checks, judge)
     lines += v3_summary_bullets() + [""]
@@ -804,8 +867,10 @@ def main():
                           if (LIVE_ROOT / name / "enforcement_check.json").exists()}
     figs = build_figures(replay_summary, live_summaries)
     write_final_report(replay_summary, llm_replay_summaries, live_summaries, enforcement_checks, figs)
+    write_version_results()
     write_dashboard(replay_summary, live_summaries)
-    print("wrote docs/final_report.md", *sorted(f for f in figs.values()), "results/dashboard.html")
+    print("wrote docs/final_report.md", *sorted(f for f in figs.values()), "results/dashboard.html",
+          "v2_detector_trusted_llm/RESULTS.md", "v3_trusted_llm_policy_doc/RESULTS.md")
 
 
 if __name__ == "__main__":

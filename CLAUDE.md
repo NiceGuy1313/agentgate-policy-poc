@@ -38,3 +38,4 @@ python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task
 - 판별기 코드는 `src/agentgate/detector/`, 설정은 `config/detector.yaml`이다. 판별기는 툴 응답에만 돌리고, 정책 코드에는 그 결과(라벨)만 넘긴다.
 - `GatedRuntime(detector=None)`과 v1 설정의 결과는 v1과 같아야 한다. v2 결과는 `results/*/v2/`, `results/detector/v1/`에 둔다.
 - 오래 걸리는 평가(재생 전체, live)는 백그라운드로 돌리고 로그를 `logs/`에 남긴다.
+- 버전별 정리는 `v2_detector_trusted_llm/`, `v3_trusted_llm_policy_doc/`에 있다. 폴더의 코드는 읽기용 사본이므로 원본을 고친 뒤 `python scripts/reporting/sync_version_folders.py`로 다시 만들고, 각 폴더의 RESULTS.md는 `build_report.py`가 생성한다.
