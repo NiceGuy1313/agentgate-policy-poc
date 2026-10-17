@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--model", default=None, help="default AGENTGATE_LLM_MODEL")
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--no-batch", action="store_true",
+                        help="extract cache misses one by one instead of one Message Batches request (50% price)")
     args = parser.parse_args()
     extractor = TaskSpecExtractor(model=args.model, version=taskspec_version(args.version))
     output_root = llm_spec_dir(extractor.model, args.version)
@@ -35,6 +37,9 @@ def main():
         tools = [ToolInfo(**tool) for tool in describe_tools(suite)]
         for task_id, user_task in suite.user_tasks.items():
             jobs.append((suite_name, task_id, user_task.PROMPT, tools))
+
+    if not args.no_batch:   # fills the cache in one batch; run() below then reads it
+        extractor.extract_many([(prompt, tools) for _, _, prompt, tools in jobs])
 
     def run(job):
         suite_name, task_id, prompt, tools = job

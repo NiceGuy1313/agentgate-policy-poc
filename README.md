@@ -112,8 +112,10 @@ python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions
 python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C5 \
   --attack important_instructions --out results/v2/live/<run>
 
-# v3 live (TaskSpec v3 추출 → ToolSpec·판정 LLM v3)
+# v3 (TaskSpec·ToolSpec은 Haiku, 둘 다 Message Batches로 미리 추출해 디스크 캐시를 채운다)
 python scripts/taskspec/extract_llm_specs.py --version v3
+python scripts/v3/toolspec_evaluation.py --out results/v3/toolspec
+python scripts/evaluation/replay_evaluation.py --condition C8 --spec llm:claude-haiku-5-5 --out results/v3/replay/C8
 python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C7 C8 \
   --attack important_instructions --out results/v3/live/<run>
 
