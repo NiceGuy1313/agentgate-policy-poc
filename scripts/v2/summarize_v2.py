@@ -42,6 +42,11 @@ def paired_cell(m: dict) -> str:
     return "-" if not p else f"{100 * p['diff']:+.1f}%p (p={p['p_mcnemar']:.3g})"
 
 
+def _policy_block(event: dict) -> str:
+    ids = sorted({d["policy_id"] for d in event["decisions"] if d["verdict"] == "BLOCK"})
+    return "정책 BLOCK " + ",".join(ids) if ids else "ESCALATE→BLOCK"
+
+
 def analyse(run_dir: Path) -> dict:
     runs = [json.loads(p.read_text()) for p in live_run_files(run_dir)]
     out: dict = {"conditions": {}}
@@ -57,17 +62,27 @@ def analyse(run_dir: Path) -> dict:
                 ids = sorted({d["policy_id"] for d in e["decisions"] if d["verdict"] == "ESCALATE"})
                 final_by_policy[(",".join(ids), e["judge"]["final"])] += 1
         benign = [r for r in cruns if r["injection_task"] is None]
-        lost = Counter()
+        lost, attack_lost = Counter(), Counter()
+        for r in [r for r in cruns if r["injection_task"] is not None]:
+            if r["utility"]:
+                continue
+            blocks = [e for e in r["trace"] if e.get("blocked")]   # enforced only (C0 audit never blocks)
+            if not blocks:
+                attack_lost["실패, 차단 없음"] += 1
+                continue
+            e = blocks[0]
+            attack_lost[f"판정 LLM {e['judge']['final']}" if e.get("judge") else
+                        _policy_block(e)] += 1
         for r in benign:
             if r["utility"]:
                 continue
-            blocks = [e for e in r["trace"] if e.get("effective") == "BLOCK"]
+            blocks = [e for e in r["trace"] if e.get("blocked")]   # enforced only (C0 audit never blocks)
             if not blocks:
                 lost["실패, 차단 없음"] += 1
                 continue
             e = blocks[0]
             lost[f"판정 LLM {e['judge']['final']}" if e.get("judge") else
-                 "정책 BLOCK " + ",".join(sorted({d['policy_id'] for d in e['decisions'] if d['verdict'] == 'BLOCK'}))] += 1
+                 _policy_block(e)] += 1
         detections = [(e["detection"], r["injection_task"] is not None) for r in cruns for e in r["trace"]
                       if e.get("detection")]
         det = Counter()
@@ -86,6 +101,8 @@ def analyse(run_dir: Path) -> dict:
             "escalated_by_policy": dict(escalated), "blocked_by_policy": dict(blocked_by_policy),
             "judge_final_by_policy": {f"{k[0]}→{k[1]}": v for k, v in final_by_policy.items()},
             "benign_lost": dict(lost), "benign_failed": sum(not r["utility"] for r in benign),
+            "attack_lost": dict(attack_lost),
+            "attack_failed": sum(not r["utility"] for r in cruns if r["injection_task"] is not None),
             "detector": {f"{t}/{'flagged' if f else 'not_flagged'}": n for (t, f), n in det.items()},
         }
     specs = {(r["suite"], r["user_task"]): json.dumps(r.get("spec"), sort_keys=True) for r in runs if r.get("spec")}
@@ -173,6 +190,11 @@ def main():
              ", ".join(f"{k} {v}" for k, v in sorted(analysis["conditions"][c]["benign_lost"].items(),
                                                        key=lambda x: -x[1])) or "-"] for c in conditions]
     lines += ["공격 없는 실행에서 user task가 실패한 원인(첫 차단 기준):", ""]
+    lines += table(["조건", "실패", "원인"], rows) + [""]
+    rows = [[c, f"{analysis['conditions'][c]['attack_failed']}/{attack_runs}",
+             ", ".join(f"{k} {v}" for k, v in sorted(analysis["conditions"][c]["attack_lost"].items(),
+                                                       key=lambda x: -x[1])[:6]) or "-"] for c in conditions]
+    lines += ["공격 실행에서 user task가 실패한 원인(첫 차단 기준, 상위 6개):", ""]
     lines += table(["조건", "실패", "원인"], rows) + [""]
 
     lines += ["## 4. 판별기", "", "live 실행의 툴 응답 단위(정답 라벨: 응답 안의 공격 표시 `<INFORMATION>`):", ""]
