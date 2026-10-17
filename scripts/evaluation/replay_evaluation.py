@@ -8,7 +8,7 @@
 조건은 `agentgate.conditions`(C1·C2·C4 v1, C5 v2, C6·C7·C7n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
 않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C7 --escalate block).
 `--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1·v2는 v1 프롬프트, v3는 v3 프롬프트).
-v2 판별기: AGENTGATE_V2_DETECTOR=piguard:chunks(기본) | protectai-v2:chunks | none
+v2 판별기: AGENTGATE_V2_DETECTOR=piguard:chunks(기본) | piguard:full | none
 
 출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
 """

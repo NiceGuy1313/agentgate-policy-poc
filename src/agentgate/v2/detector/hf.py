@@ -1,4 +1,4 @@
-"""Hugging Face 분류 모델 기반 판별기(PIGuard, ProtectAI DeBERTa v2).
+"""Hugging Face 분류 모델 기반 판별기(PIGuard).
 
 모델 이름·리비전·레이블·임계값은 config/v2/detector.yaml에서 읽는다. transformers/torch는 이 모듈을 쓸 때만
 import하므로 판별기를 쓰지 않는 기존 경로(pytest, replay v1)는 추가 의존성 없이 돈다.

@@ -22,7 +22,7 @@ class Span:
 
 @dataclass
 class DetectionResult:
-    detector: str                     # e.g. "piguard", "protectai-v2"
+    detector: str                     # e.g. "piguard"
     mode: str                         # "full" | "chunks"
     score: float                      # max chunk score (injection probability, 0..1)
     flagged: bool                     # score >= threshold

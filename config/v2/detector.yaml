@@ -10,13 +10,6 @@ models:
     injection_label: injection  # id2label {0: benign, 1: injection} (2026-10-15 확인)
     threshold: 0.5
     max_length: 512
-  protectai-v2:                 # 기준선. AgentDojo transformers_pi_detector, LLM Guard PromptInjection 기본 모델과 같음
-    hf_id: protectai/deberta-v3-base-prompt-injection-v2
-    revision: 90c9989b1a342275dd0d1a95aad283c04e075671   # 2026-10-15 main
-    trust_remote_code: false
-    injection_label: INJECTION  # id2label {0: SAFE, 1: INJECTION}
-    threshold: 0.5              # AgentDojo 기본값. LLM Guard 기본값은 0.92
-    max_length: 512
 
 chunking:
   mode: chunks                  # full: 512토큰에서 잘라 한 번만 봄(OSS 기본) | chunks: 겹치는 조각마다 검사

@@ -33,7 +33,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
-    detectors = {name: make_detector(name, "chunks") for name in ("piguard", "protectai-v2")}
+    detectors = {name: make_detector(name, "chunks") for name in ("piguard",)}
     for detector in detectors.values():
         detector.use_cache = False
     scores = {case: {name: round(d.detect(text).score, 4) for name, d in detectors.items()}
