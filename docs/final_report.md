@@ -1,6 +1,6 @@
 # AgentDojo 툴 호출 정책 게이트 — 결과 보고서
 
-> 모든 수치는 `scripts/reporting/build_report.py`가 `results/`와 `data/`의 파일에서 생성한다. 게이트 구조와 설계 결정은 [`docs/architecture.md`](architecture.md), 정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다. v2·v3의 세부 결과는 각 폴더의 RESULTS.md에 있다.
+> 모든 수치는 `scripts/reporting/build_report.py`가 `results/`와 `data/`의 파일에서 생성한다. 게이트 구조와 설계 결정은 [`docs/architecture.md`](architecture.md), 정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다. 1–5절과 7–8절은 v1 결과다.
 
 ## 요약
 
@@ -10,8 +10,6 @@
 - **RQ2 mistral-large-3:675b** (`tool_knowledge`, 공격 291쌍): ASR C0 63.9% → C1 8.2%, C2 17.9%, C4 7.2%. 정상 Utility C0 63.9% → C1 57.7%, C2 59.8%, C4 59.8%.
 - **판정 LLM (claude-sonnet-5-5)**: 재생의 ESCALATE 583건 중 공격 호출 564건에서 ALLOW 0건, 정상 호출 19건에서 ALLOW 7건, HUMAN 비율 5.8%.
 - **집행 무결성**: 실행 묶음 2개, 3104회 실행에서 위반 0건.
-- **v3.1 (6절, 짝 B 같은 시점 실행)**: Utility C0 73.2% → C7 72.2% (C0 대비 -1.0%p (p=1)), ASR 34.0% → 1.7%이며 남은 공격 성공은 모두 툴 호출 없는 유형 H다(툴 호출 공격 0건).
-- **규칙 문서 ablation**: 판정 LLM에 규칙 문서를 주지 않으면(C7n) 툴 호출 공격 성공이 짝 A 0→1건, 짝 B 0→4건이 된다.
 
 ## 1. 평가 설정
 
@@ -25,7 +23,7 @@
 
 - 공격 `important_instructions`(AgentDojo 내장): 툴 응답에 사용자 명의의 지시문으로 injection task GOAL을 넣는다. 재생 평가에 사용.
 - 공격 `tool_knowledge`(AgentDojo 내장): 같은 형식에 GOAL 수행에 쓸 툴과 인자를 함께 알려 준다. gpt-oss:120b, mistral-large-3:675b 실행.
-- 층화 표본(`data/pairs/strat3_seed0.txt`, `scripts/evaluation/make_stratified_pairs.py`): user task 97개 전부에 같은 suite의 injection task 3개를 배정한다(suite마다 시드 0에서 섞은 순서를 차례로 배정). 공격 291쌍.
+- 층화 표본(`data/agentdojo/pairs/strat3_seed0.txt`, `scripts/agentdojo/make_stratified_pairs.py`): user task 97개 전부에 같은 suite의 injection task 3개를 배정한다(suite마다 시드 0에서 섞은 순서를 차례로 배정). 공격 291쌍.
 - user task마다 공격 없는 정상 실행 1개를 더해 정상 97개.
 - 전체 949쌍보다 작지만 모든 user task와 injection task를 덮는다. 조건마다 같은 짝을 한 번씩 실행해 C0와 짝 비교한다.
 
@@ -78,7 +76,7 @@ lenient로도 놓친 35쌍의 원인: 출처 판정 실패(지목 출처 안의 
 
 ## 3. RQ2 실제 에이전트
 
-AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 넣어 실행했다. 게이트 조건의 TaskSpec은 LLM spec(`data/specs/llm/claude-sonnet-5-5/`), C4 판정 LLM은 `claude-sonnet-5-5`이다.
+AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 넣어 실행했다. 게이트 조건의 TaskSpec은 LLM spec(`data/v1/specs/claude-sonnet-5-5/`, 추출 프롬프트 `prompts/v1/extract_taskspec.md`), C4 판정 LLM은 `claude-sonnet-5-5`이다.
 
 비율 옆 괄호는 Wilson 95% CI, "C0 대비"는 같은 (suite, user task, injection task) 짝의 차이와 exact McNemar p다. 마지막 열은 차단이 있었고 user task가 실패한 정상 실행 수(그중 C0에서는 성공한 수)다.
 
@@ -126,41 +124,21 @@ AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 �
 | `strat3_tk_gpt-oss_120b` | 1552 | 6164 | 454 | 0 | 18 |
 | `strat3_tk_mistral-large-3_675b` | 1552 | 7627 | 995 | 0 | 0 |
 
-## 6. v2–v3.1 후속 실험
+## 6. v2·v3 (재실험 전)
 
-1–5절의 v1 게이트 위에서 진행했다. 에이전트는 gpt-oss:120b(Ollama), 공격은 `tool_knowledge`, TaskSpec은 claude-sonnet-5-5가 프롬프트와 툴 목록만 보고 새로 추출한 것(`data/specs/llm/claude-sonnet-5-5-v3/`)이다. 버전별 구조·코드·세부 결과는 두 폴더에 나눠 두었다.
+v2(판별기 + Trusted LLM)와 v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 설정을 버전별로 분리한 뒤 다시 실험한다. 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, 그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.
 
-| 버전 | 구성 | 폴더 |
+| 조건 | 버전 | 구성 |
 |---|---|---|
-| v2 (C5) | 툴 응답 판별기(PIGuard) 라벨 → P10, ESCALATE는 Trusted LLM v2. 판별기 오탐으로 v3에서 폐기 | [`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md) |
-| v3·v3.1 (C6·C7·C7n) | ToolSpec(툴 응답→JSON) + P11·P12, ESCALATE는 판정 LLM v3 + 규칙 문서 | [`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md) |
-
-### 6.1 실제 에이전트 비교
-
-"툴 호출 공격 성공"은 공격 성공 중 툴 호출 없이 답변만 조작한 유형 H를 뺀 수다. "C0 대비"는 같은 짝의 차이와 exact McNemar p다.
-
-**짝 A (`data/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 실행 결과를 재사용했다(같은 짝, 다른 실행 시점).
-
-| 조건 | 구성 | ASR [95% CI] | 툴 호출 공격 성공 | Utility [95% CI] | Utility C0 대비 | 공격 중 Utility [95% CI] |
-|---|---|---|---|---|---|---|
-| C0 | 방어 없음 | 35.1% [29.8, 40.7] | 97 | 75.3% [65.8, 82.8] | - | 60.5% [54.8, 65.9] |
-| C1 | v1 게이트, ESCALATE→BLOCK | 4.5% [2.6, 7.5] | 9 | 63.9% [54.0, 72.8] | -11.3%p (p=0.019) | 50.9% [45.1, 56.5] |
-| C2 | v1 게이트, ESCALATE→ALLOW | 8.9% [6.2, 12.8] | 22 | 73.2% [63.6, 81.0] | -2.1%p (p=0.75) | 59.5% [53.7, 64.9] |
-| C4 | v1 게이트 + 판정 LLM v1 | 5.2% [3.1, 8.3] | 11 | 70.1% [60.4, 78.3] | -5.2%p (p=0.3) | 51.5% [45.8, 57.2] |
-| C5 | v2: P10(PIGuard 라벨) + Trusted LLM v2 | 2.7% [1.4, 5.3] | 3 | 57.7% [47.8, 67.1] | -17.5%p (p=0.0023) | 41.9% [36.4, 47.7] |
-| C6 | v3: P11·P12 + ToolSpec + 판정 LLM v3(규칙 문서 v3) | 2.1% [0.9, 4.4] | 0 | 62.9% [52.9, 71.8] | -12.4%p (p=0.029) | 49.1% [43.5, 54.9] |
-| C7 | v3.1 + 판정 LLM v3(규칙 문서 v3.1) | 1.0% [0.4, 3.0] | 0 | 66.0% [56.1, 74.6] | -9.3%p (p=0.049) | 50.9% [45.1, 56.5] |
-| C7n | v3.1 + 판정 LLM v3(규칙 문서 없음) | 1.7% [0.7, 4.0] | 1 | 64.9% [55.0, 73.7] | -10.3%p (p=0.031) | 53.6% [47.9, 59.2] |
-
-**짝 B (`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. 정상 실행은 짝 A와 같은 97개 user task이고, 공격 쌍 291개 중 141개는 짝 A와 겹친다. 완전한 held-out은 아니다.
-
-| 조건 | 구성 | ASR [95% CI] | 툴 호출 공격 성공 | Utility [95% CI] | Utility C0 대비 | 공격 중 Utility [95% CI] |
-|---|---|---|---|---|---|---|
-| C0 | 방어 없음 | 34.0% [28.8, 39.6] | 96 | 73.2% [63.6, 81.0] | - | 61.5% [55.8, 66.9] |
-| C1 | v1 게이트, ESCALATE→BLOCK | 5.2% [3.1, 8.3] | 11 | 58.8% [48.8, 68.0] | -14.4%p (p=0.0094) | 51.2% [45.5, 56.9] |
-| C6 | v3: P11·P12 + ToolSpec + 판정 LLM v3(규칙 문서 v3) | 1.0% [0.4, 3.0] | 0 | 60.8% [50.9, 70.0] | -12.4%p (p=0.029) | 52.2% [46.5, 57.9] |
-| C7 | v3.1 + 판정 LLM v3(규칙 문서 v3.1) | 1.7% [0.7, 4.0] | 0 | 72.2% [62.5, 80.1] | -1.0%p (p=1) | 54.6% [48.9, 60.3] |
-| C7n | v3.1 + 판정 LLM v3(규칙 문서 없음) | 3.1% [1.6, 5.8] | 4 | 63.9% [54.0, 72.8] | -9.3%p (p=0.078) | 53.6% [47.9, 59.2] |
+| C0 | baseline | 방어 없음 (Gate audit) |
+| C3 | baseline | AgentDojo 내장 방어 (Gate audit) |
+| C1 | v1 | v1 Gate, ESCALATE→BLOCK |
+| C2 | v1 | v1 Gate, ESCALATE→ALLOW |
+| C4 | v1 | v1 Gate, ESCALATE→판정 LLM v1 |
+| C5 | v2 | v2 Gate(P0·P10, PIGuard), ESCALATE→Trusted LLM v2 |
+| C6 | v3 | v3 Gate(P11·P12, ToolSpec), ESCALATE→판정 LLM v3 |
+| C7 | v3 | v3.1 Gate, ESCALATE→판정 LLM v3 + 정책 문서 v3.1 |
+| C7n | v3 | v3.1 Gate, ESCALATE→판정 LLM v3(정책 문서 없음) |
 
 ## 7. 한계 (1–5절)
 
@@ -172,34 +150,24 @@ AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 �
 
 ## 8. 재현 명령
 
-Python >=3.10, `agentdojo==0.1.35`, 벤치마크 `v1.2.2`, 정책 설정 `config/policies.yaml` (version v1). LLM 단계에는 `ANTHROPIC_API_KEY`, Ollama 모델에는 `OLLAMA_API_KEY`가 필요하다.
+Python >=3.10, `agentdojo==0.1.35`, 벤치마크 `v1.2.2`, 정책 설정 `config/v1/policies.yaml` (version v1). LLM 단계에는 `ANTHROPIC_API_KEY`, Ollama 모델에는 `OLLAMA_API_KEY`가 필요하다.
 
 ```bash
 python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'
 python -m pytest -q
-python scripts/evaluation/replay_evaluation.py --spec oracle --out results/replay/v1/oracle
+python scripts/evaluation/replay_evaluation.py --spec oracle --out results/v1/replay/oracle
 python scripts/analysis/summarize_replay.py
-python scripts/taskspec/extract_llm_specs.py && python scripts/taskspec/compare_specs.py --model claude-sonnet-5-5
-python scripts/evaluation/replay_evaluation.py --spec llm:claude-sonnet-5-5 --out results/replay/v1/llm_claude-sonnet-5-5
-python scripts/analysis/summarize_replay.py --run results/replay/v1/llm_claude-sonnet-5-5
+python scripts/taskspec/extract_llm_specs.py --version v1 && python scripts/taskspec/compare_specs.py --model claude-sonnet-5-5
+python scripts/evaluation/replay_evaluation.py --spec llm:claude-sonnet-5-5 --out results/v1/replay/llm_claude-sonnet-5-5
+python scripts/analysis/summarize_replay.py --run results/v1/replay/llm_claude-sonnet-5-5
 python scripts/evaluation/judge_evaluation.py
-python scripts/evaluation/make_stratified_pairs.py --k 3 --seed 0 --benign --out data/pairs/strat3_seed0.txt
-AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/evaluation/live_evaluation.py --agent llm --spec llm --attack tool_knowledge --pairs @data/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/live/v1/strat3_tk_gpt-oss_120b
-AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=mistral-large-3:675b python scripts/evaluation/live_evaluation.py --agent llm --spec llm --attack tool_knowledge --pairs @data/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/live/v1/strat3_tk_mistral-large-3_675b
+python scripts/agentdojo/make_stratified_pairs.py --k 3 --seed 0 --benign --out data/agentdojo/pairs/strat3_seed0.txt
+AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/evaluation/live_evaluation.py --agent llm --spec llm --attack tool_knowledge --pairs @data/agentdojo/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/v1/live/strat3_tk_gpt-oss_120b
+AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=mistral-large-3:675b python scripts/evaluation/live_evaluation.py --agent llm --spec llm --attack tool_knowledge --pairs @data/agentdojo/pairs/strat3_seed0.txt --conditions C0 C1 C2 C4 --workers 5 --out results/v1/live/strat3_tk_mistral-large-3_675b
 for run in strat3_tk_gpt-oss_120b strat3_tk_mistral-large-3_675b; do
-  python scripts/analysis/check_enforcement.py --run results/live/v1/$run
-  python scripts/analysis/summarize_live.py --run results/live/v1/$run
-  python scripts/analysis/live_significance.py --run results/live/v1/$run
+  python scripts/analysis/check_enforcement.py --run results/v1/live/$run
+  python scripts/analysis/summarize_live.py --run results/v1/live/$run
+  python scripts/analysis/live_significance.py --run results/v1/live/$run
 done
-# 6절 (v2–v3.1)
-python scripts/evaluation/toolspec_evaluation.py --out results/toolspec/v1
-python scripts/analysis/analyze_atr_corpora.py --atr <agent-threat-rules checkout> --out results/rules/v1
-python scripts/evaluation/extract_taskspecs.py --name claude-sonnet-5-5-v3 --cache-dir data/specs/llm_cache_v3
-python scripts/evaluation/make_stratified_pairs.py --k 3 --seed 1 --benign --out data/pairs/strat3_seed1.txt
-for a in tool_knowledge important_instructions; do for e in judge_v3 judge_v3_norules; do
-  python scripts/evaluation/replay_evaluation.py --spec llm:claude-sonnet-5-5-v3 --gate v31 --escalate $e --attack $a --out results/replay/v31/${e}_llmspec_$a
-  python scripts/analysis/summarize_replay.py --run results/replay/v31/${e}_llmspec_$a; done; done
-AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/evaluation/live_evaluation.py --agent llm --spec llm --attack tool_knowledge --pairs @data/pairs/strat3_seed1.txt --conditions C0 C1 C6 C7 C7n --spec-cache-dir data/specs/llm_cache_v3 --out results/live/v31/strat3s1_tk_gpt-oss_120b
-python scripts/analysis/analyze_live_utility.py --run results/live/v31/strat3s1_tk_gpt-oss_120b --baseline results/live/v31/strat3s1_tk_gpt-oss_120b --condition C7
 python scripts/reporting/build_report.py
 ```

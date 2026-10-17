@@ -2,12 +2,10 @@
 
   python scripts/reporting/build_report.py
 
-입력: results/replay/v1/{oracle,llm_<model>}/, (6절) results/replay/v3·v31/, results/live/v2·v3·v31/,
-      results/toolspec/v1/, results/rules/v1/, config/policy_rules_v31.yaml,
-      results/live/v1/<run>/{summary,significance,enforcement_check,run_*}.json,
-      results/judge/v1/<model>/judge_eval.json, data/agentdojo/benchmark/, data/agentdojo/pairs/, data/specs/llm/, data/judge_cache/
-출력: docs/final_report.md, results/figures/*.png, results/dashboard.html,
-      v2_detector_trusted_llm/RESULTS.md, v3_trusted_llm_policy_doc/RESULTS.md
+입력: results/v1/replay/{oracle,llm_<model>}/, results/v1/live/<run>/{summary,significance,enforcement_check,run_*}.json,
+      results/v1/judge/<model>/judge_eval.json, data/agentdojo/{benchmark,pairs}/, data/v1/specs/, data/v1/cache/judge/,
+      src/agentgate/conditions.py(6절 조건표)
+출력: docs/final_report.md, results/figures/*.png, results/dashboard.html
 """
 
 from __future__ import annotations
@@ -26,8 +24,8 @@ from agentgate.agentdojo.metrics import TYPE_NAMES, compare_runs
 from agentgate.config import PROJECT_ROOT
 
 DOCS_DIR, FIGURES_DIR = PROJECT_ROOT / "docs", PROJECT_ROOT / "results" / "figures"
-REPLAY_DIR = PROJECT_ROOT / "results/replay/v1/oracle"
-LIVE_ROOT = PROJECT_ROOT / "results/live/v1"
+REPLAY_DIR = PROJECT_ROOT / "results/v1/replay/oracle"
+LIVE_ROOT = PROJECT_ROOT / "results/v1/live"
 PAIRS_FILE = "data/agentdojo/pairs/strat3_seed0.txt"
 CONDITION_LABELS_EN = {"C0": "no defense", "C1": "gate\nESC→block", "C2": "gate\nESC→allow",
                        "C3": "built-in\n(spotlighting)", "C4": "gate\nESC→judge"}
@@ -297,7 +295,7 @@ def setup_section(replay_summary, live_summaries) -> list[str]:
                 if attacks.get("important_instructions") else "") + ".",
              f"- 공격 `tool_knowledge`(AgentDojo 내장): 같은 형식에 GOAL 수행에 쓸 툴과 인자를 함께 알려 준다. "
              f"{', '.join(attacks.get('tool_knowledge', [])) or '-'} 실행.",
-             f"- 층화 표본(`{PAIRS_FILE}`, `scripts/evaluation/make_stratified_pairs.py`): "
+             f"- 층화 표본(`{PAIRS_FILE}`, `scripts/agentdojo/make_stratified_pairs.py`): "
              f"user task {design['users']}개 전부에 같은 suite의 injection task {design['k']}개를 배정한다"
              f"(suite마다 시드 {design['seed']}에서 섞은 순서를 차례로 배정). 공격 {design['attack']}쌍.",
              f"- user task마다 공격 없는 정상 실행 1개를 더해 정상 {design['benign']}개.",
@@ -332,7 +330,7 @@ def rq1_section(replay_summary, llm_replay_summaries, figs) -> list[str]:
              f"재생했다(`important_instructions`, LLM 호출 없음). oracle은 프롬프트만 보고 사람이 쓴 TaskSpec, "
              "LLM 열은 같은 입력으로 추출한 TaskSpec이다."
              + "".join(f" oracle과 LLM {model} spec의 탐지 결과(strict, lenient)가 다른 쌍은 "
-                       f"{len(compare_runs(REPLAY_DIR, PROJECT_ROOT / f'results/replay/v1/llm_{model}'))}쌍이다."
+                       f"{len(compare_runs(REPLAY_DIR, PROJECT_ROOT / f'results/v1/replay/llm_{model}'))}쌍이다."
                        for model in llm_replay_summaries), "",
              markdown_table(["지표"] + [name for name, _ in columns],
                             [[label] + [rows[i][1] for rows in rows_by_column]
@@ -384,13 +382,11 @@ def attack_class_table(live_summaries) -> list[str]:
 
 
 def rq2_section(live_summaries, figs) -> list[str]:
-    # v1 live runs use the v1 extraction; the "-v3" directory belongs to section 6
-    spec_models = ", ".join(p.name for p in sorted((PROJECT_ROOT / "data/specs/llm").iterdir())
-                            if p.is_dir() and not p.name.endswith("-v3"))
-    judge_models = ", ".join(p.name for p in sorted((PROJECT_ROOT / "data/judge_cache").iterdir()) if p.is_dir())
+    spec_models = ", ".join(p.name for p in sorted((PROJECT_ROOT / "data/v1/specs").iterdir()) if p.is_dir())
+    judge_models = ", ".join(p.name for p in sorted((PROJECT_ROOT / "data/v1/cache/judge").iterdir()) if p.is_dir())
     lines = ["## 3. RQ2 실제 에이전트", "",
              "AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 넣어 실행했다. 게이트 조건의 TaskSpec은 "
-             f"LLM spec(`data/specs/llm/{spec_models}/`), C4 판정 LLM은 `{judge_models}`이다.", "",
+             f"LLM spec(`data/v1/specs/{spec_models}/`, 추출 프롬프트 `prompts/v1/extract_taskspec.md`), C4 판정 LLM은 `{judge_models}`이다.", "",
              "비율 옆 괄호는 Wilson 95% CI, \"C0 대비\"는 같은 (suite, user task, injection task) 짝의 차이와 exact McNemar p다. "
              "마지막 열은 차단이 있었고 user task가 실패한 정상 실행 수(그중 C0에서는 성공한 수)다.", ""]
     lines += stratified_table(live_summaries) + [""]
@@ -456,21 +452,21 @@ def reproduce_section(llm_replay_summaries, live_summaries) -> list[str]:
     design = pairs_file_design()
     lines = ["## 8. 재현 명령", "",
              f"Python {tomllib.loads((PROJECT_ROOT / 'pyproject.toml').read_text())['project']['requires-python']}, "
-             f"`agentdojo=={version('agentdojo')}`, 벤치마크 `{BENCHMARK_VERSION}`, 정책 설정 `config/policies.yaml` "
+             f"`agentdojo=={version('agentdojo')}`, 벤치마크 `{BENCHMARK_VERSION}`, 정책 설정 `config/v1/policies.yaml` "
              f"(version {v1.load_config()['version']}). "
              "LLM 단계에는 `ANTHROPIC_API_KEY`, Ollama 모델에는 `OLLAMA_API_KEY`가 필요하다.", "",
              "```bash",
              "python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'",
              "python -m pytest -q",
-             "python scripts/evaluation/replay_evaluation.py --spec oracle --out results/replay/v1/oracle",
+             "python scripts/evaluation/replay_evaluation.py --spec oracle --out results/v1/replay/oracle",
              "python scripts/analysis/summarize_replay.py"]
     for model in llm_replay_summaries:
-        lines += ["python scripts/taskspec/extract_llm_specs.py && "
+        lines += ["python scripts/taskspec/extract_llm_specs.py --version v1 && "
                   f"python scripts/taskspec/compare_specs.py --model {model}",
-                  f"python scripts/evaluation/replay_evaluation.py --spec llm:{model} --out results/replay/v1/llm_{model}",
-                  f"python scripts/analysis/summarize_replay.py --run results/replay/v1/llm_{model}"]
+                  f"python scripts/evaluation/replay_evaluation.py --spec llm:{model} --out results/v1/replay/llm_{model}",
+                  f"python scripts/analysis/summarize_replay.py --run results/v1/replay/llm_{model}"]
     lines += ["python scripts/evaluation/judge_evaluation.py",
-              f"python scripts/evaluation/make_stratified_pairs.py --k {design['k']} --seed {design['seed']} --benign "
+              f"python scripts/agentdojo/make_stratified_pairs.py --k {design['k']} --seed {design['seed']} --benign "
               f"--out {PAIRS_FILE}"]
     for name, summary in live_summaries.items():
         args = load_run_args(name)
@@ -479,305 +475,43 @@ def reproduce_section(llm_replay_summaries, live_summaries) -> list[str]:
                else f"AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL={model}")
         lines.append(f"{env} python scripts/evaluation/live_evaluation.py --agent llm --spec llm "
                      f"--attack {summary.get('attack')} --pairs @{PAIRS_FILE} --conditions {' '.join(summary['conditions'])} "
-                     f"--workers {args.get('workers')} --out results/live/v1/{name}")
+                     f"--workers {args.get('workers')} --out results/v1/live/{name}")
     lines += [f"for run in {' '.join(live_summaries)}; do",
-              "  python scripts/analysis/check_enforcement.py --run results/live/v1/$run",
-              "  python scripts/analysis/summarize_live.py --run results/live/v1/$run",
-              "  python scripts/analysis/live_significance.py --run results/live/v1/$run",
+              "  python scripts/analysis/check_enforcement.py --run results/v1/live/$run",
+              "  python scripts/analysis/summarize_live.py --run results/v1/live/$run",
+              "  python scripts/analysis/live_significance.py --run results/v1/live/$run",
               "done"]
-    lines += ["# 6절 (v2–v3.1)",
-              "python scripts/evaluation/toolspec_evaluation.py --out results/toolspec/v1",
-              "python scripts/analysis/analyze_atr_corpora.py --atr <agent-threat-rules checkout> --out results/rules/v1",
-              "python scripts/evaluation/extract_taskspecs.py --name claude-sonnet-5-5-v3 --cache-dir data/specs/llm_cache_v3",
-              "python scripts/evaluation/make_stratified_pairs.py --k 3 --seed 1 --benign --out data/agentdojo/pairs/strat3_seed1.txt",
-              "for a in tool_knowledge important_instructions; do for e in judge_v3 judge_v3_norules; do",
-              "  python scripts/evaluation/replay_evaluation.py --spec llm:claude-sonnet-5-5-v3 --gate v31 --escalate $e "
-              "--attack $a --out results/replay/v31/${e}_llmspec_$a",
-              "  python scripts/analysis/summarize_replay.py --run results/replay/v31/${e}_llmspec_$a; done; done",
-              "AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/evaluation/live_evaluation.py "
-              "--agent llm --spec llm --attack tool_knowledge --pairs @data/agentdojo/pairs/strat3_seed1.txt "
-              "--conditions C0 C1 C6 C7 C7n --spec-cache-dir data/specs/llm_cache_v3 "
-              "--out results/live/v31/strat3s1_tk_gpt-oss_120b",
-              "python scripts/analysis/analyze_live_utility.py --run results/live/v31/strat3s1_tk_gpt-oss_120b "
-              "--baseline results/live/v31/strat3s1_tk_gpt-oss_120b --condition C7"]
     lines += ["python scripts/reporting/build_report.py", "```"]
     return lines
 
-# ---------------------------------------------------------------------------------------------- v2–v3.1 (section 6)
-V3_REPLAY, V31_REPLAY = PROJECT_ROOT / "results/replay/v3", PROJECT_ROOT / "results/replay/v31"
-V31_SEED0 = PROJECT_ROOT / "results/live/v31/strat3_tk_gpt-oss_120b"     # pairs used to analyse the v3 losses
-V31_SEED1 = PROJECT_ROOT / "results/live/v31/strat3s1_tk_gpt-oss_120b"   # pairs not used for the v3.1 design
-TYPE_H_CLASS = "(a) 툴 호출 없이 성공(유형 H)"
-V3_CONDITION_NAMES = {
-    "C0": "방어 없음", "C1": "v1 게이트, ESCALATE→BLOCK", "C2": "v1 게이트, ESCALATE→ALLOW",
-    "C4": "v1 게이트 + 판정 LLM v1", "C5": "v2: P10(PIGuard 라벨) + Trusted LLM v2",
-    "C6": "v3: P11·P12 + ToolSpec + 판정 LLM v3(규칙 문서 v3)", "C7": "v3.1 + 판정 LLM v3(규칙 문서 v3.1)",
-    "C7n": "v3.1 + 판정 LLM v3(규칙 문서 없음)"}
-REPLAY_V3_RUNS = [("v1 게이트 (P7 공격 문구 포함)", V3_REPLAY, "v1gate_llmspec"),
-                  ("v3", V3_REPLAY, "judge_v3_llmspec"),
-                  ("v3.1 + 규칙 문서", V31_REPLAY, "judge_v3_llmspec"),
-                  ("v3.1, 규칙 문서 없음", V31_REPLAY, "judge_v3_norules_llmspec")]
-
-
-def _pairs(path: Path) -> set[str]:
-    return {line.strip() for line in path.read_text().splitlines() if line.strip()}
-
-
-def _tool_call_successes(summary: dict, significance: dict, condition: str) -> tuple[int, int]:
-    """(all attack successes, successes that needed no tool call = type H)."""
-    k = significance["conditions"][condition]["asr"]["k"]
-    return k, summary["conditions"][condition]["successful_attacks_by_class"].get(TYPE_H_CLASS, 0)
-
-
-def _live_rows(summary: dict, significance: dict, conditions: list[str]) -> list[list]:
-    rows = []
-    for c in conditions:
-        if c not in significance["conditions"]:
-            continue
-        metrics = significance["conditions"][c]
-        total, type_h = _tool_call_successes(summary, significance, c)
-        rows.append([c, V3_CONDITION_NAMES[c], format_ci(metrics["asr"]), total - type_h,
-                     format_ci(metrics["utility"]), format_paired_difference(metrics["utility"]),
-                     format_ci(metrics["utility_under_attack"])])
-    return rows
-
-
-LIVE_HEADER = ["조건", "구성", "ASR [95% CI]", "툴 호출 공격 성공", "Utility [95% CI]", "Utility C0 대비",
-               "공격 중 Utility [95% CI]"]
-
-
-V2_FOLDER, V3_FOLDER = PROJECT_ROOT / "v2_detector_trusted_llm", PROJECT_ROOT / "v3_trusted_llm_policy_doc"
-REPLAY_V2 = PROJECT_ROOT / "results/replay/v2"
-V2_LIVE = PROJECT_ROOT / "results/live/v2/strat3_tk_gpt-oss_120b"
-
-
-def _live_inputs():
-    return (load_json(V31_SEED0 / "comparison_all_summary.json"), load_json(V31_SEED0 / "comparison_all_significance.json"),
-            load_json(V31_SEED1 / "summary.json"), load_json(V31_SEED1 / "significance.json"))
-
-
-def _enforcement_rows(checks: list[tuple[str, Path]]) -> list[list]:
-    return [[label, check["runs"], check["gate_events"], check["blocked_events"], check["violations"]]
-            for label, path in checks if (check := load_json(path / "enforcement_check.json"))]
-
-
-def v3_section() -> list[str]:
-    """final_report 6절: 버전별 구조 요약과 같은 짝의 live 비교. 버전별 세부 결과는 각 폴더의 RESULTS.md."""
-    seed0_summary, seed0_sig, seed1_summary, seed1_sig = _live_inputs()
-    if not all((seed0_summary, seed0_sig, seed1_summary, seed1_sig)):
-        return []
-    s0, s1 = _pairs(PROJECT_ROOT / "data/agentdojo/pairs/strat3_seed0.txt"), _pairs(PROJECT_ROOT / "data/agentdojo/pairs/strat3_seed1.txt")
-    attack0, attack1 = {x for x in s0 if not x.endswith(":none")}, {x for x in s1 if not x.endswith(":none")}
-    return ["## 6. v2–v3.1 후속 실험", "",
-            "1–5절의 v1 게이트 위에서 진행했다. 에이전트는 gpt-oss:120b(Ollama), 공격은 `tool_knowledge`, TaskSpec은 "
-            "claude-sonnet-5-5가 프롬프트와 툴 목록만 보고 새로 추출한 것(`data/specs/llm/claude-sonnet-5-5-v3/`)이다. "
-            "버전별 구조·코드·세부 결과는 두 폴더에 나눠 두었다.", "",
-            markdown_table(["버전", "구성", "폴더"], [
-                ["v2 (C5)", "툴 응답 판별기(PIGuard) 라벨 → P10, ESCALATE는 Trusted LLM v2. 판별기 오탐으로 v3에서 폐기",
-                 "[`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md)"],
-                ["v3·v3.1 (C6·C7·C7n)", "ToolSpec(툴 응답→JSON) + P11·P12, ESCALATE는 판정 LLM v3 + 규칙 문서",
-                 "[`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md)"]]), "",
-            "### 6.1 실제 에이전트 비교", "",
-            "\"툴 호출 공격 성공\"은 공격 성공 중 툴 호출 없이 답변만 조작한 유형 H를 뺀 수다. \"C0 대비\"는 같은 짝의 차이와 "
-            "exact McNemar p다.", "",
-            "**짝 A (`data/agentdojo/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 "
-            "실행 결과를 재사용했다(같은 짝, 다른 실행 시점).", "",
-            markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig, ["C0", "C1", "C2", "C4", "C5", "C6", "C7", "C7n"])),
-            "",
-            f"**짝 B (`data/agentdojo/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. "
-            f"정상 실행은 짝 A와 같은 97개 user task이고, 공격 쌍 {len(attack1)}개 중 {len(attack0 & attack1)}개는 짝 A와 "
-            "겹친다. 완전한 held-out은 아니다.", "",
-            markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), ""]
-
-
-def v2_results() -> list[str]:
-    c5 = load_json(V2_LIVE / "utility_analysis_C5.json")
-    probe = load_json(PROJECT_ROOT / "results/detector/v1/format_probe.json")
-    seed0_summary, seed0_sig, _, _ = _live_inputs()
-    if not all((c5, probe, seed0_summary, seed0_sig)):
-        return []
-    detector = c5["detector_on_benign_runs"]
-    lines = ["# v2 결과: 판별기 + Trusted LLM", "",
-             "> `scripts/reporting/build_report.py`가 생성한다. 손으로 고치지 않는다. 구조는 [README](README.md).", "",
-             "## 1. 판별기 오탐", "",
-             f"live C5의 정상 실행에서 툴 응답 {detector['responses']}개 중 {percent_of(detector['flagged'], detector['responses'])}"
-             "를 PIGuard가 flag했다(`results/live/v2/.../utility_analysis_C5.json`). 많이 flag된 툴:", "",
-             markdown_table(["툴", "flag 수"], [[f"`{t}`", n] for t, n in
-                                                list(detector["flagged_by_tool"].items())[:6]]), "",
-             "같은 내용을 출력 형식만 바꿔 넣은 점수다(`results/detector/v1/format_probe.json`). 판별기는 내용보다 형식에 반응했다.",
-             "", markdown_table(["입력", "PIGuard", "protectai-v2"],
-                                [[f"`{name}`", s["piguard"], s["protectai-v2"]] for name, s in probe["scores"].items()]), ""]
-    rows = []
-    for label, name in (("v1 게이트 (회귀 기준)", "regression_v1_gate"), ("v2, ESCALATE→BLOCK", "c5_block_piguard"),
-                        ("v2, ESCALATE→Trusted LLM v2", "c5_judge_piguard")):
-        summary = load_json(REPLAY_V2 / name / "summary.json")
-        if summary:
-            prevention = summary["prevention"]
-            rows.append([label, percent_of(prevention["prevented"], prevention["baseline_success"]),
-                         percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
-                         percent_of(summary["utility_under_attack"]["enforce"], summary["utility_under_attack"]["n"])])
-    lines += ["## 2. 재생 (oracle TaskSpec, `important_instructions`)", "",
-              markdown_table(["게이트", "저지", "정상 Utility", "공격 중 Utility"], rows), "",
-              "## 3. 실제 에이전트 (짝 A)", "",
-              markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig, ["C0", "C1", "C5"])), "",
-              "## 4. 집행 무결성", "",
-              markdown_table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"], _enforcement_rows([("v2 C5", V2_LIVE)])), "",
-              "## 5. 결론", "",
-              "- 판별기 라벨이 정책의 ALLOW를 덮어써 판단 주체가 정책에서 판별기로 넘어갔고, 정상 작업 손실의 주원인이 되었다.",
-              "- v3부터 판별기를 쓰지 않는다. 툴 응답은 ToolSpec(JSON)으로 바꿔 정책이 판단한다.", ""]
-    return lines
-
-
-def v3_results() -> list[str]:
-    seed0_summary, seed0_sig, seed1_summary, seed1_sig = _live_inputs()
-    toolspec = load_json(PROJECT_ROOT / "results/toolspec/v1/summary.json")
-    atr = load_json(PROJECT_ROOT / "results/rules/v1/atr_taxonomy.json")
-    if not all((seed0_summary, seed0_sig, seed1_summary, seed1_sig, toolspec, atr)):
-        return []
-    rules = yaml.safe_load((PROJECT_ROOT / "config/policy_rules_v31.yaml").read_text())["rules"]
-    indirect = atr["by_kind"]["indirect"]
-    techniques = indirect["techniques"]
-    lines = ["# v3·v3.1 결과: Trusted LLM + 정책 문서", "",
-             "> `scripts/reporting/build_report.py`가 생성한다. 손으로 고치지 않는다. 구조는 [README](README.md), "
-             "다른 조건과의 live 비교는 [`docs/final_report.md`](../docs/final_report.md) 6절.", "",
-             "## 1. 정책 문서의 근거", "",
-             f"`config/policy_rules_v31.yaml`: 코드 집행 조항 {sum(r['layer'] == 'code' for r in rules)}개, 판정 LLM 조항 "
-             f"{sum(r['layer'] == 'judge' for r in rules)}개와 조항별 트리거 인덱스. 근거는 ATR test-corpora "
-             f"(commit `{atr['atr_commit'][:12]}`) 사례 {atr['samples'] - atr['errors']}건(분류 실패 {atr['errors']}건 제외)을 "
-             f"claude-haiku-5-5로 분류한 결과다. 간접 주입 {indirect['n']}건 중 평범한 요청 형태 "
-             f"{techniques.get('ordinary_request_in_data', 0)}건, 권한 사칭 {techniques.get('authority_impersonation', 0)}건, "
-             f"이전 지시 무시 {techniques.get('instruction_override', 0)}건, AI를 지칭함 {indirect['addressed_to_ai']}건이다. "
-             "AgentDojo 공격 문구는 쓰지 않았다. 다만 코드 조항은 AgentDojo 툴 환경에서 설계한 P1–P9를 일반화한 것이고, "
-             "v3.1 수정은 AgentDojo live의 정상 작업 손실을 보고 만들었다.", ""]
-    ts = toolspec["all"]
-    lines += ["## 2. ToolSpec 추출 품질", "",
-              "정답 궤적의 실제 툴 응답(정상, 그리고 공격 2종으로 주입된 응답)에서 '독자에게 하는 요청'을 뽑은 결과다"
-              "(`results/toolspec/v1`).", "",
-              markdown_table(["응답", "개수", "assistant 대상 요청 추출", "요청 하나라도 추출"],
-                             [["주입 응답", ts["injected_responses"],
-                               percent_of(ts["injected_detected_strict"]["n"], ts["injected_detected_strict"]["of"]),
-                               percent_of(ts["injected_detected_any"]["n"], ts["injected_detected_any"]["of"])],
-                              ["정상 응답", ts["benign_responses"],
-                               percent_of(ts["benign_flagged_strict"]["n"], ts["benign_flagged_strict"]["of"]),
-                               percent_of(ts["benign_flagged_any"]["n"], ts["benign_flagged_any"]["of"])]]), "",
-              f"AgentDojo의 주입은 AI를 직접 부르는 문장이다. ATR 간접 주입에서는 {indirect['n'] - indirect['addressed_to_ai']}/"
-              f"{indirect['n']}건이 AI를 지칭하지 않으므로, 이 탐지율을 다른 공격에 그대로 기대할 수는 없다.", ""]
-    rows = []
-    for label, root, prefix in REPLAY_V3_RUNS:
-        for attack in ("tool_knowledge", "important_instructions"):
-            summary = load_json(root / f"{prefix}_{attack}" / "summary.json")
-            if not summary:
-                continue
-            prevention, overall = summary["prevention"], summary["overall"]
-            rows.append([label, f"`{attack}`", percent_of(prevention["prevented"], prevention["baseline_success"]),
-                         percent_of(overall["lenient"], overall["eval"]),
-                         percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
-                         percent_of(summary["utility_under_attack"]["enforce"], summary["utility_under_attack"]["n"]),
-                         sum(len(v) for v in summary["misses"].values())])
-    lines += ["## 3. 재생 (LLM TaskSpec v3)", "",
-              "정답 궤적 재생이다. 네 게이트 모두 같은 TaskSpec을 쓴다. \"놓친 쌍\"은 효과 호출이 BLOCK도 ESCALATE도 "
-              "되지 않은 공격 쌍이다.", "",
-              markdown_table(["게이트", "공격", "저지", "lenient 탐지", "정상 Utility", "공격 중 Utility", "놓친 쌍"], rows), ""]
-    lines += ["## 4. 실제 에이전트", "",
-              markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), "",
-              "짝 B(`data/agentdojo/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)의 같은 시점 실행이다. 짝 A 결과는 "
-              "`docs/final_report.md` 6.1절에 있다.", ""]
-    loss_rows = []
-    for label, path in (("짝 A C6 (v3)", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b/utility_analysis_C6.json"),
-                        ("짝 A C7 (v3.1)", V31_SEED0 / "utility_analysis_C7.json"),
-                        ("짝 B C6 (v3)", V31_SEED1 / "utility_analysis_C6.json"),
-                        ("짝 B C7 (v3.1)", V31_SEED1 / "utility_analysis_C7.json")):
-        analysis = load_json(path)
-        if analysis:
-            pairing = analysis["benign"]["pairing"]
-            loss_rows.append([label, pairing.get("C0=ok cond=fail blocked", 0), pairing.get("C0=ok cond=fail no_block", 0),
-                              pairing.get("C0=fail cond=ok no_block", 0)])
-    if loss_rows:
-        lines += ["정상 실행 97개를 같은 짝의 C0와 비교한 것이다(`scripts/analysis/analyze_live_utility.py`). 차단 없이 갈린 두 열은 "
-                  "에이전트 실행마다의 편차다.", "",
-                  markdown_table(["조건", "C0 성공 → 차단으로 실패", "C0 성공 → 차단 없이 실패", "C0 실패 → 성공"], loss_rows), ""]
-    rule_rows = []
-    for label, summary, significance in (("짝 A", seed0_summary, seed0_sig), ("짝 B", seed1_summary, seed1_sig)):
-        for c in ("C7", "C7n"):
-            total, type_h = _tool_call_successes(summary, significance, c)
-            metrics, cond = significance["conditions"][c], summary["conditions"][c]
-            rule_rows.append([label, f"{c} ({'있음' if c == 'C7' else '없음'})", total - type_h,
-                              short_rate(metrics["utility"]), short_rate(metrics["utility_under_attack"]),
-                              cond["judge_calls"], cond["human_count"], cond["judge_input_tokens_total"]])
-    replay_rule_rows = []
-    for c, prefix in (("있음", "judge_v3_llmspec"), ("없음", "judge_v3_norules_llmspec")):
-        for attack in ("tool_knowledge", "important_instructions"):
-            summary = load_json(V31_REPLAY / f"{prefix}_{attack}" / "summary.json")
-            if summary:
-                prevention = summary["prevention"]
-                replay_rule_rows.append([c, f"`{attack}`", percent_of(prevention["prevented"], prevention["baseline_success"]),
-                                         percent_of(summary["benign"]["utility_enforce"], summary["n_benign"]),
-                                         percent_of(summary["utility_under_attack"]["enforce"],
-                                                    summary["utility_under_attack"]["n"])])
-    lines += ["## 5. 정책 문서의 효과 (C7 vs C7n)", "",
-              "두 조건은 게이트(v3.1)와 판정 LLM에 넘기는 사실(TaskSpec, ToolSpec, 값의 출처)이 같고, 판정 LLM에 규칙 인덱스와 "
-              "조항을 주는지만 다르다. 규칙 문서가 없으면 system 프롬프트가 짧아 프롬프트 캐시가 동작하지 않는다.", "",
-              markdown_table(["짝", "규칙 문서", "툴 호출 공격 성공", "Utility", "공격 중 Utility", "판정 호출", "HUMAN",
-                              "판정 입력 토큰(캐시 제외)"], rule_rows), "",
-              markdown_table(["규칙 문서", "재생 공격", "저지", "정상 Utility", "공격 중 Utility"], replay_rule_rows), ""]
-    lines += ["## 6. 집행 무결성과 한계", "",
-              markdown_table(["실행 묶음", "실행", "게이트 판정", "차단 집행", "위반"], _enforcement_rows(
-                  [("v3 C6", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b"),
-                   ("v3.1 짝 A", V31_SEED0), ("v3.1 짝 B", V31_SEED1)])), "",
-              "- v3.1의 수정은 짝 A의 C6 손실을 보고 만들었다. 짝 B는 공격 쌍 일부만 새롭고 정상 user task는 같다.",
-              "- v3.1 B1은 처음에 지목 자료 안 링크를 판정 없이 P7에 넘기도록 구현했다가, 파일럿에서 주입된 URL 방문이 통과해 "
-              "ESCALATE로 바꿨다. 본 실행은 바꾼 뒤의 결과다.",
-              "- ToolSpec 추출기는 툴 응답을 읽으므로 그 자체가 주입 대상이다. 자유 텍스트 필드를 두지 않고 값은 원문 대조로 검증하지만, "
-              "추출기를 겨냥한 적응형 공격은 평가하지 않았다.",
-              "- AgentDojo 밖의 벤치마크로 일반화를 검증하지 않았다.",
-              "- 유형 H(툴 호출 없는 출력 조작)는 모든 조건에서 남는다. 조건당 1회 실행이다.", ""]
-    return lines
-
-
-def write_version_results():
-    for folder, lines in ((V2_FOLDER, v2_results()), (V3_FOLDER, v3_results())):
-        if lines:
-            (folder / "RESULTS.md").write_text("\n".join(lines) + "\n")
-
-
-def v3_summary_bullets() -> list[str]:
-    seed1_summary, seed1_sig = load_json(V31_SEED1 / "summary.json"), load_json(V31_SEED1 / "significance.json")
-    seed0_summary = load_json(V31_SEED0 / "comparison_all_summary.json")
-    seed0_sig = load_json(V31_SEED0 / "comparison_all_significance.json")
-    if not all((seed1_summary, seed1_sig, seed0_summary, seed0_sig)):
-        return []
-    conditions = seed1_sig["conditions"]
-
-    def tool_attacks(summary, significance, c):
-        total, type_h = _tool_call_successes(summary, significance, c)
-        return total - type_h
-
-    return [f"- **v3.1 (6절, 짝 B 같은 시점 실행)**: Utility C0 {short_rate(conditions['C0']['utility'])} → C7 "
-            f"{short_rate(conditions['C7']['utility'])} (C0 대비 {format_paired_difference(conditions['C7']['utility'])}), "
-            f"ASR {short_rate(conditions['C0']['asr'])} → {short_rate(conditions['C7']['asr'])}이며 남은 공격 성공은 모두 툴 호출 "
-            f"없는 유형 H다(툴 호출 공격 {tool_attacks(seed1_summary, seed1_sig, 'C7')}건).",
-            f"- **규칙 문서 ablation**: 판정 LLM에 규칙 문서를 주지 않으면(C7n) 툴 호출 공격 성공이 짝 A "
-            f"{tool_attacks(seed0_summary, seed0_sig, 'C7')}→{tool_attacks(seed0_summary, seed0_sig, 'C7n')}건, 짝 B "
-            f"{tool_attacks(seed1_summary, seed1_sig, 'C7')}→{tool_attacks(seed1_summary, seed1_sig, 'C7n')}건이 된다."]
-
+# ---------------------------------------------------------------------------------------------- v2·v3 (section 6)
+def versions_section() -> list[str]:
+    """v2·v3는 재실험 전이라 결과가 없다. 구성과 조건만 적는다(조건 정의: src/agentgate/conditions.py)."""
+    from agentgate.conditions import CONDITIONS
+    rows = [[c.name, c.version, c.description] for c in CONDITIONS.values()]
+    return ["## 6. v2·v3 (재실험 전)", "",
+            "v2(판별기 + Trusted LLM)와 v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 설정을 버전별로 분리한 뒤 다시 실험한다. "
+            "이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, "
+            "그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.", "",
+            markdown_table(["조건", "버전", "구성"], rows), ""]
 
 
 def write_final_report(replay_summary, llm_replay_summaries, live_summaries, enforcement_checks, figs):
-    judge_dir = PROJECT_ROOT / "results/judge/v1"
+    judge_dir = PROJECT_ROOT / "results/v1/judge"
     judge = {path.parent.name: load_json(path) for path in sorted(judge_dir.glob("*/judge_eval.json"))}
     lines = ["# AgentDojo 툴 호출 정책 게이트 — 결과 보고서", "",
              "> 모든 수치는 `scripts/reporting/build_report.py`가 `results/`와 `data/`의 파일에서 생성한다. "
              "게이트 구조와 설계 결정은 [`docs/architecture.md`](architecture.md), "
-             "정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다. v2·v3의 세부 결과는 각 폴더의 RESULTS.md에 있다.", "",
+             "정책 P1~P9의 정의는 [`docs/policy_spec.md`](policy_spec.md)에 있다. 1–5절과 7–8절은 v1 결과다.", "",
              "## 요약", ""]
     lines += summary_bullets(replay_summary, llm_replay_summaries, live_summaries, enforcement_checks, judge)
-    lines += v3_summary_bullets() + [""]
+    lines += [""]
     lines += setup_section(replay_summary, live_summaries)
     lines += rq1_section(replay_summary, llm_replay_summaries, figs)
     lines += rq2_section(live_summaries, figs)
     lines += judge_section(judge)
     lines += enforcement_section(enforcement_checks)
-    lines += v3_section()
+    lines += versions_section()
     lines += limitations_section(replay_summary)
     lines += reproduce_section(llm_replay_summaries, live_summaries)
     (DOCS_DIR / "final_report.md").write_text("\n".join(lines) + "\n")
@@ -861,16 +595,14 @@ function v(id){return document.querySelector('#'+id).value.trim()}['s','d','t','
 def main():
     replay_summary = load_json(REPLAY_DIR / "summary.json")
     llm_replay_summaries = {path.parent.name.removeprefix("llm_"): load_json(path)
-                            for path in sorted((PROJECT_ROOT / "results/replay/v1").glob("llm_*/summary.json"))}
+                            for path in sorted((PROJECT_ROOT / "results/v1/replay").glob("llm_*/summary.json"))}
     live_summaries = {path.parent.name: load_json(path) for path in sorted(LIVE_ROOT.glob("strat3_*/summary.json"))}
     enforcement_checks = {name: load_json(LIVE_ROOT / name / "enforcement_check.json") for name in live_summaries
                           if (LIVE_ROOT / name / "enforcement_check.json").exists()}
     figs = build_figures(replay_summary, live_summaries)
     write_final_report(replay_summary, llm_replay_summaries, live_summaries, enforcement_checks, figs)
-    write_version_results()
     write_dashboard(replay_summary, live_summaries)
-    print("wrote docs/final_report.md", *sorted(f for f in figs.values()), "results/dashboard.html",
-          "v2_detector_trusted_llm/RESULTS.md", "v3_trusted_llm_policy_doc/RESULTS.md")
+    print("wrote docs/final_report.md", *sorted(f for f in figs.values()), "results/dashboard.html")
 
 
 if __name__ == "__main__":
