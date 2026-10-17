@@ -95,7 +95,7 @@ python scripts/analysis/summarize_live.py --run results/v1/live/<run>
 
 ## 5. 실험 조건과 재현
 
-조건은 [`src/agentgate/conditions.py`](src/agentgate/conditions.py)에 있다. C0(방어 없음)·C3(AgentDojo 내장 방어)은 기준선, C1·C2·C4는 v1, C5는 v2, C6·C7·C7n은 v3다. 버전을 비교할 때는 같은 실행에 C0을 함께 넣는다.
+조건은 [`src/agentgate/conditions.py`](src/agentgate/conditions.py)에 있다. C0(방어 없음)·C3(AgentDojo 내장 방어)은 기준선, C1·C2·C4는 v1, C5는 v2, C6·C7·C7n·C8은 v3다. C8은 ESCALATE만이 아니라 모든 effect 호출을 판정 LLM이 최종 판단한다. 버전을 비교할 때는 같은 실행에 C0을 함께 넣는다.
 
 규모: AgentDojo v1.2.2는 사용자 작업 97개 × 같은 suite의 injection task(workspace 14, travel 7, banking 9, slack 5) = 공격 쌍 949개다. `--pairs`를 주지 않으면 live도 이 전체(공격 없음 97 + 공격 949)를 돌린다. `--pairs @data/agentdojo/pairs/strat3_seed0.txt`는 사용자 작업마다 공격 3개를 고른 층화 표본(97 + 291)이다.
 
@@ -114,7 +114,7 @@ python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions
 
 # v3 live (TaskSpec v3 추출 → ToolSpec·판정 LLM v3)
 python scripts/taskspec/extract_llm_specs.py --version v3
-python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C6 C7 C7n \
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C7 C8 \
   --attack important_instructions --out results/v3/live/<run>
 
 python scripts/analysis/check_enforcement.py --run results/<version>/live/<run>
@@ -132,7 +132,7 @@ src/agentgate/
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
   llm/           LLM client, TaskSpec 추출기, 판정 LLM 공용 입출력
   v1/  v2/  v3/  버전별 정책·판정 LLM·런타임 확장·조건 조립(experiment.py)
-  conditions.py  실험 조건 등록부 (C0–C7n)
+  conditions.py  실험 조건 등록부 (C0–C8)
 config/          agentdojo/(툴 역할·민감 읽기·지목 자료 규칙), v1/, v2/, v3/, frameworks.yaml
 prompts/         v1/, v2/, v3/
 scripts/         agentdojo · taskspec · evaluation · analysis · reporting · v2 · v3 · cloud

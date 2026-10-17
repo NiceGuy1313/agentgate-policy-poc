@@ -1,4 +1,4 @@
-"""v3 실험 조건(C6, C7, C7n) 런타임 조립. ToolSpec 추출기는 suite마다 하나를 스레드 사이에 공유한다."""
+"""v3 실험 조건(C6, C7, C7n, C8) 런타임 조립. ToolSpec 추출기는 suite마다 하나를 스레드 사이에 공유한다."""
 
 from __future__ import annotations
 
@@ -36,9 +36,10 @@ def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, s
             toolspec_stats["latency_ms"] += 0 if result.cached else result.latency_ms
         return result.spec
 
-    kwargs = {"engine": v3.make_engine(disabled, cond.gate), "toolspec": toolspec}
+    scope = "all" if cond.judge == "v3-all" else "escalate"
+    kwargs = {"engine": v3.make_engine(disabled, cond.gate), "toolspec": toolspec, "judge_scope": scope}
     if escalate == "judge":
         from agentgate.v3.judge import TrustedJudgeV3, as_runtime_judge
-        judge = TrustedJudgeV3(gate=cond.gate, use_rules=cond.judge != "v3-norules")
+        judge = TrustedJudgeV3(gate=cond.gate, use_rules=cond.judge != "v3-norules", scope=scope)
         kwargs["judge"] = as_runtime_judge(judge, prompt)
     return ToolSpecGatedRuntime, kwargs

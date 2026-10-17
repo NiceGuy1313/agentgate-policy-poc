@@ -12,6 +12,7 @@
 | C6  | v3 | P0+P1–P9+P11·P12, ToolSpec, ESCALATE→판정 LLM v3 + 정책 문서 v3 |
 | C7  | v3.1 | v3 + A1·B1·B2·C1·D2, ESCALATE→판정 LLM v3 + 정책 문서 v3.1 |
 | C7n | v3.1 | C7과 같고 판정 LLM에 정책 문서를 주지 않음(ablation) |
+| C8  | v3.1 | v3.1 Gate, 모든 effect 호출과 엔진이 ALLOW하지 않은 호출을 판정 LLM v3가 최종 판단(정책 문서 전체, 엔진 판정은 근거). P0 always_block만 판정 없이 BLOCK |
 
 C0·C3은 버전과 무관한 기준선이다. 버전을 비교할 때는 같은 실행(같은 짝·공격·모델·시점)에 C0을 함께 넣는다.
 """
@@ -29,7 +30,7 @@ class Condition:
     escalate: str         # block | allow | judge
     description: str
     gate: str = "v1"      # policy configuration: v1 | v2 | v3 | v31
-    judge: str | None = None   # v1 | v2 | v3 | v3-norules (escalate == "judge")
+    judge: str | None = None   # v1 | v2 | v3 | v3-norules | v3-all (escalate == "judge")
     defense: str | None = None  # AgentDojo pipeline defense (C3)
     detector: str | None = None  # v2 detector model in config/v2/detector.yaml (None = its default)
 
@@ -53,6 +54,8 @@ CONDITIONS: dict[str, Condition] = {c.name: c for c in [
     Condition("C7", "v3", "enforce", "judge", "v3.1 Gate, ESCALATE→판정 LLM v3 + 정책 문서 v3.1", gate="v31", judge="v3"),
     Condition("C7n", "v3", "enforce", "judge", "v3.1 Gate, ESCALATE→판정 LLM v3(정책 문서 없음)", gate="v31",
               judge="v3-norules"),
+    Condition("C8", "v3", "enforce", "judge", "v3.1 Gate, 모든 effect·엔진 플래그 호출→판정 LLM v3(정책 문서 전체, 최종 판단)",
+              gate="v31", judge="v3-all"),
 ]}
 
 

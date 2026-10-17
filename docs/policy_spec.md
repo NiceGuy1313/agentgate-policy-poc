@@ -83,3 +83,5 @@ v3.1은 v1 클래스를 고치지 않고 서브클래스로 바꾼다(`v3/polici
 | D2 | P0 | `always_human` 툴이라도 `requested_ops`에 있으면 사람 확인 생략 |
 
 판정 LLM v3는 정책 문서(`config/v3/policy.yaml`의 `rules`, v3.1은 `v31.rule_overrides` 적용)의 규칙 인덱스 전체를 system에, 트리거(`policy:<id>`, `tool_class:<분류>`, `signal:<신호>`)로 고른 조항만 user에 받는다. 정책 문서의 근거는 ATR test-corpora 공격 사례 1,139건(전체 1,140건 중 분류 실패 1건 제외)의 분류(`data/v3/atr/atr_taxonomy.json`)이고 규칙마다 `evidence`에 해당 건수를 적었다. `evidence`는 판정 LLM 입력에 들어가지 않는다. AgentDojo 공격 문구는 쓰지 않았다. 판정 LLM은 툴 응답 원문을 보지 않는다.
+
+C8은 판정 범위만 다르다. ESCALATE된 호출만이 아니라 모든 effect 호출(`config/agentdojo/tool_roles.yaml`의 effect)과 엔진이 ALLOW하지 않은 호출을 판정 LLM이 ALLOW / BLOCK / HUMAN으로 최종 판단하고, 엔진 판정은 근거로 넘긴다. 엔진이 BLOCK한 호출도 판정 LLM이 ALLOW할 수 있다. 예외는 P0 `always_block`(판정 없이 BLOCK)과 `always_human`(판정 없이 HUMAN)이다. 엔진이 ALLOW한 읽기 호출은 판정하지 않는다. 트리거 인덱스로 조항을 고르면 엔진이 ALLOW한 `write`·`delete`·`account`·`reservation` 호출에는 J7만 들어가므로(`scripts/v3/rule_coverage.py`), C8은 정책 문서 전체(15개 조항)를 system에 두고 프롬프트 캐시로 재사용하며, 인덱스로 고른 조항은 id 목록으로만 준다.
