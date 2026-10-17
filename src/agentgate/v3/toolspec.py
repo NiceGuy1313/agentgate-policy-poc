@@ -141,7 +141,7 @@ class ToolSpecExtractor:
                       for k, i in missing.items()}
             for key, completion in self.client.run_batch(params).items():
                 if not isinstance(completion, str):
-                    results[missing[key]] = self._finish(completion, items[missing[key]][2], key)
+                    results[missing[key]] = self._finish(completion, items[missing[key]][2], key, batch=True)
         return [r if r is not None else self.extract(*items[i]) for i, r in enumerate(results)]
 
     def extract(self, tool: str, args: dict, output_text: str) -> ToolSpecResult:
@@ -157,8 +157,9 @@ class ToolSpecExtractor:
             return ToolSpecResult(None, self.model, False, error=f"{type(error).__name__}: {error}"[:300])
         return self._finish(completion, output_text, key)
 
-    def _finish(self, completion, output_text: str, key: str) -> ToolSpecResult:
-        result = ToolSpecResult(None, self.model, False, completion.latency_ms, completion.input_tokens,
+    def _finish(self, completion, output_text: str, key: str, batch: bool = False) -> ToolSpecResult:
+        """batch: latency is the whole batch's wall time, so it is not recorded per item (0)."""
+        result = ToolSpecResult(None, self.model, False, 0.0 if batch else completion.latency_ms, completion.input_tokens,
                                 completion.output_tokens, cache_read_input_tokens=completion.cache_read_input_tokens,
                                 cache_creation_input_tokens=completion.cache_creation_input_tokens)
         try:

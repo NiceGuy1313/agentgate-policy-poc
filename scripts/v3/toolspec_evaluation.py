@@ -103,14 +103,16 @@ def main():
     print(f"{len(items)} unique responses "
           f"({sum(i['label'] == 'benign' for i in items)} benign, {sum(i['label'] == 'injected' for i in items)} injected)")
 
-    if not args.no_batch:   # fills the disk cache at 50% price; the rows below then read it
+    batched = {}   # id(item) -> ToolSpecResult from the batch (keeps its token counts; latency is not per item)
+    if not args.no_batch:
         for suite_name, extractor in extractors.items():
             suite_items = [i for i in items if i["suite"] == suite_name]
             if suite_items:
-                extractor.extract_many([(i["tool"], i["args"], i["text"]) for i in suite_items])
+                results = extractor.extract_many([(i["tool"], i["args"], i["text"]) for i in suite_items])
+                batched.update({id(i): r for i, r in zip(suite_items, results)})
 
     def run(item):
-        result = extractors[item["suite"]].extract(item["tool"], item["args"], item["text"])
+        result = batched.get(id(item)) or extractors[item["suite"]].extract(item["tool"], item["args"], item["text"])
         return {**{k: v for k, v in item.items() if k != "text"}, "chars": len(item["text"]), "spec": result.spec,
                 "error": result.error, "cached": result.cached, "dropped_values": result.dropped_values,
                 "input_tokens": 0 if result.cached else result.input_tokens,
@@ -168,6 +170,7 @@ def main():
     summary["errors"] = sum(r["error"] is not None for r in rows)
     summary["dropped_values"] = sum(r["dropped_values"] for r in rows)
     summary["api_calls"] = sum(not r["cached"] and r["error"] is None for r in rows)
+    summary["batch_extracted"] = sum(not r["cached"] and not r["latency_ms"] for r in rows)
     summary["input_tokens"] = sum(r["input_tokens"] for r in rows)
     summary["output_tokens"] = sum(r["output_tokens"] for r in rows)
     latencies = sorted(r["latency_ms"] for r in rows if r["latency_ms"])
