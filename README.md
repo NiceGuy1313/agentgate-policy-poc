@@ -116,7 +116,7 @@ python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions
 python scripts/taskspec/extract_llm_specs.py --version v3
 python scripts/v3/toolspec_evaluation.py --out results/v3/toolspec
 python scripts/evaluation/replay_evaluation.py --condition C8 --spec llm:claude-haiku-5-5 --out results/v3/replay/C8
-python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C7 C8 \
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C8b C8n C8 \
   --attack important_instructions --out results/v3/live/<run>
 
 python scripts/analysis/check_enforcement.py --run results/<version>/live/<run>

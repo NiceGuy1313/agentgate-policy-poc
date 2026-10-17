@@ -105,3 +105,21 @@ def test_all_scope_prompt_has_whole_rule_document_and_engine_findings(tmp_path, 
     assert "Rules indexed for this call" in request["user"]
     assert request["cache_system"] and request["user"].startswith(request["cache_user_prefix"])
     assert "## Input 2" not in request["cache_user_prefix"]
+
+
+def test_c8n_and_c8b_conditions():
+    assert (get_condition("C8n").gate, get_condition("C8n").judge) == ("v31", "v3-all-norules")
+    assert (get_condition("C8b").gate, get_condition("C8b").escalate, get_condition("C8b").judge) == ("v31", "block", None)
+
+
+def test_all_scope_without_rule_document(tmp_path, monkeypatch):
+    monkeypatch.setattr(judge_module, "CACHE_DIR", tmp_path)
+    client = StubClient()
+    judge = judge_module.TrustedJudgeV3(client=client, gate="v31", use_rules=False, scope="all")
+    runtime = ToolSpecGatedRuntime((), prompt="Pay the bill.", spec=TaskSpec(), engine=v3.make_engine(gate="v31"))
+    record = judge(ToolCall("send_money", {"recipient": "X", "amount": 1}), EngineResult(Verdict.ALLOW, []),
+                   runtime.context, "Pay the bill.")
+    request = client.requests[0]
+    assert record["judge"] == "v3-all-norules"
+    assert not any(f"{r['id']} [" in request["system"] + request["user"] for r in v3.load_rules("v31"))
+    assert "policy engine verdict: ALLOW" in request["user"] and "Rules indexed" not in request["user"]

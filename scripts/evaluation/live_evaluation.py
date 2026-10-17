@@ -149,7 +149,7 @@ def run_one(job: dict) -> str:
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
         "judge": (stats["judge_object"].stats if "judge_object" in stats
-                  else _judge_stats(runtime) if cond.judge in ("v2", "v3", "v3-norules", "v3-all") else None),
+                  else _judge_stats(runtime) if cond.judge in ("v2", "v3", "v3-norules", "v3-all", "v3-all-norules") else None),
         "toolspec": stats.get("toolspec") if cond.gate in ("v3", "v31") else None,
         "trace": runtime.trace_records(),
     }
