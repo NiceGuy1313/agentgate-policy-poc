@@ -8,7 +8,7 @@ run별 검사 항목:
      거부하는 호출(알 수 없는 툴·빈 이름)은 제외하고, ToolsExecutionLoop 반복 한도에서 요청된 호출은 실행되지
      않으므로 따로 센다.
 
-사용법: python scripts/analysis/check_enforcement.py --run results/live/v1/<name>
+사용법: python scripts/analysis/check_enforcement.py --run results/v1/live/<name>
 출력: <run>/enforcement_check.json
 """
 
@@ -53,7 +53,7 @@ def unexecuted_requests(run: dict) -> int:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", required=True, help="results/live/<ver>/<name>")
+    parser.add_argument("--run", required=True, help="results/<version>/live/<name>")
     args = parser.parse_args()
     run_dir = PROJECT_ROOT / args.run
     files = live_run_files(run_dir)

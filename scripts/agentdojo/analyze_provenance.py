@@ -4,7 +4,7 @@ LLM 호출 없음.
 입력: data/agentdojo/benchmark/{user_tasks,injection_tasks}.json, injection_labels.yaml (extract_benchmark.py 선행)
 출력(data/agentdojo/benchmark/): label_check.json, arg_provenance.json, provenance_summary.json, attacker_dest_check.json
 
-사용법: python scripts/benchmark/analyze_provenance.py
+사용법: python scripts/agentdojo/analyze_provenance.py
 """
 
 from __future__ import annotations

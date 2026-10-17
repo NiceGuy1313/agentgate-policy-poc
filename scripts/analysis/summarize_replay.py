@@ -1,10 +1,10 @@
 """재생 평가의 지표, ablation, 실패 분석을 계산해 <run>/summary.json에 쓴다.
 
-사용법: python scripts/analysis/summarize_replay.py --run results/replay/v1/oracle [--compare results/replay/v1/llm_<model>]
+사용법: python scripts/analysis/summarize_replay.py --run results/v1/replay/oracle [--compare results/v1/replay/llm_<model>]
 
-v2 실행(판별기 라벨이나 Trusted LLM v2 판정이 trace에 있음)이면 summary.json에 "v2" 절을 더한다(명세서.md Phase 3):
+v2 실행(판별기 라벨이나 Trusted LLM v2 판정이 trace에 있음)이면 summary.json에 "v2" 절을 더한다:
 v1 misses·escalate_only_pairs가 v2에서 어떻게 끝났는지, 정상 태스크의 차단 증가분(원인별), 판정 LLM·판별기 지연.
-기준 v1 결과는 --baseline(기본 results/replay/v1/oracle).
+기준 v1 결과는 --baseline(기본 results/v1/replay/oracle).
 """
 
 from __future__ import annotations
@@ -309,9 +309,9 @@ def summarize_v2(run_dir: Path, baseline_dir: Path) -> dict:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", default="results/replay/v1/oracle")
+    parser.add_argument("--run", default="results/v1/replay/oracle")
     parser.add_argument("--compare", default=None)
-    parser.add_argument("--baseline", default="results/replay/v1/oracle", help="v1 run for the v2 comparison")
+    parser.add_argument("--baseline", default="results/v1/replay/oracle", help="v1 run for the v2 comparison")
     args = parser.parse_args()
     run_dir = PROJECT_ROOT / args.run
     summary = summarize(run_dir)

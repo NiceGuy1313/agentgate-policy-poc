@@ -4,8 +4,8 @@
 차단된 호출마다 원인(게이트 BLOCK 정책, 판정 LLM BLOCK·HUMAN, ④, P0)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
 판별기 오탐은 정상(주입 없음) run의 응답 중 flagged 비율로 본다.
 
-사용법: python scripts/analysis/analyze_live_utility.py --run results/live/v2/strat3_tk_gpt-oss_120b \
-          --baseline results/live/v1/strat3_tk_gpt-oss_120b --condition C5
+사용법: python scripts/analysis/analyze_live_utility.py --run results/v2/live/strat3_tk_gpt-oss_120b \
+          --baseline results/v1/live/strat3_tk_gpt-oss_120b --condition C5
 run 폴더에 <condition>/가 없으면 runs.tar.gz를 임시 폴더에 풀어 읽는다. 출력: <run>/utility_analysis_<condition>.json
 """
 

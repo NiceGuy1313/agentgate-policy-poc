@@ -1,6 +1,6 @@
 # 정책 규칙 문서 v3: 인덱스 + 조항.
 # 원칙: 규칙의 입력은 사용자 프롬프트에서 뽑은 TaskSpec, 툴 응답에서 뽑은 ToolSpec(JSON), 툴 스키마, 값의 출처뿐이다.
-#       특정 벤치마크의 공격 문구·파일명·주소는 쓰지 않는다. 근거는 ATR test-corpora 분류(results/rules/v1/atr_taxonomy.json).
+#       특정 벤치마크의 공격 문구·파일명·주소는 쓰지 않는다. 근거는 ATR test-corpora 분류(data/v3/atr/atr_taxonomy.json).
 # layer: code  = 정책 엔진이 결정론으로 집행 (ALLOW/BLOCK/ESCALATE)
 #        judge = ESCALATE된 호출에만 판정 LLM이 적용 (ALLOW/BLOCK/HUMAN)
 # triggers: 판정 LLM에 어떤 조항을 넘길지 고르는 인덱스 키. 코드가 사실(facts)에서 키를 계산해 해당 조항만 넣는다.

@@ -5,7 +5,7 @@
   data/agentdojo/benchmark/injection_tasks.json   (ground truth 호출에 `role` 필드: prep | effect)
   data/agentdojo/benchmark/tools.json             (suite 툴 목록: name, description, parameters)
 
-사용법: python scripts/benchmark/extract_benchmark.py
+사용법: python scripts/agentdojo/extract_benchmark.py
 """
 
 from __future__ import annotations

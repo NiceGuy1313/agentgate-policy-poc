@@ -1,4 +1,4 @@
-"""클라우드 환경 점검(명세서.md Phase 0). 설치, AgentDojo suite 로딩, 네트워크, API 키 유무를 한 번에 확인한다.
+"""클라우드 환경 점검. 설치, AgentDojo suite 로딩, 네트워크, API 키 유무를 한 번에 확인한다.
 
 사용법: python scripts/cloud/check_env.py      # 키 값은 출력하지 않고 설정 여부만 보인다
 """

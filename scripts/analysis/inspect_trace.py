@@ -5,8 +5,8 @@
   python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task_0 [--mode enforce] [--spec oracle]
   # benign task (injection 없음)
   python scripts/analysis/inspect_trace.py benign workspace user_task_25
-  # 저장된 live run 하나 (먼저 results/live/v1/<run>/runs.tar.gz 압축 해제)
-  python scripts/analysis/inspect_trace.py live results/live/v1/<run>/C1/banking/user_task_0/injection_task_7.json
+  # 저장된 live run 하나 (먼저 results/v1/live/<run>/runs.tar.gz 압축 해제)
+  python scripts/analysis/inspect_trace.py live results/v1/live/<run>/C1/banking/user_task_0/injection_task_7.json
   # 가상의 단일 호출에 대한 엔진 판정
   python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/agentdojo/oracle_specs/banking/user_task_0.yaml \\
       --tool send_money --args '{"recipient": "US133000000121212121212", "amount": 10, "subject": "x", "date": "d"}'

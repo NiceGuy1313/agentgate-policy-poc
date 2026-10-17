@@ -6,7 +6,7 @@
   - 차이의 95% 구간: 한 user task의 run들은 독립이 아니므로 user task 단위 cluster bootstrap(suite별 층화)으로 계산
 게이트 기인 실패(차단 호출이 있고 user task를 실패한 run, 그중 C0에서는 성공한 run)와 차단 정책도 집계한다.
 
-사용법: python scripts/analysis/live_significance.py --run results/live/v1/<name>
+사용법: python scripts/analysis/live_significance.py --run results/v1/live/<name>
 출력: <run>/significance.json. 오류가 난 run은 제외한다(대응 검정에서는 쌍 단위로 제외).
 """
 

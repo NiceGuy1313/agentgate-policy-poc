@@ -1,6 +1,6 @@
 """live run의 조건별 지표, 우회·행동 분석, 비용 추정을 계산한다.
 
-사용법: python scripts/analysis/summarize_live.py --run results/live/v1/<name> [--price-in 3 --price-out 15]
+사용법: python scripts/analysis/summarize_live.py --run results/v1/live/<name> [--price-in 3 --price-out 15]
 출력: <run>/summary.json
 """
 
@@ -148,7 +148,7 @@ def summarize(run_dir: Path, price_in: float | None, price_out: float | None) ->
                                         for d in e["decisions"] if d["verdict"] != "ALLOW"})
             lost.append({"task": f"{task_key[0]}/{task_key[1]}", "blocked_by": blocking_policies})
     summary["utility_lost_C1"] = lost
-    replay_summary = PROJECT_ROOT / "results/replay/v1/oracle/summary.json"
+    replay_summary = PROJECT_ROOT / "results/v1/replay/oracle/summary.json"
     if replay_summary.exists():
         replay_lost = set(json.loads(replay_summary.read_text()).get("utility_lost_enforce", []))
         live_lost = {x["task"] for x in lost}

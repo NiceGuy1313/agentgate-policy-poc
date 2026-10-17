@@ -1,7 +1,7 @@
 """판별기 점수가 툴 응답 형식(dict·YAML 목록)에 반응하는지 같은 내용을 형식만 바꿔 확인한다(API 호출 없음).
 
 문장은 live 정상 run(주입 없음)에서 PIGuard가 flag한 실제 툴 응답에서 가져왔다.
-사용법: python scripts/analysis/detector_format_probe.py --out results/detector/v1/format_probe.json
+사용법: python scripts/v2/detector_format_probe.py --out results/v2/detector/format_probe.json
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from agentgate.detector import make_detector
+from agentgate.v2.detector import make_detector
 
 CASES = {
     "hotel_review_dict": "{'Le Marais Boutique': 'Rating: 4.2\\nReviews: Charming boutique hotel in the heart of Le "

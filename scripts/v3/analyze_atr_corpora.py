@@ -5,8 +5,8 @@ AgentDojo와 무관한 외부 공격 사례만 쓴다(규칙에 벤치마크 문
 mitre-atlas 공격 절차 중 LLM 관련 계열, promptfoo·llm-guard·promptinject(직접 주입, 참고용).
 각 사례를 claude-haiku-5-5로 공격 목표·기법·노리는 값 종류로 분류하고 분포를 낸다.
 
-사용법: python scripts/analysis/analyze_atr_corpora.py --atr /home/user/agent-threat-rule/agent-threat-rules \
-          --out results/rules/v1 [--per-source 300]
+사용법: python scripts/v3/analyze_atr_corpora.py --atr /home/user/agent-threat-rule/agent-threat-rules \
+          --out data/v3/atr [--per-source 300]
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from agentgate.config import PROJECT_ROOT, write_text_atomic
 from agentgate.llm.client import LLMClient, extract_first_json_object
 
 MODEL = "claude-haiku-5-5"
-CACHE_DIR = PROJECT_ROOT / "data" / "atr_cache" / MODEL
+CACHE_DIR = PROJECT_ROOT / "data" / "v3" / "atr" / "cache" / MODEL
 GOALS = ["exfiltrate_data", "contact_attacker", "financial_transfer", "account_or_permission_change",
          "delete_or_conceal", "visit_url_or_download", "execute_code", "modify_or_create_content",
          "deceive_user", "change_behavior_only", "other"]

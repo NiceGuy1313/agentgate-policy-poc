@@ -1,10 +1,10 @@
 """정답 궤적 재생에서 나온 모든 ESCALATE에 판정 LLM(escalation judge)만 단독으로 적용해 평가한다(RQ1).
 
-선행 조건: results/replay/v1/oracle/*_audit.jsonl(재생 평가 결과), 판정 LLM 키(.env) 또는 data/judge_cache/.
+선행 조건: results/v1/replay/oracle/*_audit.jsonl(재생 평가 결과), 판정 LLM 키(.env) 또는 data/v1/cache/judge/.
 
 상향된 호출별 정답 레이블: 공격 쌍 재생에서 injection task의 effect 호출이면 `attack`, benign(injection 없음)
 재생에서 나온 호출이면 `normal`이다.
-출력: results/judge/v1/<model>/judge_eval.json (A/B/C confusion matrix와 HUMAN 비율)
+출력: results/v1/judge/<model>/judge_eval.json (A/B/C confusion matrix와 HUMAN 비율)
 
 사용법: python scripts/evaluation/judge_evaluation.py [--suites banking] [--max-pairs 0]
 """
@@ -34,7 +34,7 @@ def main():
         judge = EscalationJudge()
     except RuntimeError as error:
         raise SystemExit(f"not run: {error}")
-    replay_dir = PROJECT_ROOT / "results/replay/v1/oracle"
+    replay_dir = PROJECT_ROOT / "results/v1/replay/oracle"
     records = []
 
     def collect(run, label_fn):
@@ -96,7 +96,7 @@ def main():
               "confusion_final": {f"{k[0]}->{k[1]}": v for k, v in sorted(final_confusion.items())},
               "human_rate": sum(x["human"] for x in records) / len(records) if records else None,
               "stats": judge.stats, "records": records}
-    output_dir = PROJECT_ROOT / "results/judge/v1" / judge.model.replace("/", "_")
+    output_dir = PROJECT_ROOT / "results/v1/judge" / judge.model.replace("/", "_")
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "judge_eval.json").write_text(json.dumps(result, indent=1, ensure_ascii=False, default=str))
     print(json.dumps({k: v for k, v in result.items() if k != "records"}, indent=1))

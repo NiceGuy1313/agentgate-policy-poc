@@ -25,7 +25,7 @@ if ! $PY -c "import agentgate, agentdojo, fastapi" 2>/dev/null; then
   $PY -m pip install -q -e '.[dev,dashboard]' || echo "WARN: base install failed"
 fi
 
-# 2) 판별기 의존성. CPU torch는 download.pytorch.org가 허용 목록에 있어야 한다(명세서.md 1.2). 없으면 PyPI로 대체
+# 2) 판별기 의존성. CPU torch는 download.pytorch.org가 허용 목록에 있어야 한다. 없으면 PyPI로 대체
 if ! $PY -c "import torch, transformers" 2>/dev/null; then
   $PY -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu \
     || { echo "WARN: CPU torch index unreachable, falling back to PyPI torch"; $PY -m pip install -q torch; }
@@ -37,7 +37,7 @@ export HF_HOME="${HF_HOME:-$ROOT/.hf_cache}"
 $PY - <<'EOF' || echo "WARN: model download failed (huggingface.co allowed?)"
 import yaml
 from huggingface_hub import snapshot_download
-for name, model in yaml.safe_load(open("config/detector.yaml"))["models"].items():
+for name, model in yaml.safe_load(open("config/v2/detector.yaml"))["models"].items():
     print(name, snapshot_download(model["hf_id"], revision=model.get("revision")))
 EOF
 

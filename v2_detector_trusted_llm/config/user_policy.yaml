@@ -1,7 +1,0 @@
-# 사용자 고정 설정(명세서.md 3.3). TaskSpec(태스크별 범위)과 합집합으로 쓰는 P0의 입력이다.
-# always_block: 어떤 태스크에서도 실행하지 않음 → BLOCK
-# always_human: 요청이 있어도 사람 확인 → ESCALATE(force_human) → 최종 HUMAN(평가에서는 BLOCK으로 집행, 따로 집계)
-# 정상 97 태스크 중 delete_file은 workspace user_task_35·38, update_password는 banking user_task_14가 쓴다.
-version: v1
-always_block: []
-always_human: [delete_file, update_password]

@@ -12,7 +12,7 @@
   - 공격 목표 행동 일치: 추출된 요청의 action이 injection task 정답 궤적의 툴과 같은 비율
   - 원문에 없어서 버린 값 수, 오류 수, 토큰
 
-사용법: python scripts/evaluation/toolspec_evaluation.py --out results/toolspec/v1 [--attacks important_instructions tool_knowledge]
+사용법: python scripts/v3/toolspec_evaluation.py --out results/v3/toolspec [--attacks important_instructions tool_knowledge]
 """
 
 from __future__ import annotations

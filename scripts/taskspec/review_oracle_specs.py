@@ -21,7 +21,7 @@ OPS_POLICED = set(v1.load_config()["P6"]["tools"]) | set(v1.load_config()["P8"][
 
 def _p2_blocked_calls() -> set[tuple[str, str, str]]:
     """(suite, task, tool) where the benign oracle replay got a P2 BLOCK."""
-    path = PROJECT_ROOT / "results/replay/v1/oracle/benign_audit.jsonl"
+    path = PROJECT_ROOT / "results/v1/replay/oracle/benign_audit.jsonl"
     blocked = set()
     if path.exists():
         for line in path.open():
