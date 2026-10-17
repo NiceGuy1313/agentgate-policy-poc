@@ -79,20 +79,67 @@ class LLMClient:
             import openai
             self._client = openai.OpenAI()
 
-    def complete(self, system: str, user: str, max_tokens: int = 16000, cache_system: bool = False) -> Completion:
-        """`cache_system`: mark the system prompt as a prompt-cache breakpoint (anthropic only). Worth it only when
-        the system prompt is identical across calls and above the model's minimum cacheable length."""
+    def anthropic_params(self, system: str, user: str, max_tokens: int = 16000, cache_system: bool = False,
+                         cache_user_prefix: str | None = None) -> dict:
+        """Messages API parameters (also used as Batches API request params).
+
+        `cache_system`: prompt-cache breakpoint on the system prompt. `cache_user_prefix`: a second breakpoint after
+        this leading part of the user message (e.g. instructions + tool list that repeat across tasks). The minimum
+        cacheable prefix on claude-sonnet-5-5 / claude-haiku-5-5 is 512 tokens; shorter prefixes are not cached.
+        """
+        system_param = ([{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+                        if cache_system else system)
+        if cache_user_prefix and user.startswith(cache_user_prefix) and len(user) > len(cache_user_prefix):
+            content = [{"type": "text", "text": cache_user_prefix, "cache_control": {"type": "ephemeral"}},
+                       {"type": "text", "text": user[len(cache_user_prefix):]}]
+        else:
+            content = user
+        params = dict(model=self.model, system=system_param, max_tokens=max_tokens,
+                      messages=[{"role": "user", "content": content}])
+        if supports_temperature(self.model):
+            params["temperature"] = self.temperature
+        else:
+            params["output_config"] = {"effort": self.effort}
+        return params
+
+    def run_batch(self, requests_by_id: dict[str, dict], poll_s: float = 20.0) -> dict[str, Completion | str]:
+        """Message Batches API (anthropic only, 50% price): {custom_id: params} -> {custom_id: Completion | error}.
+
+        custom_id must match [a-zA-Z0-9_-]{1,64}. Results arrive in any order and are keyed by custom_id.
+        Server-side refusal fallbacks are not accepted on the Batches API, so they are not sent.
+        """
+        if self.provider != "anthropic":
+            raise ValueError("batches need the anthropic provider")
+        from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+        from anthropic.types.messages.batch_create_params import Request
+        start = time.perf_counter()
+        batch = self._client.messages.batches.create(requests=[
+            Request(custom_id=cid, params=MessageCreateParamsNonStreaming(**params))
+            for cid, params in requests_by_id.items()])
+        while batch.processing_status != "ended":
+            time.sleep(poll_s)
+            batch = self._client.messages.batches.retrieve(batch.id)
+        elapsed = (time.perf_counter() - start) * 1000
+        out: dict[str, Completion | str] = {}
+        for result in self._client.messages.batches.results(batch.id):
+            if result.result.type != "succeeded":
+                out[result.custom_id] = f"batch {result.result.type}"
+                continue
+            message = result.result.message
+            usage = message.usage
+            out[result.custom_id] = Completion(
+                "".join(b.text for b in message.content if getattr(b, "type", "") == "text"), self.model, elapsed,
+                usage.input_tokens, usage.output_tokens, message.stop_reason, getattr(message, "model", self.model),
+                getattr(usage, "cache_read_input_tokens", 0) or 0, getattr(usage, "cache_creation_input_tokens", 0) or 0)
+        return out
+
+    def complete(self, system: str, user: str, max_tokens: int = 16000, cache_system: bool = False,
+                 cache_user_prefix: str | None = None) -> Completion:
+        """`cache_system` / `cache_user_prefix`: prompt-cache breakpoints (anthropic only), see anthropic_params."""
         start = time.perf_counter()
         cache_read = cache_creation = 0
         if self.provider == "anthropic":
-            system_param = ([{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-                            if cache_system else system)
-            request_kwargs = dict(model=self.model, system=system_param, max_tokens=max_tokens,
-                                  messages=[{"role": "user", "content": user}])
-            if supports_temperature(self.model):
-                request_kwargs["temperature"] = self.temperature
-            else:
-                request_kwargs["output_config"] = {"effort": self.effort}
+            request_kwargs = self.anthropic_params(system, user, max_tokens, cache_system, cache_user_prefix)
             if self.fallbacks and not supports_temperature(self.model) and supports_server_fallback(self.model):
                 response = self._client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default",
                                                              **request_kwargs)

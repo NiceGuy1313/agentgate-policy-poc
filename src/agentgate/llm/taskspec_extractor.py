@@ -88,21 +88,64 @@ class TaskSpecExtractor:
             self._client = LLMClient(model=self.model)
         return self._client
 
+    def _cached(self, path: Path) -> ExtractionResult | None:
+        if not path.exists():
+            return None
+        cached = json.loads(path.read_text())
+        spec = TaskSpec.model_validate(cached["spec"]) if cached.get("spec") else None
+        return ExtractionResult(spec, cached["model"], True, cached["latency_ms"], cached["input_tokens"],
+                                cached["output_tokens"], cached["attempts"], cached.get("error"), cached.get("raw", []))
+
+    def _write(self, path: Path, result: ExtractionResult) -> None:
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        record = asdict(result)
+        record["spec"] = result.spec.model_dump() if result.spec else None
+        write_text_atomic(path, json.dumps(record, indent=1, ensure_ascii=False))
+
+    def cache_prefix(self, user_prompt: str) -> str | None:
+        """Instructions + tool list (identical for every task of a suite): the prompt-cache prefix."""
+        marker = "<request>\n"
+        return user_prompt[: user_prompt.index(marker) + len(marker)] if marker in user_prompt else None
+
+    def extract_many(self, items: list[tuple[str, list[ToolInfo]]], batch: bool = True) -> list[ExtractionResult]:
+        """Extract several requests. Cache misses go through one Message Batches request (50% price) when the
+        provider is anthropic; a reply that does not validate is retried once with the synchronous path."""
+        keys = [compute_cache_key(prompt, tools, self.model, self.template_path) for prompt, tools in items]
+        results: list[ExtractionResult | None] = [self._cached(self.cache_dir / f"{k}.json") for k in keys]
+        missing = {k: i for i, (k, r) in enumerate(zip(keys, results)) if r is None}
+        if missing and batch and self.client.provider == "anthropic":
+            params = {}
+            for key, i in missing.items():
+                user_prompt = render_extraction_prompt(items[i][0], items[i][1], self.template_path)
+                params[key] = self.client.anthropic_params(SYSTEM_PROMPT, user_prompt, 16000,
+                                                           cache_user_prefix=self.cache_prefix(user_prompt))
+            for key, completion in self.client.run_batch(params).items():
+                i = missing[key]
+                if isinstance(completion, str):
+                    continue
+                result = ExtractionResult(None, self.model, False, completion.latency_ms, completion.input_tokens,
+                                          completion.output_tokens, 1, None, [completion.text])
+                try:
+                    result.spec = TaskSpec.model_validate(json.loads(extract_first_json_object(completion.text)))
+                except (ValueError, ValidationError):
+                    continue   # the synchronous path below retries it
+                self._write(self.cache_dir / f"{key}.json", result)
+                results[i] = result
+        return [r if r is not None else self.extract(*items[i]) for i, r in enumerate(results)]
+
     def extract(self, prompt: str, tools: list[ToolInfo]) -> ExtractionResult:
         key = compute_cache_key(prompt, tools, self.model, self.template_path)
         path = self.cache_dir / f"{key}.json"
-        if path.exists():
-            cached = json.loads(path.read_text())
-            spec = TaskSpec.model_validate(cached["spec"]) if cached.get("spec") else None
-            return ExtractionResult(spec, cached["model"], True, cached["latency_ms"], cached["input_tokens"],
-                                    cached["output_tokens"], cached["attempts"], cached.get("error"),
-                                    cached.get("raw", []))
+        cached = self._cached(path)
+        if cached is not None:
+            return cached
         user_prompt = render_extraction_prompt(prompt, tools, self.template_path)
         result = ExtractionResult(None, self.model, False)
         for attempt in (1, 2):   # validation failure -> one retry, then record the error
             completion = self.client.complete(SYSTEM_PROMPT, user_prompt if attempt == 1 else
                                               user_prompt + "\n\nYour previous reply was not valid. "
-                                              "Reply with the JSON object only.")
+                                              "Reply with the JSON object only.",
+                                              cache_user_prefix=self.cache_prefix(user_prompt))
             result.attempts = attempt
             result.latency_ms += completion.latency_ms
             result.input_tokens += completion.input_tokens
@@ -114,8 +157,5 @@ class TaskSpecExtractor:
                 break
             except (ValueError, ValidationError) as error:
                 result.error = f"{type(error).__name__}: {error}"[:500]
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        record = asdict(result)
-        record["spec"] = result.spec.model_dump() if result.spec else None
-        write_text_atomic(path, json.dumps(record, indent=1, ensure_ascii=False))
+        self._write(path, result)
         return result

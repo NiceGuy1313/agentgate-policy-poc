@@ -166,16 +166,15 @@ def _extract_specs_once(jobs: list[dict]) -> None:
     keys = sorted({(j["suite"], j["user_task"], taskspec_version(get_condition(j["cond"]).gate
                                                                  if get_condition(j["cond"]).gated else j["spec_version"]))
                    for j in jobs if j.get("framework", "native") == "native"})
-    extractors = {v: TaskSpecExtractor(version=v) for v in {k[2] for k in keys}}
-
-    def extract(key):
-        suite_name, user_task_id, version = key
-        suite = load_suite(suite_name)
-        tools = [ToolInfo(**tool) for tool in describe_tools(suite)]
-        return extractors[version].extract(suite.get_user_task_by_id(user_task_id).PROMPT, tools)
-
-    with ThreadPoolExecutor(8) as executor:
-        results = list(executor.map(extract, keys))
+    results = []
+    for version in sorted({k[2] for k in keys}):
+        items = []
+        for suite_name, user_task_id, _ in [k for k in keys if k[2] == version]:
+            suite = load_suite(suite_name)
+            items.append((suite.get_user_task_by_id(user_task_id).PROMPT,
+                          [ToolInfo(**tool) for tool in describe_tools(suite)]))
+        # one Message Batches request for every cache miss (anthropic): 50% price, prompt-cached tool list
+        results += TaskSpecExtractor(version=version).extract_many(items)
     print(f"TaskSpec: {len(keys)} extracted ({sum(not r.cached for r in results)} live, "
           f"{sum(r.spec is None for r in results)} failed) -> {os.environ['AGENTGATE_TASKSPEC_CACHE_DIR']}")
 

@@ -28,7 +28,7 @@ class FakeClient:
     def __init__(self, text):
         self.text, self.calls = text, 0
 
-    def complete(self, system, user, max_tokens=0, cache_system=False):
+    def complete(self, system, user, max_tokens=0, cache_system=False, cache_user_prefix=None):
         self.calls += 1
         self.systems = getattr(self, "systems", []) + [(system, cache_system)]
         return Completion(self.text, self.model, 1.0, 10, 2)

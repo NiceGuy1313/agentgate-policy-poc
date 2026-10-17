@@ -124,7 +124,10 @@ class TrustedJudgeV2:
         if path.exists():
             record = {**json.loads(path.read_text()), "cached": True}
         else:
-            completion = self.client.complete(system_prompt, user_prompt, max_tokens=4000, cache_system=True)
+            # Input 1 (TaskSpec + fixed settings) repeats for every escalation of a task: cache it after the system
+            prefix = user_prompt.split("## Input 2", 1)[0] if "## Input 2" in user_prompt else None
+            completion = self.client.complete(system_prompt, user_prompt, max_tokens=4000, cache_system=True,
+                                              cache_user_prefix=prefix)
             record = {"answer": parse_trusted_answer(completion.text), "text": completion.text.strip()[:400],
                       "latency_ms": completion.latency_ms, "input_tokens": completion.input_tokens,
                       "output_tokens": completion.output_tokens, "served_model": completion.served_model,

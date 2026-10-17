@@ -15,7 +15,7 @@ class FakeClient:
     def __init__(self, replies, model="fake-model"):
         self.replies, self.model, self.calls = list(replies), model, []
 
-    def complete(self, system, user, max_tokens=1024):
+    def complete(self, system, user, max_tokens=1024, **kwargs):
         self.calls.append((system, user))
         return Completion(self.replies.pop(0), self.model, 5.0, 100, 20)
 
@@ -82,3 +82,29 @@ def test_judge_end_to_end_with_fake_client(tmp_path, monkeypatch):
     judge = escalation_judge.EscalationJudge(FakeClient(["B\nThe IBAN sits inside injected instructions."]))
     output = judge(call, result, context, "Pay the bill bill.txt")
     assert output["verdict"] == "BLOCK" and not output["human"] and judge.stats["calls"] == 1
+
+
+def test_extract_many_uses_one_batch_for_misses(tmp_path):
+    class BatchClient:
+        model, provider = "fake", "anthropic"
+
+        def __init__(self):
+            self.batches = []
+
+        def anthropic_params(self, system, user, max_tokens, cache_user_prefix=None):
+            assert cache_user_prefix and user.startswith(cache_user_prefix) and "<request>" in cache_user_prefix
+            return {"user": user}
+
+        def run_batch(self, requests_by_id):
+            from agentgate.llm.client import Completion
+            self.batches.append(len(requests_by_id))
+            return {cid: Completion('{"requested_ops": ["send_email"]}', "fake", 1.0, 10, 2)
+                    for cid in requests_by_id}
+
+    client = BatchClient()
+    extractor = taskspec_extractor.TaskSpecExtractor(client, cache_dir=tmp_path)
+    tools = [taskspec_extractor.ToolInfo(name="send_email", description="Send")]
+    first = extractor.extract_many([("mail bob", tools), ("mail alice", tools)])
+    assert client.batches == [2] and all(r.spec.requested_ops == ["send_email"] for r in first)
+    again = extractor.extract_many([("mail bob", tools), ("mail alice", tools)])
+    assert client.batches == [2] and all(r.cached for r in again)
