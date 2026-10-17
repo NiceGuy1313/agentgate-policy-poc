@@ -7,7 +7,8 @@
 | C1  | v1 | P1–P9, ESCALATE→BLOCK |
 | C2  | v1 | P1–P9, ESCALATE→ALLOW |
 | C4  | v1 | P1–P9, ESCALATE→판정 LLM v1 |
-| C5  | v2 | P0+P1–P10, PIGuard 판별기, ESCALATE→Trusted LLM v2 + 규칙 ④ |
+| C5  | v2 | P0+P1–P10, 판별기 horizon-base, ESCALATE→Trusted LLM v2 (HUMAN→BLOCK) |
+| C5p | v2 | C5와 같고 판별기만 PIGuard |
 | C6  | v3 | P0+P1–P9+P11·P12, ToolSpec, ESCALATE→판정 LLM v3 + 정책 문서 v3 |
 | C7  | v3.1 | v3 + A1·B1·B2·C1·D2, ESCALATE→판정 LLM v3 + 정책 문서 v3.1 |
 | C7n | v3.1 | C7과 같고 판정 LLM에 정책 문서를 주지 않음(ablation) |
@@ -30,6 +31,7 @@ class Condition:
     gate: str = "v1"      # policy configuration: v1 | v2 | v3 | v31
     judge: str | None = None   # v1 | v2 | v3 | v3-norules (escalate == "judge")
     defense: str | None = None  # AgentDojo pipeline defense (C3)
+    detector: str | None = None  # v2 detector model in config/v2/detector.yaml (None = its default)
 
     @property
     def gated(self) -> bool:
@@ -43,7 +45,10 @@ CONDITIONS: dict[str, Condition] = {c.name: c for c in [
     Condition("C1", "v1", "enforce", "block", "v1 Gate, ESCALATE→BLOCK"),
     Condition("C2", "v1", "enforce", "allow", "v1 Gate, ESCALATE→ALLOW"),
     Condition("C4", "v1", "enforce", "judge", "v1 Gate, ESCALATE→판정 LLM v1", judge="v1"),
-    Condition("C5", "v2", "enforce", "judge", "v2 Gate(P0·P10, PIGuard), ESCALATE→Trusted LLM v2", gate="v2", judge="v2"),
+    Condition("C5", "v2", "enforce", "judge", "v2 Gate(P0·P10, horizon-base), ESCALATE→Trusted LLM v2", gate="v2",
+              judge="v2", detector="horizon-base"),
+    Condition("C5p", "v2", "enforce", "judge", "v2 Gate(P0·P10, PIGuard), ESCALATE→Trusted LLM v2", gate="v2",
+              judge="v2", detector="piguard"),
     Condition("C6", "v3", "enforce", "judge", "v3 Gate(P11·P12, ToolSpec), ESCALATE→판정 LLM v3", gate="v3", judge="v3"),
     Condition("C7", "v3", "enforce", "judge", "v3.1 Gate, ESCALATE→판정 LLM v3 + 정책 문서 v3.1", gate="v31", judge="v3"),
     Condition("C7n", "v3", "enforce", "judge", "v3.1 Gate, ESCALATE→판정 LLM v3(정책 문서 없음)", gate="v31",

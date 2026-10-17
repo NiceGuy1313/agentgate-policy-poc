@@ -46,11 +46,12 @@ def test_value_in_clean_chunk_of_flagged_response_still_escalates(synth):
     assert decision.evidence["detection"]["in_suspicious_span"] is False
 
 
-def test_other_tool_value_in_suspicious_chunk_blocks(synth):
+def test_other_tool_value_in_suspicious_window_escalates_never_blocks(synth):
     trace = _trace(synth, "Summarize my inbox.")
     text = SAFE + INJ
     _read(trace, "get_received_emails", {}, text, [(0, len(SAFE), 0.01), (len(SAFE), len(text), 0.99)])
-    assert trace.by("get_webpage", "P10", url="www.evil-site.com").verdict == Verdict.BLOCK
+    decision = trace.by("get_webpage", "P10", url="www.evil-site.com")
+    assert decision.verdict == Verdict.ESCALATE and decision.evidence["detection"]["in_suspicious_span"]
 
 
 def test_unflagged_response_gives_no_decision(synth):

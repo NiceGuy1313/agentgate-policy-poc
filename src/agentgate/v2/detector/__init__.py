@@ -26,11 +26,15 @@ def make_detector(name: str | None = None, mode: str | None = None, threshold: f
     args = (model["hf_id"], model.get("revision"), model["injection_label"], model.get("trust_remote_code", False))
     if mode == "windows":
         window, stride = model.get("window_tokens", 2048), model.get("stride_tokens", 512)
-        return HFDetector(name, None, threshold, mode, cache_key=f"{name}@{model.get('revision') or 'main'}|{window}|{stride}",
-                          window_scorer=load_hf_window_scorer(*args, window, stride))
-    scorer = load_hf_scorer(*args, model.get("max_length", 512))
-    return HFDetector(name, scorer, threshold, mode, chunking["chunk_chars"], chunking["overlap_chars"],
-                      cache_key=f"{name}@{model.get('revision') or 'main'}")
+        detector = HFDetector(name, None, threshold, mode,
+                              cache_key=f"{name}@{model.get('revision') or 'main'}|{window}|{stride}",
+                              window_scorer=load_hf_window_scorer(*args, window, stride))
+    else:
+        detector = HFDetector(name, load_hf_scorer(*args, model.get("max_length", 512)), threshold, mode,
+                              chunking["chunk_chars"], chunking["overlap_chars"],
+                              cache_key=f"{name}@{model.get('revision') or 'main'}")
+    detector.input_format = model.get("input_format", "raw")
+    return detector
 
 
 __all__ = ["DetectionResult", "Detector", "HFDetector", "Span", "load_detector_config", "make_detector"]

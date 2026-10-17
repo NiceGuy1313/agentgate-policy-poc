@@ -74,3 +74,12 @@ def test_default_detector_is_horizon_windows():
     model = config["models"][config["default"]]
     assert config["default"] == "horizon-base" and model["mode"] == "windows"
     assert model["hf_id"] == "Horizon-Labs/prompt-injection-guard-base" and model["injection_label"] == "INJECTION"
+
+
+def test_plain_input_keeps_values_and_drops_structure():
+    from agentgate.v2.detector.inputs import prepare_input
+    raw = [{"id_": "1", "sender": "bob@corp.com", "body": "See www.x.com", "read": True},
+           {"id_": "2", "sender": "eve@evil.com", "body": "Hello"}]
+    text = prepare_input("plain", raw, "ignored")
+    assert text == "1\nbob@corp.com\nSee www.x.com\n\n2\neve@evil.com\nHello"
+    assert prepare_input("raw", raw, "YAML TEXT") == "YAML TEXT"

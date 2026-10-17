@@ -18,6 +18,10 @@ class _SharedDetector:
         self._detector = make_detector(name, mode)
         self._lock = threading.Lock()
 
+    @property
+    def input_format(self) -> str:
+        return self._detector.input_format
+
     def detect(self, text: str):
         with self._lock:
             return self._detector.detect(text)
@@ -31,9 +35,9 @@ def shared_detector(name: str | None = None, mode: str | None = None):
 
 
 def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, stats=None):
-    """Detector: AGENTGATE_V2_DETECTOR=name[:mode] from config/v2/detector.yaml (empty = its default model and mode),
+    """Detector: the condition's model (C5 horizon-base, C5p piguard). AGENTGATE_V2_DETECTOR=name[:mode] overrides it,
     "none" = no detector (P10 never fires)."""
-    choice = os.environ.get("AGENTGATE_V2_DETECTOR") or ""
+    choice = os.environ.get("AGENTGATE_V2_DETECTOR") or (cond.detector or "")
     detector = None
     if choice != "none":
         name, _, mode = choice.partition(":")

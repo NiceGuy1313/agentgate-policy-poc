@@ -109,3 +109,7 @@ reversibility:
 runtime:
   escalate_action: block       # block | allow | judge
   min_string_field_len: 4      # ValueIndex: minimum length of indexed string field values
+
+# ---- v2 판별기·판정 LLM ---------------------------------------------------------------------
+v2:
+  rule4: false                 # 규칙 ④(되돌릴 수 없는 툴 + 판별기 경고면 판정 LLM ALLOW도 HUMAN). 끔

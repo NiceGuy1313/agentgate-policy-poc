@@ -96,17 +96,27 @@ def test_cache_and_mapping(synth, tmp_path, monkeypatch):
     assert first["final"] == second["final"] == "BLOCK" and client.calls == 1 and second["cached"]
 
 
-def _runtime_with_judge(judgement):
+def _runtime_with_judge(judgement, rule4=False):
     suite = load_suite("slack")
-    runtime = DetectorGatedRuntime(suite.tools, prompt="p", spec=TaskSpec(), engine=v2.make_engine(),
+    engine = v2.make_engine()
+    engine.config["v2"] = {"rule4": rule4}
+    runtime = DetectorGatedRuntime(suite.tools, prompt="p", spec=TaskSpec(), engine=engine,
                            mode="enforce", escalate_action="judge", judge=lambda c, r, ctx: dict(judgement))
     runtime.engine.decide = lambda call, ctx: EngineResult(Verdict.ESCALATE, [])
     return suite, runtime
 
 
-def test_rule4_irreversible_with_warning_becomes_human():
+def test_rule4_off_by_default_keeps_judge_allow():
     suite, runtime = _runtime_with_judge({"final": "ALLOW", "verdict": "ALLOW", "detector_warning": True,
                                           "reversibility": "irreversible"})
+    env = suite.load_and_inject_default_environment({})
+    runtime.run_function(env, "send_direct_message", {"recipient": "Alice", "body": "hi"})
+    assert runtime.trace[-1].executed and "rule4" not in runtime.trace[-1].decision["judge"]
+
+
+def test_rule4_irreversible_with_warning_becomes_human_when_enabled():
+    suite, runtime = _runtime_with_judge({"final": "ALLOW", "verdict": "ALLOW", "detector_warning": True,
+                                          "reversibility": "irreversible"}, rule4=True)
     env = suite.load_and_inject_default_environment({})
     runtime.run_function(env, "send_direct_message", {"recipient": "Alice", "body": "hi"})
     judge = runtime.trace[-1].decision["judge"]

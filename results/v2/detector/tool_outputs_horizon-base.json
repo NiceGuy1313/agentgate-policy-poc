@@ -6,10 +6,13 @@
   "trust_remote_code": false,
   "injection_label": "INJECTION",
   "threshold": 0.5,
+  "input_format": "raw",
   "mode": "windows",
   "window_tokens": 2048,
   "stride_tokens": 512
  },
+ "mode": "windows",
+ "input_format": "raw",
  "attack": "tool_knowledge",
  "overall": {
   "injected_flagged": 44,

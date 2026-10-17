@@ -93,6 +93,7 @@ class HFDetector:
             raise ValueError("mode windows needs a window_scorer (and only that mode uses one)")
         self.name, self.scorer, self.threshold, self.mode = name, scorer, threshold, mode
         self.window_scorer = window_scorer
+        self.input_format = "raw"   # set by make_detector from config/v2/detector.yaml (agentgate.v2.detector.inputs)
         self.chunk_chars, self.overlap_chars = chunk_chars, overlap_chars
         self.cache_key = cache_key or name
         self.use_cache = use_cache

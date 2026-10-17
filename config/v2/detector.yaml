@@ -9,6 +9,7 @@ models:
     trust_remote_code: false
     injection_label: INJECTION  # id2label {0: SAFE, 1: INJECTION}
     threshold: 0.5              # 모델 카드 기본값. 비신뢰 콘텐츠에는 0.5 이하 권장
+    input_format: raw           # 모델 카드 예시: 툴 출력 원문을 그대로 넣는다(난독화 정규화는 토크나이저에 포함)
     mode: windows               # 모델 카드의 긴 입력 방식: 토큰 창마다 점수, 응답 점수는 창 최고값
     window_tokens: 2048
     stride_tokens: 512          # 창 사이 겹치는 토큰 수
@@ -18,7 +19,11 @@ models:
     trust_remote_code: true
     injection_label: injection  # id2label {0: benign, 1: injection} (2026-10-15 확인)
     threshold: 0.5
-    max_length: 512
+    max_length: 512             # max_position_embeddings 512 (토크나이저 model_max_length는 제한 없음 → 직접 지정)
+    input_format: plain         # 사용자 프롬프트 형태로 학습(모델 카드). 구조화 형식에 오탐하므로 레코드별 평문
+    mode: windows
+    window_tokens: 512
+    stride_tokens: 128
 
 chunking:                       # 모델 항목에 mode가 없을 때 쓰는 기본값
   mode: chunks                  # full: max_length에서 잘라 한 번만 봄 | chunks: 글자 조각마다 | windows: 토큰 창마다

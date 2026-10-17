@@ -1,15 +1,12 @@
-"""Trusted LLM v2: ESCALATE를 세 가지 입력으로 ALLOW / BLOCK / HUMAN으로 해소한다.
+"""Trusted LLM v2: ESCALATE를 ALLOW / BLOCK / HUMAN으로 해소한다. HUMAN은 BLOCK으로 집행한다.
 
-입력 1 허용 범위: 사용자 프롬프트, TaskSpec 필드, 사용자 고정 설정(config/v2/user_policy.yaml)
-입력 2 대기 중 호출: 툴, 되돌림 가능 여부, ESCALATE를 낸 정책과 이유, 인자 전부(400자 절단, <data>)와 인자별 출처
-입력 3 판별 결과: 인자 출처 응답의 점수, 값이 속한 조각 점수, 의심 조각 발췌(최대 3개, 240자, <data>)
-툴 응답 전문은 넣지 않는다. 해석 실패는 HUMAN이다. C4 재현을 위해 EscalationJudge(v1)는 그대로 둔다.
+입력 1 허용 범위: TaskSpec(사용자 요청에서 추출)과 사용자 고정 설정(config/v2/user_policy.yaml의 always_block,
+       always_human). 사용자 프롬프트 원문과 ESCALATE 이유는 넣지 않는다.
+입력 2 대기 중 호출: 툴, 되돌림 가능 여부, 인자(400자 절단, <data>)와 인자별 출처
+입력 3 판별 결과: 인자 출처 응답의 점수, 값이 속한 창 점수, 의심 구간 발췌(최대 3개, 240자, <data>)
+툴 응답 전문은 넣지 않는다. 해석 실패는 HUMAN이다.
 
-프롬프트 배치(layout "cached"): 고정 지시문 전부를 system(prompts/trusted_judge_system.md)에 두고 Anthropic prompt
-caching breakpoint를 단다. user 메시지(prompts/trusted_judge.md)에는 호출마다 바뀌는 세 입력만 넣는다. 고정 부분은
-약 660토큰으로 claude-sonnet-5-5의 최소 캐시 길이(512)를 넘으므로, 5분 안에 이어지는 호출은 이 부분을 캐시 읽기
-가격(기본 입력가의 0.1배)으로 낸다.
-
+고정 지시문은 system(prompts/v2/trusted_judge_system.md)에 두고 Anthropic prompt caching breakpoint를 단다.
 답 캐시: data/v2/cache/judge/<model>/<system+user 해시>.json (같은 입력의 재실행은 API를 부르지 않음)
 """
 
@@ -77,8 +74,6 @@ def build_trusted_facts(call: ToolCall, result: EngineResult, context: PolicyCon
 def render_trusted_prompt(facts: dict) -> str:
     scope = "\n".join(f"- {k}: {json.dumps(v, ensure_ascii=False)}" for k, v in facts["scope"].items())
     user_policy = "\n".join(f"- {k}: {json.dumps(v)}" for k, v in facts["user_policy"].items())
-    escalations = "\n".join(f"  - {e['policy_id']} {e['verdict']}: {e['reason']}" for e in facts["escalations"]) \
-        or "  - (none)"
     argument_lines = []
     for argument in facts["arguments"]:
         argument_lines.append(f"  - `{argument['name']}` = {data_block(argument['value'], VALUE_CHARS)}")
@@ -94,8 +89,7 @@ def render_trusted_prompt(facts: dict) -> str:
                                f"flagged={d['flagged']}, suspicious chunks={d['suspicious_spans']}")
         detection_lines += [f"  excerpt: {data_block(x, EXCERPT_CHARS)}" for x in d["excerpts"]]
     return PROMPT_TEMPLATE_PATH.read_text().format(
-        prompt=facts["prompt"], scope=scope, user_policy=user_policy, tool=facts["tool"],
-        reversibility=facts["reversibility"], escalations=escalations,
+        scope=scope, user_policy=user_policy, tool=facts["tool"], reversibility=facts["reversibility"],
         arguments="\n".join(argument_lines) or "  - (no arguments)",
         detection="\n".join(detection_lines) or "(no argument comes from a tool response)")
 

@@ -21,16 +21,21 @@ from agentgate import SUITES
 from agentgate.agentdojo.replay import ATTACK_MARKER, build_injections
 from agentgate.agentdojo.suites import load_suite, task_number
 from agentgate.v2.detector import load_detector_config, make_detector
+from agentgate.v2.detector.inputs import prepare_input
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--detector", default=None, help="model name in config/v2/detector.yaml (default: its default)")
     parser.add_argument("--attack", default="tool_knowledge")
+    parser.add_argument("--mode", default=None, help="override the model's mode (windows | chunks | full)")
+    parser.add_argument("--input-format", default=None, help="override the model's input_format (raw | plain)")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     name = args.detector or load_detector_config()["default"]
-    detector = make_detector(name)
+    model_config = load_detector_config()["models"][name]
+    input_format = args.input_format or model_config.get("input_format", "raw")
+    detector = make_detector(name, args.mode)
     counts, misses, false_alarms, seen = Counter(), [], [], set()
     for suite_name in SUITES:
         suite = load_suite(suite_name)
@@ -44,11 +49,11 @@ def main():
                     output, error = runtime.run_function(env, call.function, call.args)
                     if error:
                         continue
-                    text = tool_result_to_str(output)
+                    text = prepare_input(input_format, output, tool_result_to_str(output))
                     if (suite_name, text) in seen:
                         continue
                     seen.add((suite_name, text))
-                    injected = ATTACK_MARKER in text
+                    injected = ATTACK_MARKER in tool_result_to_str(output)
                     result = detector.detect(text)
                     counts[(suite_name, injected, result.flagged)] += 1
                     case = {"suite": suite_name, "user_task": user_task_id, "tool": call.function,
@@ -65,13 +70,14 @@ def main():
         negatives = sum(counts[(s, False, f)] for s in keys for f in (True, False))
         return {"injected_flagged": tp, "injected": positives, "clean_flagged": fp, "clean": negatives}
 
-    summary = {"detector": name, "model": load_detector_config()["models"][name], "attack": args.attack,
+    summary = {"detector": name, "model": model_config, "mode": detector.mode, "input_format": input_format,
+               "attack": args.attack,
                "overall": rates(SUITES), "by_suite": {s: rates([s]) for s in SUITES},
                "misses": misses, "false_alarms": false_alarms}
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(summary, indent=1, ensure_ascii=False))
     o = summary["overall"]
-    print(f"{name}: injected {o['injected_flagged']}/{o['injected']} flagged, clean {o['clean_flagged']}/{o['clean']} flagged")
+    print(f"{name} ({detector.mode}, {input_format}): injected {o['injected_flagged']}/{o['injected']} flagged, clean {o['clean_flagged']}/{o['clean']} flagged")
 
 
 if __name__ == "__main__":

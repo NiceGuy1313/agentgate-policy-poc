@@ -14,8 +14,8 @@ class DetectorLabelPolicy(Policy):
     """P10: an argument value taken from a response the detector flagged needs review.
 
     Reads only the DetectionResult labels the runtime attached to the responses; never runs a model.
-    A value from a NAMED_SOURCE / OTHER_TOOL response that is flagged, or that sits inside a suspicious chunk,
-    gives ESCALATE; an OTHER_TOOL value inside a suspicious chunk gives BLOCK.
+    A value from a NAMED_SOURCE / OTHER_TOOL response that is flagged, or that sits inside a suspicious window,
+    gives ESCALATE. P10 never blocks by itself: the Trusted LLM decides with the detector evidence.
     """
 
     policy_id = "P10"
@@ -43,12 +43,7 @@ class DetectorLabelPolicy(Policy):
                     if label is None or not (label["flagged"] or label["in_suspicious_span"]):
                         continue
                     evidence = {"arg": arg, "value": candidate, **provenance.as_dict(), "detection": label}
-                    if provenance.origin == Origin.OTHER_TOOL and label["in_suspicious_span"]:
-                        decisions.append(self.block(
-                            f"'{candidate}' sits in a chunk the detector flagged, in an unrequested response.",
-                            **evidence))
-                    else:
-                        decisions.append(self.escalate(
-                            f"'{candidate}' comes from a response the detector flagged "
-                            f"(score {label['response_score']}, value chunk {label['value_score']}).", **evidence))
+                    decisions.append(self.escalate(
+                        f"'{candidate}' comes from a response the detector flagged "
+                        f"(score {label['response_score']}, value window {label['value_score']}).", **evidence))
         return strictest_decision(decisions)

@@ -45,6 +45,7 @@ from agentgate.agents.factory import UsageMeter, make_llm, spec_provider
 from agentgate.agents.scripted_agent import ScriptedAgent
 from agentgate.conditions import CONDITIONS, get_condition, make_runtime
 from agentgate.config import load_dotenv
+from agentgate.gate.task_spec import taskspec_version
 
 PILOT = {"suites": ["banking"], "user_tasks": ["user_task_0", "user_task_2", "user_task_3", "user_task_13"],
          "injection_tasks": ["injection_task_0", "injection_task_4", "injection_task_7"]}
@@ -117,7 +118,9 @@ def run_one(job: dict) -> str:
         llm = make_llm(meter)
         attack_model = job["attack_model_name"]
     cond = get_condition(condition)
-    provider = spec_provider(job["spec"] if cond.gated else "oracle", suite_name, user_task_id, cond.gate)
+    # gated conditions use their version's TaskSpec; audit baselines (C0, C3) use the run's TaskSpec version, so
+    # every condition of a run sees the same live-extracted spec
+    provider = spec_provider(job["spec"], suite_name, user_task_id, cond.gate if cond.gated else job["spec_version"])
     stats: dict = {}
     runtime = make_runtime(cond, suite.tools, suite_name=suite_name, prompt=user_task.PROMPT, stats=stats,
                            record_env_hash=True)
@@ -139,7 +142,8 @@ def run_one(job: dict) -> str:
         "agent": job["agent"], "agent_model": getattr(llm, "name", None),
         "attack": job["attack"] if injection_task else None,
         "version": cond.version, "gate": cond.gate,
-        "spec_source": job["spec"] if cond.gated else "oracle(audit)", "spec_meta": runtime.spec_meta,
+        "spec_source": job["spec"], "spec_meta": runtime.spec_meta,
+        "spec": runtime.spec.model_dump() if runtime.spec is not None else None,
         "error": error, **result,
         "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
@@ -152,6 +156,28 @@ def run_one(job: dict) -> str:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, ensure_ascii=False, default=str))
     return "error" if error else "ok"
+
+
+def _extract_specs_once(jobs: list[dict]) -> None:
+    """One extraction per (suite, user task, TaskSpec version) before any run, so concurrent runs of the same task
+    never extract it separately (they all read the same cached spec)."""
+    from agentgate.agentdojo.suites import describe_tools
+    from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
+    keys = sorted({(j["suite"], j["user_task"], taskspec_version(get_condition(j["cond"]).gate
+                                                                 if get_condition(j["cond"]).gated else j["spec_version"]))
+                   for j in jobs if j.get("framework", "native") == "native"})
+    extractors = {v: TaskSpecExtractor(version=v) for v in {k[2] for k in keys}}
+
+    def extract(key):
+        suite_name, user_task_id, version = key
+        suite = load_suite(suite_name)
+        tools = [ToolInfo(**tool) for tool in describe_tools(suite)]
+        return extractors[version].extract(suite.get_user_task_by_id(user_task_id).PROMPT, tools)
+
+    with ThreadPoolExecutor(8) as executor:
+        results = list(executor.map(extract, keys))
+    print(f"TaskSpec: {len(keys)} extracted ({sum(not r.cached for r in results)} live, "
+          f"{sum(r.spec is None for r in results)} failed) -> {os.environ['AGENTGATE_TASKSPEC_CACHE_DIR']}")
 
 
 def main():
@@ -185,8 +211,9 @@ def main():
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
-    if args.spec_cache_dir:
-        os.environ["AGENTGATE_TASKSPEC_CACHE_DIR"] = str(Path(args.spec_cache_dir).resolve())
+    # live TaskSpec: extracted fresh for this run (cache inside the run directory) unless --spec-cache-dir reuses one
+    os.environ["AGENTGATE_TASKSPEC_CACHE_DIR"] = str(Path(args.spec_cache_dir or Path(args.out) / "taskspec_cache")
+                                                     .resolve())
     if args.pilot:
         args.suites, args.user_tasks, args.injection_tasks = (PILOT["suites"], PILOT["user_tasks"],
                                                               PILOT["injection_tasks"])
@@ -194,7 +221,8 @@ def main():
     agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
     if args.model:
         provider, _, agent_model = args.model.partition(":")
-    for condition in args.conditions:
+    conditions = list(args.conditions)
+    for condition in conditions:
         get_condition(condition)
     if args.framework != "native" and not set(args.conditions) <= {"C0", "C1", "C2", "C4"}:
         parser.error("--framework supports C0 C1 C2 C4 only (C3 is an AgentDojo pipeline defense, C5–C7n native only)")
@@ -233,6 +261,12 @@ def main():
                     jobs.append({**base, "injection_task": None})
                 for injection_task_id in injection_task_ids:
                     jobs.append({**base, "injection_task": injection_task_id})
+    gated_versions = {taskspec_version(get_condition(c).gate) for c in conditions if get_condition(c).gated}
+    spec_version = gated_versions.pop() if len(gated_versions) == 1 else "v1"
+    for job in jobs:
+        job["spec_version"] = spec_version
+    if args.spec == "llm":
+        _extract_specs_once(jobs)
     started = time.time()
     if args.agent == "scripted" and args.framework == "native":
         with mp.Pool(args.workers) as pool:
