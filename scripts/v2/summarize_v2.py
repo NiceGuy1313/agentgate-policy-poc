@@ -3,7 +3,7 @@
 선행: check_enforcement.py, summarize_live.py, live_significance.py를 같은 --run에 실행
 입력: <run>/{C0,C5,C5p}/... 실행 기록, <run>/{summary,significance,enforcement_check,run_*}.json,
       results/v2/detector/tool_outputs_*.json(오프라인 판별기 평가), config/v2/detector.yaml
-출력: results/v2/RESULTS.md, <run>/v2_analysis.json
+출력: results/v2/RESULTS.md (--cleanup이면 그 뒤 실행 기록·중간 json·로그를 지우고 RESULTS.md만 남긴다)
 
 사용법: python scripts/v2/summarize_v2.py --run results/v2/live/full_tk_gpt-oss_120b
 """
@@ -99,20 +99,23 @@ def analyse(run_dir: Path) -> dict:
     return out
 
 
-def detector_row(name: str) -> list | None:
-    path = V2_DIR / "detector" / f"tool_outputs_{name}.json"
-    if not path.exists():
-        return None
-    s = json.loads(path.read_text())
-    o = s["overall"]
-    return [name, s.get("mode", "-"), s.get("input_format", "-"), s["model"]["threshold"],
-            pct(o["injected_flagged"], o["injected"]), pct(o["clean_flagged"], o["clean"])]
+def detector_rows() -> list[list]:
+    """Offline detector evaluations: the configured inputs (tool_outputs_*) first, then alternatives (alt_*)."""
+    rows = []
+    for pattern, kind in (("tool_outputs_*.json", "설정"), ("alt_*.json", "비교")):
+        for path in sorted((V2_DIR / "detector").glob(pattern)):
+            s = json.loads(path.read_text())
+            o = s["overall"]
+            rows.append([s["detector"], kind, s.get("mode", "-"), s.get("input_format", "-"), s["model"]["threshold"],
+                         pct(o["injected_flagged"], o["injected"]), pct(o["clean_flagged"], o["clean"])])
+    return rows
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
     parser.add_argument("--out", default=str(V2_DIR / "RESULTS.md"))
+    parser.add_argument("--cleanup", action="store_true", help="keep only RESULTS.md afterwards")
     args = parser.parse_args()
     run_dir = Path(args.run).resolve()
     summary = json.loads((run_dir / "summary.json").read_text())
@@ -120,7 +123,6 @@ def main():
     enforcement = json.loads((run_dir / "enforcement_check.json").read_text())
     run_args = json.loads(sorted(run_dir.glob("run_*.json"))[-1].read_text())["args"]
     analysis = analyse(run_dir)
-    (run_dir / "v2_analysis.json").write_text(json.dumps(analysis, indent=1, ensure_ascii=False))
     conditions = list(summary["conditions"])
     rel = run_dir.relative_to(PROJECT_ROOT) if run_dir.is_relative_to(PROJECT_ROOT) else run_dir
     detectors = load_detector_config()["models"]
@@ -186,10 +188,11 @@ def main():
             "clean_attack_run/not_flagged", 0)
         rows.append([c, get_condition(c).detector, pct(*inj), pct(*cb), pct(*ca)])
     lines += table(["조건", "판별기", "주입 응답 탐지", "정상 실행 응답 오탐", "공격 실행의 깨끗한 응답 오탐"], rows) + [""]
-    offline = [r for r in (detector_row(n) for n in detectors) if r]
+    offline = detector_rows()
     if offline:
-        lines += ["AgentDojo 정답 호출의 툴 응답(`scripts/v2/detector_tool_output_eval.py`, 중복 제거):", ""]
-        lines += table(["판별기", "모드", "입력", "임계값", "주입 응답 탐지", "정상 응답 오탐"], offline) + [""]
+        lines += ["AgentDojo 정답 호출의 툴 응답(`scripts/v2/detector_tool_output_eval.py`, 중복 제거). "
+                  "\"설정\"은 실험에 쓴 입력, \"비교\"는 다른 입력 형식:", ""]
+        lines += table(["판별기", "구분", "모드", "입력", "임계값", "주입 응답 탐지", "정상 응답 오탐"], offline) + [""]
 
     lines += ["## 5. 비용 (Trusted LLM)", ""]
     rows = [[c, a["judge_api_calls"], a["judge_input_tokens"], a["judge_cache_read_tokens"],
@@ -197,7 +200,16 @@ def main():
             for c, a in analysis["conditions"].items() if a["judge_calls"]]
     lines += table(["조건", "API 호출", "입력(캐시 외)", "캐시 읽기", "캐시 쓰기", "출력"], rows) + [""]
     Path(args.out).write_text("\n".join(lines) + "\n")
-    print(f"wrote {args.out} and {run_dir / 'v2_analysis.json'}")
+    print(f"wrote {args.out}")
+    if args.cleanup:
+        import shutil
+        shutil.rmtree(run_dir)
+        for path in (V2_DIR / "detector").glob("*.json"):
+            path.unlink()
+        for path in (V2_DIR / "detector", V2_DIR / "live"):
+            if path.exists() and not any(path.iterdir()):
+                path.rmdir()
+        print(f"removed {rel} and results/v2/detector/*.json")
 
 
 if __name__ == "__main__":
