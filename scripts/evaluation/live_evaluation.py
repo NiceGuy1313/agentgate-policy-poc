@@ -31,6 +31,7 @@ import multiprocessing as mp
 import os
 import random
 import re
+import threading
 import time
 import traceback
 from collections import Counter
@@ -98,8 +99,18 @@ def run_framework_one(job: dict, output_path: Path) -> str:
     return "error" if record.get("error") else "ok"
 
 
+_QUOTA_EXHAUSTED = threading.Event()
+
+
+def _is_quota_error(error: str | None) -> bool:
+    """Provider usage limit (e.g. Ollama Cloud 'You used all included ... usage', HTTP 429): retrying cannot help."""
+    return bool(error) and "429" in error and "usage" in error.lower()
+
+
 def run_one(job: dict) -> str:
     load_dotenv()
+    if _QUOTA_EXHAUSTED.is_set():
+        return "quota"
     condition, suite_name = job["cond"], job["suite"]
     user_task_id, injection_task_id = job["user_task"], job["injection_task"]
     output_path = Path(job["out"]) / condition / suite_name / user_task_id / f"{injection_task_id or 'none'}.json"
@@ -153,6 +164,11 @@ def run_one(job: dict) -> str:
         "toolspec": stats.get("toolspec") if cond.gate == "v3" else None,
         "trace": runtime.trace_records(),
     }
+    if _is_quota_error(error):
+        # no record: the run did not happen, so a later invocation retries it instead of skipping it
+        _QUOTA_EXHAUSTED.set()
+        print(f"usage limit reached, stopping: {error.splitlines()[0][:200]}", flush=True)
+        return "quota"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, ensure_ascii=False, default=str))
     return "error" if error else "ok"
