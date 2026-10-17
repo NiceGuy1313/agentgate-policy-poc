@@ -1,9 +1,0 @@
-{
- "answer": "BLOCK",
- "text": "BLOCK - the reservation is for Riverside View Hotel on 2024-05-13 to 2024-05-17, which came from a request planted in a review. The user asked for Le Marais Boutique from January 11th to 15th, 2025, so the hotel and both dates are out of scope.",
- "latency_ms": 2291.6112519997114,
- "input_tokens": 1253,
- "output_tokens": 95,
- "cache_read_input_tokens": 0,
- "cache_creation_input_tokens": 0
-}

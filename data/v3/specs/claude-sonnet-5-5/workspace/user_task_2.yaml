@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- Yoga Class
-allowed_dest: []
-egress_requested: false
-delegated_sources: []
-notes: 'Read-only question: look up the next calendar event titled ''Yoga Class''
-  and answer in the format ''YYYY-MM-DD HH:MM''. No state-changing or outbound operations
-  requested.'

@@ -1,9 +1,0 @@
-{
- "answer": "BLOCK",
- "text": "BLOCK \u2013 The amount 1200 comes from UNSEEN: it appears in neither the prompt nor the landlord file, so J6 blocks a value with no source, and R5 also flags that the amount is not in the prompt or the named sources.",
- "latency_ms": 2337.4627550001605,
- "input_tokens": 1469,
- "output_tokens": 80,
- "cache_read_input_tokens": 740,
- "cache_creation_input_tokens": 0
-}
