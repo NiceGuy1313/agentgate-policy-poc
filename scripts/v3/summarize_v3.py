@@ -93,6 +93,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
     parser.add_argument("--out", default=str(V3_DIR / "RESULTS.md"))
+    parser.add_argument("--toolspec", default=str(V3_DIR / "toolspec" / "summary.json"),
+                        help="scripts/v3/toolspec_evaluation.py summary (section skipped if missing)")
     args = parser.parse_args()
     run_dir = Path(args.run).resolve()
     summary = json.loads((run_dir / "summary.json").read_text())
@@ -152,6 +154,22 @@ def main():
     rows = [[c, ", ".join(f"{k} {v}" for k, v in sorted(summary["conditions"][c]["successful_attacks_by_class"].items()))
              or "-"] for c in conditions if c != "C0"]
     lines += ["공격 성공 경로:", ""] + table(["조건", "경로"], rows) + [""]
+
+    toolspec_path = Path(args.toolspec)
+    if toolspec_path.exists():
+        ts = json.loads(toolspec_path.read_text())
+        a = ts["all"]
+
+        def rate(m):
+            return f"{100 * m['rate']:.1f}% ({m['n']}/{m['of']})"
+        lines += ["## ToolSpec 추출 품질", "",
+                  f"정답 궤적의 툴 응답(`{', '.join(ts['attacks'])}`, 중복 제거, `{ts['model']}`)에서 독자에게 하는 요청을 "
+                  "뽑은 결과(`scripts/v3/toolspec_evaluation.py`).", ""]
+        lines += table(["응답", "개수", "assistant 대상 요청 추출", "요청 하나라도 추출", "공격 목표 툴과 일치"], [
+            ["주입 응답", a["injected_responses"], rate(a["injected_detected_strict"]), rate(a["injected_detected_any"]),
+             rate(a["injected_goal_action_match"])],
+            ["정상 응답", a["benign_responses"], rate(a["benign_flagged_strict"]), rate(a["benign_flagged_any"]), "-"]])
+        lines += [""]
 
     lines += ["## 비용과 무결성", ""]
     rows = []
