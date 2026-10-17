@@ -2,7 +2,7 @@
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)를 따라 송금·반출·삭제를 하지 않도록, 모든 툴 호출을 **실행 직전에 결정론 정책(P1–P9)으로 검사**하는 Gate다. AgentDojo v1.2.2(`agentdojo==0.1.35`)와 외부 에이전트 프레임워크(smolagents 등)에서 검증한다.
 
-> **버전**: v1(P1–P9), v2(판별기 + Trusted LLM), v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 `src/agentgate/v1`·`v2`·`v3`에 나뉘어 있다. v2·v3는 재실험 전이며, 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](archive/v2_v3_results_2026-10-17/README.md)에 있다.
+> **버전**: v1(P1–P9), v2(판별기 + Trusted LLM), v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 `src/agentgate/v1`·`v2`·`v3`에 나뉘어 있다. v3 재실험 결과(C8·C8n·C8b)는 [`results/v3/RESULTS.md`](results/v3/RESULTS.md)에 있다. 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](archive/v2_v3_results_2026-10-17/README.md)에 있다.
 
 자세한 내용은 [`docs/architecture.md`](docs/architecture.md)(구조·Wrapper 규약), [`docs/policy_spec.md`](docs/policy_spec.md)(정책 상세), [`docs/final_report.md`](docs/final_report.md)(평가 결과)에 있다. 정적 결과 요약은 [`results/dashboard.html`](results/dashboard.html)이다.
 

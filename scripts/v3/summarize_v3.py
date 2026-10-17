@@ -2,7 +2,7 @@
 
 세 비교: 판정 LLM 없음(C8b) / 판정 LLM + 정책 문서(C8) / 판정 LLM, 정책 문서 없음(C8n). 기준선 C0는 같은 실행.
 선행: check_enforcement.py, summarize_live.py, live_significance.py를 같은 --run에 실행
-출력: results/v3/RESULTS.md, <run>/v3_analysis.json
+출력: results/v3/RESULTS.md
 
 사용법: python scripts/v3/summarize_v3.py --run results/v3/live/full_tk_gpt-oss_120b
 """
@@ -103,7 +103,6 @@ def main():
     runs = [json.loads(p.read_text()) for p in live_run_files(run_dir)]
     conditions = list(summary["conditions"])
     analysis = analyse(runs, conditions)
-    (run_dir / "v3_analysis.json").write_text(json.dumps(analysis, indent=1, ensure_ascii=False))
     rel = run_dir.relative_to(PROJECT_ROOT) if run_dir.is_relative_to(PROJECT_ROOT) else run_dir
     first = summary["conditions"][conditions[0]]
     judge_model = next((j.get("model") for r in runs for e in r["trace"] if (j := e.get("judge")) and j.get("model")),
@@ -114,13 +113,34 @@ def main():
     toolspec_model = os.environ.get("AGENTGATE_TOOLSPEC_MODEL") or TOOLSPEC_DEFAULT_MODEL
 
     lines = ["# v3 결과: 판정 LLM이 모든 effect 호출을 판단", "",
-             f"> `scripts/v3/summarize_v3.py --run {rel}`가 생성한다. 손으로 고치지 않는다.", "",
+             f"> `scripts/v3/summarize_v3.py --run {rel}`가 생성한다. 손으로 고치지 않는다. 실행 기록(json)은 요약 후 지웠다.", "",
              "## 구성", "",
              f"- 에이전트 `{summary['agent_model']}`, 공격 `{summary['attack']}`, AgentDojo v1.2.2, 조건마다 공격 없음 "
              f"{first['benign_runs']}건 + 공격 {first['attack_runs']}건.",
              f"- TaskSpec `{spec_model}`, ToolSpec `{toolspec_model}`, "
              f"판정 LLM `{judge_model}`. 정책: `config/v3/policy.yaml`(gate v31).", ""]
     lines += table(["조건", "구성"], [[c, get_condition(c).description] for c in conditions]) + [""]
+
+    def rate(c, name):
+        m = significance["conditions"][c][name]
+        return f"{100 * m['rate']:.1f}%"
+
+    def diff(a, b, name):
+        comp = analysis["comparisons"].get(f"{a}-{b}", {}).get(name)
+        if not comp or comp["diff"] is None:
+            return "-"
+        sig = "유의" if comp["p_mcnemar"] < 0.05 else "유의하지 않음"
+        return f"{100 * comp['diff']:+.1f}%p (p={comp['p_mcnemar']:.3g}, {sig})"
+    if {"C0", "C8", "C8n", "C8b"} <= set(conditions):
+        lines += ["## 핵심", "",
+                  f"- 세 방식 모두 ASR을 C0 {rate('C0', 'asr')}에서 C8b {rate('C8b', 'asr')}, C8 {rate('C8', 'asr')}, "
+                  f"C8n {rate('C8n', 'asr')}로 낮췄다.",
+                  f"- 판정 LLM(C8 − C8b): 공격 중 Utility {diff('C8', 'C8b', '공격 중 Utility')}, "
+                  f"ASR {diff('C8', 'C8b', 'ASR')}, 정상 Utility {diff('C8', 'C8b', 'Utility')}.",
+                  f"- 정책 문서(C8 − C8n): ASR {diff('C8', 'C8n', 'ASR')}, 공격 중 Utility "
+                  f"{diff('C8', 'C8n', '공격 중 Utility')}, 정상 Utility {diff('C8', 'C8n', 'Utility')}.",
+                  f"- 정상 Utility는 C0 {rate('C0', 'utility')} 대비 C8 {rate('C8', 'utility')}, "
+                  f"C8n {rate('C8n', 'utility')}, C8b {rate('C8b', 'utility')}.", ""]
 
     lines += ["## 결과", "", "Wilson 95% CI, \"C0 대비\"는 같은 짝의 차이와 exact McNemar p.", ""]
     rows = []
@@ -184,7 +204,7 @@ def main():
               f"{enforcement.get('violations', '-')}건, 오류 {sum(a['errors'] for a in analysis['conditions'].values())}건.", ""]
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text("\n".join(lines) + "\n")
-    print(f"wrote {args.out} and {run_dir / 'v3_analysis.json'}")
+    print(f"wrote {args.out}")
 
 
 if __name__ == "__main__":
