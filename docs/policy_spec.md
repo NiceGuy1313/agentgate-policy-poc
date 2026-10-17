@@ -15,13 +15,13 @@
 | G | 무단 예약·일정 생성 | 요청하지 않은 예약·일정 생성 | P8, P9 |
 | H | 툴 호출 없는 출력 조작 | 응답 문장만 조작 | 범위 밖 |
 
-태스크별 레이블은 [`data/benchmark/injection_labels.yaml`](../data/benchmark/injection_labels.yaml)에 있다.
+태스크별 레이블은 [`data/agentdojo/benchmark/injection_labels.yaml`](../data/agentdojo/benchmark/injection_labels.yaml)에 있다.
 
-**설계 전제**: 정상 태스크의 목적지 값도 상당수가 툴 응답에서 온다([`data/benchmark/provenance_summary.json`](../data/benchmark/provenance_summary.json)). 그래서 "프롬프트에 없으면 차단"만으로는 오탐이 커서, 사용자가 지목한 자료에서 온 값은 별도 범주(`NAMED_SOURCE` → ESCALATE)로 다룬다.
+**설계 전제**: 정상 태스크의 목적지 값도 상당수가 툴 응답에서 온다([`data/agentdojo/benchmark/provenance_summary.json`](../data/agentdojo/benchmark/provenance_summary.json)). 그래서 "프롬프트에 없으면 차단"만으로는 오탐이 커서, 사용자가 지목한 자료에서 온 값은 별도 범주(`NAMED_SOURCE` → ESCALATE)로 다룬다.
 
 ## 2. 정책 P1–P9
 
-구현은 [`src/agentgate/policy/rules.py`](../src/agentgate/policy/rules.py), 대상 툴·임계값은 [`config/policies.yaml`](../config/policies.yaml)의 같은 키(`P1`…`P9`)에 있다.
+구현은 [`src/agentgate/v1/policies.py`](../src/agentgate/v1/policies.py), 대상 툴·임계값은 [`config/v1/policies.yaml`](../config/v1/policies.yaml)의 같은 키(`P1`…`P9`)에 있다.
 
 | 정책 | 클래스 | 대상 | 규칙 → 판정 |
 |---|---|---|---|
@@ -39,7 +39,7 @@ v3부터 P7의 인젝션 문구 목록(`instruction_phrases`)은 비운다. Agen
 
 ## 3. TaskSpec
 
-사용자 프롬프트와 툴 목록(이름·설명)만으로 만든다. 툴 응답, ground truth, injection GOAL은 입력으로 쓰지 않는다. 정의는 [`src/agentgate/task_spec.py`](../src/agentgate/task_spec.py).
+사용자 프롬프트와 툴 목록(이름·설명)만으로 만든다. 툴 응답, ground truth, injection GOAL은 입력으로 쓰지 않는다. 정의는 [`src/agentgate/gate/task_spec.py`](../src/agentgate/gate/task_spec.py).
 
 | 필드 | 형 | 의미 |
 |---|---|---|
@@ -53,10 +53,33 @@ v3부터 P7의 인젝션 문구 목록(`instruction_phrases`)은 비운다. Agen
 
 ## 4. 판정 결합과 ESCALATE
 
-- 한 호출에 여러 정책이 걸리면 BLOCK > ESCALATE > ALLOW 중 가장 강한 판정이 최종이다(`policy/engine.py`의 `combine_verdicts`).
-- ESCALATE 처리는 `config/policies.yaml`의 `runtime.escalate_action`으로 정한다: `block` | `allow` | `judge`.
+- 한 호출에 여러 정책이 걸리면 BLOCK > ESCALATE > ALLOW 중 가장 강한 판정이 최종이다(`gate/engine.py`의 `combine_verdicts`).
+- ESCALATE 처리는 실험 조건(`src/agentgate/conditions.py`)이 정한다: `block`(C1) | `allow`(C2) | `judge`(C4–C7n). 조건 없이 만든 런타임은 `runtime.escalate_action`(기본 `block`)을 쓴다.
 - `judge`는 판정 LLM의 답을 B → BLOCK, A → ALLOW(되돌릴 수 있는 툴만), 그 밖은 HUMAN으로 바꾼다. 벤치마크에서 HUMAN은 BLOCK으로 집행하고 따로 센다.
 
-## 5. v2–v3.1 확장
+## 5. v2·v3 정책
 
-추가 정책은 버전별 폴더에 정의한다. P0(사용자 고정 설정)·P10(판별기 라벨)은 [`v2_detector_trusted_llm/`](../v2_detector_trusted_llm/README.md), P11(툴 콘텐츠가 시킨 행동)·P12(요청된 행동만)·v3.1 변경·정책 문서는 [`v3_trusted_llm_policy_doc/`](../v3_trusted_llm_policy_doc/README.md)에 있다. v3부터 P7의 공격 문구 목록을 쓰지 않고 P10은 제외한다.
+v2·v3는 v1의 P1–P9 클래스를 그대로 쓰고 아래 정책을 더한다. 버전마다 설정 파일이 따로 있다(`config/v2/policies.yaml`, `config/v3/policies_v3.yaml`, `config/v3/policies_v31.yaml`). 정책 순서는 각 버전 패키지의 `POLICY_CLASSES`가 정한다.
+
+| 정책 | 버전 | 클래스 | 규칙 → 판정 |
+|---|---|---|---|
+| P0 사용자 고정 설정 | v2, v3 | `UserFixedPolicy` ([`gate/user_policy.py`](../src/agentgate/gate/user_policy.py)) | `always_block` 툴 → BLOCK, `always_human` 툴(`delete_file`, `update_password`) → ESCALATE(force_human, 판정 없이 HUMAN) |
+| P10 판별기 라벨 | v2 | `DetectorLabelPolicy` ([`v2/policies.py`](../src/agentgate/v2/policies.py)) | 판별기가 flag한 응답에서 온 값 → ESCALATE, 지목하지 않은 응답의 의심 조각 안 값 → BLOCK |
+| P11 툴 콘텐츠가 시킨 행동 | v3 | `InstructedActionPolicy` ([`v3/policies.py`](../src/agentgate/v3/policies.py)) | 호출이 ToolSpec 속 요청과 일치하고, 사용자가 요청하지도 위임하지도 않은 행동 → BLOCK, 그 밖 → ESCALATE. 사용자가 준 값은 일치 근거에서 뺀다 |
+| P12 요청된 행동만 | v3 | `RequestedActionPolicy` | `requested_ops`에 없는 상태 변경·외부 전송(URL 방문 제외) → ESCALATE |
+
+v3는 P7의 공격 문구 목록을 비우고 P10을 쓰지 않는다. v2의 규칙 ④(`v2/runtime.py`): 판정 LLM이 ALLOW해도, 되돌릴 수 없는 툴이고 관련 출처에 판별기 경고가 있으면 HUMAN이다.
+
+v3.1은 v1 클래스를 고치지 않고 서브클래스로 바꾼다(`v3/policies.py`의 `*V31`).
+
+| 표시 | 대상 | 변경 |
+|---|---|---|
+| A1 | P6·P8·P9 | 요청되지 않은 행동이라도 위임 자료의 요청과 일치하면 BLOCK 대신 ESCALATE |
+| A2 | 규칙 J1 | 위임 자료에서 와야 하는 것은 요청 자체이고, 수행에 필요한 내용은 다른 자료에서 와도 됨 |
+| A3 | 판정 입력 | 위임 자료의 ToolSpec을 항상 넣음 |
+| B1 | P11 | 지목 자료 안의 링크를 여는 호출은 BLOCK 대신 ESCALATE |
+| B2 | 지목 자료 일치 | 이름 비교 최소 길이 4 → 3 (`runtime.named_match_min_len`) |
+| C1 | P3 | 전송을 요청했고 수신자가 신뢰 출처나 지목 자료에서 왔으면 BLOCK 대신 ESCALATE |
+| D2 | P0 | `always_human` 툴이라도 `requested_ops`에 있으면 사람 확인 생략 |
+
+판정 LLM v3는 정책 문서(`config/v3/policy_rules_v3.yaml`, v3.1은 `policy_rules_v31.yaml`)의 규칙 인덱스 전체를 system에, 트리거(`policy:<id>`, `tool_class:<분류>`, `signal:<신호>`)로 고른 조항만 user에 받는다. 정책 문서의 근거는 ATR test-corpora 공격 사례 분류(`data/v3/atr/`)이고 AgentDojo 공격 문구는 쓰지 않았다. 판정 LLM은 툴 응답 원문을 보지 않는다.

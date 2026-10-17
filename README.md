@@ -2,7 +2,7 @@
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)를 따라 송금·반출·삭제를 하지 않도록, 모든 툴 호출을 **실행 직전에 결정론 정책(P1–P9)으로 검사**하는 Gate다. AgentDojo v1.2.2(`agentdojo==0.1.35`)와 외부 에이전트 프레임워크(smolagents 등)에서 검증한다.
 
-> **후속 구성**: [`v2_detector_trusted_llm/`](v2_detector_trusted_llm/README.md)(판별기 + Trusted LLM, 폐기)와 [`v3_trusted_llm_policy_doc/`](v3_trusted_llm_policy_doc/README.md)(ToolSpec + 정책 문서 + 판정 LLM)에 버전별 구조·코드·결과를 나눠 두었다. 작업 명세는 [`명세서.md`](명세서.md).
+> **버전**: v1(P1–P9), v2(판별기 + Trusted LLM), v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 `src/agentgate/v1`·`v2`·`v3`에 나뉘어 있다. v2·v3는 재실험 전이며, 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](archive/v2_v3_results_2026-10-17/README.md)에 있다.
 
 자세한 내용은 [`docs/architecture.md`](docs/architecture.md)(구조·Wrapper 규약), [`docs/policy_spec.md`](docs/policy_spec.md)(정책 상세), [`docs/final_report.md`](docs/final_report.md)(평가 결과)에 있다. 정적 결과 요약은 [`results/dashboard.html`](results/dashboard.html)이다.
 
@@ -43,6 +43,9 @@ export OLLAMA_API_KEY=<키>
 | `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | 해당 제공자 모델을 쓸 때 |
 | `AGENTGATE_AGENT_PROVIDER` · `AGENTGATE_AGENT_MODEL` | 배치 평가에서 쓸 에이전트 모델 |
 | `AGENTGATE_LLM_PROVIDER` · `AGENTGATE_LLM_MODEL` | TaskSpec 추출 LLM(캐시가 있으면 키 없이 재사용) |
+| `AGENTGATE_JUDGE_MODEL` | ESCALATE 판정 LLM(C4·C5·C6·C7) |
+| `AGENTGATE_TOOLSPEC_MODEL` | v3 ToolSpec 추출 LLM(기본 `claude-haiku-5-5`) |
+| `AGENTGATE_V2_DETECTOR` | v2 판별기(`piguard:chunks` 기본, `none`) |
 
 ## 3. 대시보드 실행
 
@@ -64,70 +67,82 @@ uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
 
 ```bash
 python scripts/evaluation/live_evaluation.py --framework smolagents --model ollama:gpt-oss:120b \
-  --pilot --conditions C0 C1 --out results/live/v2/<run>
-python scripts/analysis/summarize_live.py --run results/live/v2/<run>
+  --pilot --conditions C0 C1 --out results/v1/live/<run>
+python scripts/analysis/summarize_live.py --run results/v1/live/<run>
 ```
 
 ## 4. 정책
 
-판정 코드는 [`src/agentgate/policy/rules.py`](src/agentgate/policy/rules.py)에 있다. 정책별 대상 툴과 임계값은 [`config/policies.yaml`](config/policies.yaml)에서 바꾼다.
+판정 코드는 [`src/agentgate/v1/policies.py`](src/agentgate/v1/policies.py)에 있다. 정책별 대상 툴과 임계값은 [`config/v1/policies.yaml`](config/v1/policies.yaml)에서 바꾼다.
 
 | 정책 | 막는 것 | 코드 |
 |---|---|---|
-| P1 외부 목적지 출처 | 프롬프트에 없는 수신자·계좌·URL로 보내기 | [`DestinationProvenancePolicy`](src/agentgate/policy/rules.py#L41) |
-| P2 민감 데이터 반출 | 요청 없이 민감한 읽기 결과를 외부로 전송 | [`SensitiveEgressPolicy`](src/agentgate/policy/rules.py#L58) |
-| P3 대량 반출 | 한 번의 전송에 여러 읽기 결과 묶어 보내기 | [`BulkEgressPolicy`](src/agentgate/policy/rules.py#L106) |
-| P4 금전 | 상한 초과·근거 없는 금액, 반복 송금 | [`MoneyTransferPolicy`](src/agentgate/policy/rules.py#L149) |
-| P5 삭제 | 보낸 메일 삭제, 지정하지 않은 파일 삭제 | [`DeletionPolicy`](src/agentgate/policy/rules.py#L196) |
-| P6 계정·권한 | 요청 없는 비밀번호·사용자 정보·권한 변경 | [`AccountPermissionPolicy`](src/agentgate/policy/rules.py#L221) |
-| P7 비신뢰 내용 | 툴 응답 속 지시·링크 전파, 요청 없는 URL 방문 | [`UntrustedContentPolicy`](src/agentgate/policy/rules.py#L247) |
-| P8 예약 | 요청 없는 호텔·차량·식당 예약 | [`ReservationPolicy`](src/agentgate/policy/rules.py#L293) |
-| P9 일정 | 요청 없는 일정 생성·변경·취소 | [`CalendarChangePolicy`](src/agentgate/policy/rules.py#L315) |
+| P1 외부 목적지 출처 | 프롬프트에 없는 수신자·계좌·URL로 보내기 | [`DestinationProvenancePolicy`](src/agentgate/v1/policies.py) |
+| P2 민감 데이터 반출 | 요청 없이 민감한 읽기 결과를 외부로 전송 | [`SensitiveEgressPolicy`](src/agentgate/v1/policies.py) |
+| P3 대량 반출 | 한 번의 전송에 여러 읽기 결과 묶어 보내기 | [`BulkEgressPolicy`](src/agentgate/v1/policies.py) |
+| P4 금전 | 상한 초과·근거 없는 금액, 반복 송금 | [`MoneyTransferPolicy`](src/agentgate/v1/policies.py) |
+| P5 삭제 | 보낸 메일 삭제, 지정하지 않은 파일 삭제 | [`DeletionPolicy`](src/agentgate/v1/policies.py) |
+| P6 계정·권한 | 요청 없는 비밀번호·사용자 정보·권한 변경 | [`AccountPermissionPolicy`](src/agentgate/v1/policies.py) |
+| P7 비신뢰 내용 | 툴 응답 속 지시·링크 전파, 요청 없는 URL 방문 | [`UntrustedContentPolicy`](src/agentgate/v1/policies.py) |
+| P8 예약 | 요청 없는 호텔·차량·식당 예약 | [`ReservationPolicy`](src/agentgate/v1/policies.py) |
+| P9 일정 | 요청 없는 일정 생성·변경·취소 | [`CalendarChangePolicy`](src/agentgate/v1/policies.py) |
 
-판정은 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 것을 고른다([`engine.py`](src/agentgate/policy/engine.py)). 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/runtime.py) 한 곳을 지난다.
+판정은 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 것을 고른다([`engine.py`](src/agentgate/gate/engine.py)). 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/gate/runtime.py) 한 곳을 지난다. v2·v3 추가 정책(P0, P10, P11, P12, v3.1 수정)은 [`docs/policy_spec.md`](docs/policy_spec.md) 5절에 있다.
 
 정책을 수정하면 다음을 지킨다.
-- `tests/policy/`의 해당 테스트를 고치고 `python -m pytest -q`를 통과시킨다.
-- `scripts/evaluation/replay_evaluation.py --spec oracle`을 새 버전 경로로 돌려 이전 결과와 비교한다.
+- `tests/v1/`·`tests/v2/`·`tests/v3/`의 해당 테스트를 고치고 `python -m pytest -q`를 통과시킨다.
+- `scripts/evaluation/replay_evaluation.py`를 새 결과 경로로 돌려 이전 결과와 비교한다.
 
-## 5. 재현
+## 5. 실험 조건과 재현
+
+조건은 [`src/agentgate/conditions.py`](src/agentgate/conditions.py)에 있다. C0(방어 없음)·C3(AgentDojo 내장 방어)은 기준선, C1·C2·C4는 v1, C5는 v2, C6·C7·C7n은 v3다. 버전을 비교할 때는 같은 실행에 C0을 함께 넣는다.
+
+규모: AgentDojo v1.2.2는 사용자 작업 97개 × 같은 suite의 injection task(workspace 14, travel 7, banking 9, slack 5) = 공격 쌍 949개다. `--pairs`를 주지 않으면 live도 이 전체(공격 없음 97 + 공격 949)를 돌린다. `--pairs @data/agentdojo/pairs/strat3_seed0.txt`는 사용자 작업마다 공격 3개를 고른 층화 표본(97 + 291)이다.
 
 ```bash
-# 재생 평가 (LLM 없음)
-python scripts/evaluation/replay_evaluation.py --spec oracle --out results/replay/v1/oracle
-python scripts/analysis/summarize_replay.py --run results/replay/v1/oracle
+# 재생 평가 (에이전트 없음, ground truth 궤적)
+python scripts/evaluation/replay_evaluation.py --condition C1 --spec oracle --out results/v1/replay/oracle
+python scripts/analysis/summarize_replay.py --run results/v1/replay/oracle
 
-# 실제 에이전트 평가 (키 필요)
-python scripts/evaluation/live_evaluation.py --agent llm --spec llm --pairs @data/pairs/strat3_seed0.txt \
-  --conditions C0 C1 C2 C4 --out results/live/v1/<run>
-python scripts/analysis/summarize_live.py --run results/live/v1/<run>   # 커밋된 run은 runs.tar.gz를 먼저 푼다
+# v1 live (전체 규모, important_instructions)
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C1 C2 C4 \
+  --attack important_instructions --out results/v1/live/<run>
 
-# 보고서·그림·대시보드 재생성
-python scripts/reporting/build_report.py
+# v2 live (판별기: pip install -e '.[detector]')
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C5 \
+  --attack important_instructions --out results/v2/live/<run>
+
+# v3 live (TaskSpec v3 추출 → ToolSpec·판정 LLM v3)
+python scripts/taskspec/extract_llm_specs.py --version v3
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C6 C7 C7n \
+  --attack important_instructions --out results/v3/live/<run>
+
+python scripts/analysis/check_enforcement.py --run results/<version>/live/<run>
+python scripts/analysis/summarize_live.py --run results/<version>/live/<run>
+python scripts/reporting/build_report.py      # docs/final_report.md, results/figures, results/dashboard.html (v1)
 ```
 
 ## 6. 폴더 구조
 
 ```
 src/agentgate/
-  policy/        정책과 판정 결합 (LLM 호출 없음)
-  llm/           TaskSpec·ToolSpec 추출기, ESCALATE 판정 LLM (v1, v2, v3)
-  detector/      툴 응답 인젝션 판별기 래퍼 (v2만, PIGuard·ProtectAI)
-  agents/        평가 대상 에이전트 (frameworks/: smolagents 어댑터)
+  gate/          버전 공통 Gate: 정책 primitive·엔진·값 출처·TaskSpec·GatedRuntime (LLM 호출 없음)
+  agentdojo/     AgentDojo 테스트: suite 로딩, live pipeline·채점, 재생, 공격 궤적, 지표, 층화 표본
+  agents/        평가 대상 에이전트(Claude·Ollama·OpenAI·Scripted)와 프레임워크 어댑터
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
-  evaluation/    재생 평가, 지표
-config/          정책 설정, 프레임워크 등록(frameworks.yaml), 판별기 설정(detector.yaml)
-dashboard/       실시간 Gate 대시보드 (FastAPI)
-prompts/         LLM 프롬프트
-scripts/         benchmark · taskspec · evaluation · analysis · reporting · cloud(클라우드 세션 준비)
-tests/           pytest
+  llm/           LLM client, TaskSpec 추출기, 판정 LLM 공용 입출력
+  v1/  v2/  v3/  버전별 정책·판정 LLM·런타임 확장·조건 조립(experiment.py)
+  conditions.py  실험 조건 등록부 (C0–C7n)
+config/          agentdojo/(툴 역할·민감 읽기·지목 자료 규칙), v1/, v2/, v3/, frameworks.yaml
+prompts/         v1/, v2/, v3/
+scripts/         agentdojo · taskspec · evaluation · analysis · reporting · v2 · v3 · cloud
+tests/           공통 테스트, v1/, v2/, v3/, frameworks/
 data/
-  benchmark/     AgentDojo에서 추출한 태스크·툴 목록, 공격 유형 레이블, 인자 출처 분석
-  specs/         태스크별 TaskSpec (oracle, LLM 추출)
-  pairs/         live 평가용 층화 표본 쌍
-  judge_cache/   판정 LLM 응답 캐시 (키 없이 재현)
-docs/            구조·정책 사양·평가 보고서 (v1 중심, 6절·9절·5절에서 버전별 폴더로 연결)
-v2_detector_trusted_llm/    v2 구조·결과(README, RESULTS)와 코드 읽기용 사본
-v3_trusted_llm_policy_doc/  v3·v3.1 구조·결과(README, RESULTS)와 코드 읽기용 사본
-results/         평가 결과 (replay, live, judge)
+  agentdojo/     벤치마크 추출(태스크·툴·공격 유형 레이블), oracle TaskSpec, 층화 표본 쌍
+  v1/            LLM TaskSpec(specs/), LLM 응답 캐시(cache/)
+  v3/atr/        v3 정책 문서 근거(ATR test-corpora 분류)
+results/         v1/{replay,live,judge}, figures/, dashboard.html (v2·v3는 재실험 후 results/v2·v3/)
+docs/            구조(architecture.md), 정책 사양(policy_spec.md), 결과 보고서(final_report.md)
+archive/         이전 v2·v3 결과 문서 백업
+dashboard/       실시간 Gate 대시보드 (FastAPI)
 ```
