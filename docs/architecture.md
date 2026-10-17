@@ -162,14 +162,14 @@ src/agentgate/
   harness/     외부 프레임워크 연결(Wrapper 규약 v1, 대시보드 서비스)
   llm/         API client, TaskSpec 추출기(버전별 프롬프트), 판정 LLM 공용 입출력
   v1/          P1–P9, 판정 LLM v1(C4)
-  v2/          P10, 판별기(detector/), Trusted LLM v2, DetectorGatedRuntime(규칙 ④)
+  v2/          P10(모든 툴 호출을 Trusted LLM으로), 판별기(detector/), Trusted LLM v2, DetectorGatedRuntime
   v3/          P11·P12, v3.1 서브클래스, ToolSpec 추출기, 판정 LLM v3, ToolSpecGatedRuntime
   conditions.py  실험 조건 C0–C7n → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
 ```
 
 설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v2,v3}/`, `prompts/{v1,v2,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
 
-- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v2 판별기 라벨, v3 ToolSpec), `finalize_judgement`(v2 규칙 ④), `index_class`(v3 위임 자료).
-- v2·v3 설정 파일은 v1 파일을 실행 시 복사하지 않고 독립 파일로 둔다. v1 파일을 고쳐도 v2·v3 판정은 바뀌지 않는다.
+- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v2 판별기 라벨, v3 ToolSpec), `index_class`(v3 위임 자료).
+- v2는 규칙 정책 설정이 없다(`config/v2/`에는 사용자 허용 범위와 판별기 설정만 있다). v3 설정은 v1 파일을 복사하지 않는 독립 파일이다.
 - TaskSpec 추출 프롬프트는 v1·v2가 `prompts/v1/extract_taskspec.md`, v3가 `prompts/v3/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
 - 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.

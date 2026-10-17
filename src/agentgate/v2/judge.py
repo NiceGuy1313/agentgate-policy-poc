@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 
 from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.gate.base import PolicyContext, ToolCall, Verdict
@@ -94,6 +95,15 @@ def render_trusted_prompt(facts: dict) -> str:
         detection="\n".join(detection_lines) or "(no argument comes from a tool response)")
 
 
+_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _key_lock(key: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.Lock())
+
+
 class TrustedJudgeV2:
     """Model: AGENTGATE_JUDGE_MODEL (default claude-sonnet-5-5). The API client is created on a cache miss only."""
 
@@ -121,21 +131,8 @@ class TrustedJudgeV2:
         user_prompt = render_trusted_prompt(facts)
         key = hashlib.sha256((self.model + system_prompt + user_prompt).encode()).hexdigest()[:24]
         path = CACHE_DIR / self.model.replace("/", "_").replace(":", "_") / f"{key}.json"
-        if path.exists():
-            record = {**json.loads(path.read_text()), "cached": True}
-        else:
-            # Input 1 (TaskSpec + fixed settings) repeats for every escalation of a task: cache it after the system
-            prefix = user_prompt.split("## Input 2", 1)[0] if "## Input 2" in user_prompt else None
-            completion = self.client.complete(system_prompt, user_prompt, max_tokens=4000, cache_system=True,
-                                              cache_user_prefix=prefix)
-            record = {"answer": parse_trusted_answer(completion.text), "text": completion.text.strip()[:400],
-                      "latency_ms": completion.latency_ms, "input_tokens": completion.input_tokens,
-                      "output_tokens": completion.output_tokens, "served_model": completion.served_model,
-                      "cache_read_input_tokens": completion.cache_read_input_tokens,
-                      "cache_creation_input_tokens": completion.cache_creation_input_tokens,
-                      "layout": PROMPT_LAYOUT, "cached": False}
-            path.parent.mkdir(parents=True, exist_ok=True)
-            write_text_atomic(path, json.dumps({k: v for k, v in record.items() if k != "cached"}, indent=1))
+        with _key_lock(key):   # identical concurrent requests: one API call, the others read its cache file
+            record = self._answer(path, system_prompt, user_prompt)
         final = record["answer"]
         return {**base, "answer": record["answer"], "final": final, "verdict": "ALLOW" if final == "ALLOW" else "BLOCK",
                 "human": final == "HUMAN", "text": record["text"][:200], "cached": record["cached"],
@@ -144,6 +141,23 @@ class TrustedJudgeV2:
                 "output_tokens": 0 if record["cached"] else record["output_tokens"],
                 "cache_read_input_tokens": 0 if record["cached"] else record.get("cache_read_input_tokens", 0),
                 "cache_creation_input_tokens": 0 if record["cached"] else record.get("cache_creation_input_tokens", 0)}
+
+    def _answer(self, path, system_prompt: str, user_prompt: str) -> dict:
+        if path.exists():
+            return {**json.loads(path.read_text()), "cached": True}
+        # Input 1 (TaskSpec + fixed settings) repeats for every escalation of a task: cache it after the system
+        prefix = user_prompt.split("## Input 2", 1)[0] if "## Input 2" in user_prompt else None
+        completion = self.client.complete(system_prompt, user_prompt, max_tokens=4000, cache_system=True,
+                                          cache_user_prefix=prefix)
+        record = {"answer": parse_trusted_answer(completion.text), "text": completion.text.strip()[:400],
+                  "latency_ms": completion.latency_ms, "input_tokens": completion.input_tokens,
+                  "output_tokens": completion.output_tokens, "served_model": completion.served_model,
+                  "cache_read_input_tokens": completion.cache_read_input_tokens,
+                  "cache_creation_input_tokens": completion.cache_creation_input_tokens,
+                  "layout": PROMPT_LAYOUT, "cached": False}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_text_atomic(path, json.dumps({k: v for k, v in record.items() if k != "cached"}, indent=1))
+        return record
 
 
 def as_runtime_judge(judge: TrustedJudgeV2, prompt: str):

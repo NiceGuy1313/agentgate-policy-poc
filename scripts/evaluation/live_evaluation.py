@@ -268,6 +268,9 @@ def main():
         job["spec_version"] = spec_version
     if args.spec == "llm":
         _extract_specs_once(jobs)
+    # all runs of one user task (every condition, benign and attack) back to back: the judge's prompt-cache prefix
+    # (system + TaskSpec) stays warm within its 5-minute TTL. Runs are independent, so the order does not change results.
+    jobs.sort(key=lambda j: (j["suite"], task_number(j["user_task"]), j["injection_task"] or "", j["cond"]))
     started = time.time()
     if args.agent == "scripted" and args.framework == "native":
         with mp.Pool(args.workers) as pool:

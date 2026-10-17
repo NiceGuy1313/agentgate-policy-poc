@@ -1,36 +1,32 @@
-"""v2 정책 P10: 판별기 라벨. P0은 `agentgate.gate.user_policy`, P1–P9는 v1 클래스를 그대로 쓴다."""
+"""v2 정책 P10: 모든 툴 호출을 Trusted LLM 판정(ALLOW/BLOCK)으로 넘긴다. P0은 `agentgate.gate.user_policy`.
+
+v2는 규칙 정책(P1–P9)을 쓰지 않는다. 판정 근거는 TaskSpec, 사용자 허용 범위, 툴 응답에 대한 IPI detector 판단이다.
+"""
 
 from __future__ import annotations
 
-from agentgate.config import load_effect_tools
 from agentgate.gate.base import Policy, PolicyContext, ToolCall
 from agentgate.gate.normalization import iterate_leaf_values, long_value_candidates
 from agentgate.gate.provenance import Origin
-from agentgate.v1.policies import strictest_decision
 from agentgate.v2.labels import value_detection
 
 
-class DetectorLabelPolicy(Policy):
-    """P10: an argument value taken from a response the detector flagged needs review.
+class TrustedReviewPolicy(Policy):
+    """P10: every tool call goes to the Trusted LLM (ESCALATE), reads included.
 
-    Reads only the DetectionResult labels the runtime attached to the responses; never runs a model.
-    A value from a NAMED_SOURCE / OTHER_TOOL response that is flagged, or that sits inside a suspicious window,
-    gives ESCALATE. P10 never blocks by itself: the Trusted LLM decides with the detector evidence.
+    Reads only the detector labels the runtime attached to the responses; never runs a model. The evidence lists,
+    for argument values taken from tool responses, the detector label of that response.
     """
 
     policy_id = "P10"
-    LONG_VALUE_CHARS = 200    # longer values (message bodies) are checked through the typed values inside them
+    LONG_VALUE_CHARS = 200    # longer values (message bodies) are traced through the typed values inside them
     MIN_VALUE_CHARS = 3
 
-    def __init__(self, config: dict):
-        super().__init__(config)
-        self.effect_tools = load_effect_tools()
-
     def applies_to(self, tool):
-        return tool in self.effect_tools
+        return True
 
     def evaluate(self, call: ToolCall, context: PolicyContext):
-        decisions = []
+        labels = []
         for arg, raw in call.args.items():
             for value in iterate_leaf_values(raw):
                 for candidate in long_value_candidates(value, self.LONG_VALUE_CHARS):
@@ -40,10 +36,9 @@ class DetectorLabelPolicy(Policy):
                     if provenance.origin not in (Origin.NAMED_SOURCE, Origin.OTHER_TOOL):
                         continue
                     label = value_detection(context.value_index, candidate, provenance.source_id)
-                    if label is None or not (label["flagged"] or label["in_suspicious_span"]):
-                        continue
-                    evidence = {"arg": arg, "value": candidate, **provenance.as_dict(), "detection": label}
-                    decisions.append(self.escalate(
-                        f"'{candidate}' comes from a response the detector flagged "
-                        f"(score {label['response_score']}, value window {label['value_score']}).", **evidence))
-        return strictest_decision(decisions)
+                    if label is not None:
+                        labels.append({"arg": arg, "value": candidate, **provenance.as_dict(), "detection": label})
+        flagged = [x for x in labels if x["detection"]["flagged"] or x["detection"]["in_suspicious_span"]]
+        reason = (f"{len(flagged)} argument value(s) of '{call.tool}' come from a response the detector flagged."
+                  if flagged else f"'{call.tool}' needs a decision.")
+        return self.escalate(reason, detector_flagged=bool(flagged), value_sources=labels[:10])

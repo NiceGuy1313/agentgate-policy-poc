@@ -1,4 +1,4 @@
-"""v2 Gate: 툴 응답마다 판별기 라벨을 붙인다. 규칙 ④는 config/v2/policies.yaml의 v2.rule4가 true일 때만 쓴다."""
+"""v2 Gate: 툴 응답마다 IPI detector 라벨을 붙인다. 판정은 Trusted LLM이 한다."""
 
 from __future__ import annotations
 
@@ -26,11 +26,3 @@ class DetectorGatedRuntime(GatedRuntime):
                                      "suspicious_spans": len(detection.suspicious_spans()),
                                      "latency_ms": round(detection.latency_ms, 1), "cached": detection.cached,
                                      "attack_marker": ATTACK_MARKER in event.output_text}
-
-    def finalize_judgement(self, judgement: dict) -> dict:
-        # ④: an irreversible call stays with a human when its sources carry a detector warning, even if the
-        # judge allowed it (off by default: it turned most judge ALLOWs on flagged sources into BLOCK)
-        if (self.config.get("v2") or {}).get("rule4") and (judgement.get("final") == "ALLOW" and judgement.get("detector_warning")
-                and judgement.get("reversibility") == "irreversible"):
-            return {**judgement, "final": "HUMAN", "verdict": "BLOCK", "human": True, "rule4": True}
-        return judgement

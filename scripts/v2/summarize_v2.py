@@ -22,35 +22,7 @@ from agentgate.v2.detector import load_detector_config
 
 V2_DIR = PROJECT_ROOT / "results" / "v2"
 LABELS = {"C0": "방어 없음", "C5": "horizon 모델(IPI detector)", "C5p": "PIGuard 모델(IPI detector)"}
-FLOW = """## 검사 흐름
-
-```mermaid
-flowchart TD
-    P[사용자 프롬프트 + 툴 목록] --> TS[TaskSpec 추출<br/>claude-haiku-5-5, 실행 전 작업마다 1회]
-    TS --> G
-    P --> A[에이전트 LLM<br/>gpt-oss:120b]
-    A -->|툴 호출| G{정책 엔진<br/>P0 + P1–P9 + P10}
-    G -->|ALLOW| X[툴 실행]
-    G -->|BLOCK| B[차단 메시지를 툴 결과로 반환]
-    G -->|ESCALATE| T[Trusted LLM<br/>claude-sonnet-5-5]
-    T -->|ALLOW| X
-    T -->|BLOCK · HUMAN| B
-    X --> D[IPI detector<br/>horizon 모델 또는 PIGuard 모델]
-    D -->|응답 라벨: 창별 점수| G
-    X -->|툴 응답| A
-    B --> A
-```
-
-| 구성 요소 | 입력 | 출력 |
-|---|---|---|
-| TaskSpec 추출 (claude-haiku-5-5, Message Batches) | 사용자 프롬프트, 툴 목록(이름·설명). 툴 응답·정답·공격 목표는 넣지 않는다. 프롬프트 `prompts/v1/extract_taskspec.md` | TaskSpec JSON: `requested_ops`(요청된 상태 변경·외부 전송 툴), `named_sources`(사용자가 지목한 자료), `allowed_dest`(프롬프트의 목적지), `amount_cap`(송금 상한), `egress_requested`(데이터 전송 요청 여부), `notes` |
-| 에이전트 LLM (gpt-oss:120b) | 사용자 프롬프트, 이전 툴 응답(차단 메시지 포함) | 툴 호출(툴 이름, 인자) 또는 최종 답 |
-| 정책 엔진 (`GatedRuntime`, LLM 없음) | 툴 호출, TaskSpec, 사용자 고정 설정(`always_block: []`, `always_human: [delete_file, update_password]`), 값 출처 인덱스(프롬프트와 이전 툴 응답), 응답별 IPI detector 라벨 | 정책별 ALLOW / ESCALATE / BLOCK, 가장 강한 판정을 최종으로. P0: `always_block` → BLOCK, `always_human` → 사람 확인(판정 LLM 없이 HUMAN). P1–P9: v1 정책. P10: 인자 값이 detector가 flag한 응답(또는 그 응답의 의심 창)에서 왔으면 ESCALATE(BLOCK은 내지 않음) |
-| IPI detector | 실행된 툴 응답. horizon 모델: 원문(에이전트가 받는 YAML) 2048토큰 창·512토큰 겹침. PIGuard 모델: 레코드별 평문(키·기호 제거) 512토큰 창·128토큰 겹침 | 창별 주입 확률, 응답 점수(창 최고값), flagged(점수 ≥ 0.5). 정책 엔진에는 이 라벨만 넘긴다 |
-| Trusted LLM (claude-sonnet-5-5) | ① 허용 범위: TaskSpec, 사용자 고정 설정. ② 대기 중 호출: 툴, 되돌림 가능 여부, 인자 값(400자 절단)과 값마다의 출처(프롬프트·지목 자료·그 밖의 툴 응답·출처 없음). ③ 판별 결과: 값이 나온 응답의 점수·flagged·의심 창 수, 값이 속한 창 점수, 의심 창 발췌 최대 3개(240자). 사용자 프롬프트 원문, ESCALATE 이유, 툴 응답 전문은 넣지 않는다 | 첫 줄 ALLOW / BLOCK / HUMAN과 한 문장 근거. 해석 실패는 HUMAN. HUMAN은 BLOCK으로 집행한다 |
-| 차단 | BLOCK 판정 | 툴을 실행하지 않고 `Tool call blocked by security policy <정책>: <이유>`를 툴 결과로 에이전트에 돌려준다 |
-
-"""
+FLOW = ""   # the flow section of results/v2/RESULTS.md is written by hand from this output
 
 
 def label(condition: str) -> str:
@@ -182,7 +154,7 @@ def main():
 
     lines = ["# v2 결과: 판별기 + Trusted LLM", "",
              f"> `scripts/v2/summarize_v2.py --run {rel}`가 생성한다. 손으로 고치지 않는다.", "",
-             *FLOW.rstrip("\n").split("\n"), "", "## 1. 구성", ""]
+             "## 1. 구성", ""]
     lines += [f"- 에이전트 `{summary['agent_model']}`, 공격 `{summary['attack']}`, AgentDojo v1.2.2, "
               f"조건마다 공격 없음 {benign_runs}건 + 공격 {attack_runs}건"
               f"{' (전체 규모)' if not run_args.get('pairs') and not run_args.get('pilot') else ''}.",
@@ -190,7 +162,8 @@ def main():
               f"TaskSpec을 쓴다(작업 {analysis['taskspec']['tasks']}개, 실행 간 TaskSpec이 다른 작업 "
               f"{analysis['taskspec']['tasks_with_more_than_one_spec']}개).",
               "- Trusted LLM v2 입력: TaskSpec + 사용자 고정 설정(`always_block`·`always_human`) + 대기 중 호출 + 판별 결과. "
-              "HUMAN은 BLOCK으로 집행한다. P10은 ESCALATE만 낸다. 규칙 ④는 끈다.", ""]
+              "HUMAN은 BLOCK으로 집행한다. 규칙 정책(P1–P9)은 없고, P0(delete_file·update_password) 외의 모든 툴 호출을 "
+              "Trusted LLM이 판정한다.", ""]
     lines += table(["조건", "구성", "판별기 · 입력"], [
         [label(c), get_condition(c).description,
          (f"`{get_condition(c).detector}` · {detectors[get_condition(c).detector].get('mode')}, "

@@ -59,16 +59,16 @@ v3부터 P7의 인젝션 문구 목록(`instruction_phrases`)은 비운다. Agen
 
 ## 5. v2·v3 정책
 
-v2·v3는 v1의 P1–P9 클래스를 그대로 쓰고 아래 정책을 더한다. 버전마다 설정 파일이 따로 있다(`config/v2/policies.yaml`, `config/v3/policy.yaml`). v3는 한 파일에 위협 통제 영역(`controls`: 요청 범위, 주입된 지시, 목적지, 데이터 반출, 자금 이동, 삭제·은폐, 계정·권한, 외부 콘텐츠, 사용자 고정 설정), 판정 규칙(`rules`), 환경 바인딩(`environment`: 툴별 능력과 인자 역할), 사용자 고정 설정, v3.1 수정(`v31`)을 둔다. 통제 영역은 ATR 공격 목표로 나눈 추상 분류이고 툴 이름은 바인딩에만 있다. `agentgate.v3.compile_engine_config`가 이를 P0–P12 클래스가 읽는 엔진 설정으로 바꾼다. 정책 순서는 각 버전 패키지의 `POLICY_CLASSES`가 정한다.
+v2는 규칙 정책(P1–P9)을 쓰지 않는다. P0(사용자 허용 범위, `config/v2/user_policy.yaml`) 외의 모든 툴 호출을 P10이 Trusted LLM 판정으로 넘긴다. v3는 v1의 P1–P9 클래스를 그대로 쓰고 아래 정책을 더하며, 설정은 `config/v3/policy.yaml`이다. v3는 한 파일에 위협 통제 영역(`controls`: 요청 범위, 주입된 지시, 목적지, 데이터 반출, 자금 이동, 삭제·은폐, 계정·권한, 외부 콘텐츠, 사용자 고정 설정), 판정 규칙(`rules`), 환경 바인딩(`environment`: 툴별 능력과 인자 역할), 사용자 고정 설정, v3.1 수정(`v31`)을 둔다. 통제 영역은 ATR 공격 목표로 나눈 추상 분류이고 툴 이름은 바인딩에만 있다. `agentgate.v3.compile_engine_config`가 이를 P0–P12 클래스가 읽는 엔진 설정으로 바꾼다. 정책 순서는 각 버전 패키지의 `POLICY_CLASSES`가 정한다.
 
 | 정책 | 버전 | 클래스 | 규칙 → 판정 |
 |---|---|---|---|
 | P0 사용자 고정 설정 | v2, v3 | `UserFixedPolicy` ([`gate/user_policy.py`](../src/agentgate/gate/user_policy.py)) | `always_block` 툴 → BLOCK, `always_human` 툴(`delete_file`, `update_password`) → ESCALATE(force_human, 판정 없이 HUMAN) |
-| P10 판별기 라벨 | v2 | `DetectorLabelPolicy` ([`v2/policies.py`](../src/agentgate/v2/policies.py)) | 판별기가 flag한 응답에서 온 값 → ESCALATE, 지목하지 않은 응답의 의심 조각 안 값 → BLOCK |
+| P10 Trusted LLM 판정 | v2 | `TrustedReviewPolicy` ([`v2/policies.py`](../src/agentgate/v2/policies.py)) | 모든 툴 호출 → ESCALATE(Trusted LLM이 TaskSpec + 사용자 허용 범위 + IPI detector 판단으로 ALLOW/BLOCK/HUMAN). 인자 값이 나온 응답의 판별 라벨을 근거로 붙인다 |
 | P11 툴 콘텐츠가 시킨 행동 | v3 | `InstructedActionPolicy` ([`v3/policies.py`](../src/agentgate/v3/policies.py)) | 호출이 ToolSpec 속 요청과 일치하고, 사용자가 요청하지도 위임하지도 않은 행동 → BLOCK, 그 밖 → ESCALATE. 사용자가 준 값은 일치 근거에서 뺀다 |
 | P12 요청된 행동만 | v3 | `RequestedActionPolicy` | `requested_ops`에 없는 상태 변경·외부 전송(URL 방문 제외) → ESCALATE |
 
-v3는 P7의 공격 문구 목록을 비우고 P10을 쓰지 않는다. v2의 규칙 ④(`v2/runtime.py`): 판정 LLM이 ALLOW해도, 되돌릴 수 없는 툴이고 관련 출처에 판별기 경고가 있으면 HUMAN이다.
+v3는 P7의 공격 문구 목록을 비우고 P10을 쓰지 않는다.
 
 v3.1은 v1 클래스를 고치지 않고 서브클래스로 바꾼다(`v3/policies.py`의 `*V31`).
 
