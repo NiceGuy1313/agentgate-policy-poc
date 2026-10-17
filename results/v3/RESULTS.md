@@ -12,24 +12,42 @@
 ## 실험 흐름
 
 ```mermaid
-flowchart TD
-    P["사용자 프롬프트"] --> TS["TaskSpec 추출기<br/>(Haiku)"]
-    P --> AG["에이전트<br/>(gpt-oss:120b)"]
-    AG -- "툴 호출" --> EN["정책 엔진 P0–P12<br/>(결정론, LLM 없음)"]
-    TS -- "TaskSpec" --> EN
-    EN -- "읽기 호출 + ALLOW" --> EX["툴 실행<br/>(AgentDojo 환경)"]
-    EN -- "effect 호출 또는<br/>ALLOW가 아닌 호출" --> SW{"조건"}
-    SW -- "C8b" --> RB["엔진 판정 그대로<br/>ESCALATE는 BLOCK"]
-    SW -- "C8 · C8n" --> JD["판정 LLM<br/>(Sonnet)"]
-    RB -- "ALLOW" --> EX
-    RB -- "BLOCK" --> BL["차단 메시지"]
-    JD -- "ALLOW" --> EX
-    JD -- "BLOCK · HUMAN" --> BL
-    EX -- "툴 응답" --> TO["ToolSpec 추출기<br/>(Haiku)"]
-    TO -- "ToolSpec" --> EN
-    TO -- "ToolSpec" --> JD
-    EX -- "툴 응답" --> AG
-    BL --> AG
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant TS as TaskSpec 추출기<br/>(Haiku)
+    participant AG as 에이전트<br/>(gpt-oss:120b)
+    participant EN as 정책 엔진 P0–P12<br/>(규칙, LLM 없음)
+    participant JD as 판정 LLM<br/>(Sonnet)
+    participant TL as 툴<br/>(AgentDojo 환경)
+    participant TO as ToolSpec 추출기<br/>(Haiku)
+
+    U->>TS: 프롬프트 + 툴 목록
+    TS-->>EN: TaskSpec (허락한 범위)
+    U->>AG: 프롬프트
+    loop 에이전트가 끝낼 때까지
+        AG->>EN: 툴 호출 (툴, 인자)
+        EN->>EN: 규칙 검사 → ALLOW / ESCALATE / BLOCK
+        alt 읽기 호출이고 엔진 ALLOW
+            EN->>TL: 실행
+        else C8b (판정 LLM 없음)
+            Note over EN: ALLOW만 실행, ESCALATE·BLOCK은 차단
+            EN->>TL: 실행 (ALLOW일 때)
+            EN-->>AG: 차단 메시지 (그 밖)
+        else C8 · C8n (effect 호출 또는 엔진 ALLOW 아님)
+            EN->>JD: 호출 + 엔진 판정·이유 + 값 출처 + TaskSpec + ToolSpec<br/>(C8은 정책 문서 포함)
+            JD-->>EN: ALLOW / BLOCK / HUMAN
+            alt ALLOW
+                EN->>TL: 실행
+            else BLOCK · HUMAN
+                EN-->>AG: 차단 메시지
+            end
+        end
+        TL-->>AG: 툴 응답 (공격 실행이면 주입 문구 포함)
+        TL->>TO: 툴 응답 원문
+        TO-->>EN: ToolSpec (레코드·응답 속 요청, 다음 판정에 사용)
+    end
+    AG-->>U: 최종 답변
 ```
 
 사용자 고정 설정의 `always_block` 툴은 어느 조건에서든 판정 없이 BLOCK된다.
