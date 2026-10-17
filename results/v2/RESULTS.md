@@ -5,20 +5,24 @@
 ## 검사 흐름
 
 ```mermaid
-flowchart LR
-    P[사용자 프롬프트 + 툴 목록] --> S[TaskSpec 추출]
-    P --> A[에이전트 LLM]
-    A -->|툴 호출| R{허용?}
-    R -->|예| X[툴 실행]
-    R -->|판단 필요| T[Trusted LLM]
-    T -->|ALLOW| X
-    T -->|BLOCK · HUMAN| B[차단]
-    X --> D[IPI detector]
-    D -->|응답 점수| R
-    S -->|허용 범위| T
+flowchart TD
+    P[① 사용자 프롬프트 + 툴 목록] --> S[② TaskSpec 추출]
+    P --> A[③ 에이전트 LLM]
+    A -->|툴 호출| X[툴 실행]
     X -->|툴 응답| A
-    B -->|차단 메시지| A
+    X -->|툴 응답| D[④ IPI detector<br/>응답마다 주입 점수]
+    A -->|flag된 응답의 값을 쓰는 다음 툴 호출| T[⑤ Trusted LLM]
+    S -->|TaskSpec| T
+    D -->|점수 · 의심 구간| T
+    T -->|ALLOW| X
+    T -->|BLOCK · HUMAN| B[차단 메시지]
+    B --> A
 ```
+
+1. 실행 전에 사용자 프롬프트로 TaskSpec(허용 범위)을 한 번 뽑는다.
+2. 에이전트가 툴을 호출해 응답을 읽으면, IPI detector가 그 응답의 주입 점수를 매긴다.
+3. 에이전트의 다음 호출이 flag된 응답에서 온 값을 쓰면, Trusted LLM이 **TaskSpec + 판별 점수**를 보고 실행 여부를 정한다.
+4. 그 밖의 호출은 Trusted LLM 없이 바로 실행된다.
 
 **TaskSpec 추출** (claude-haiku-5-5, 실행 전 작업마다 1회, 배치)
 - 입력: 사용자 프롬프트, 툴 이름·설명
