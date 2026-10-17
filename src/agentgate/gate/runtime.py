@@ -153,16 +153,10 @@ class GatedRuntime(FunctionsRuntime):
         else:
             result = self.engine.decide(ToolCall(function, args), self.context)
             event.decision = result.as_dict()
-        effective = result.verdict
-        if effective == Verdict.ESCALATE:
-            if self.escalate_action == "allow":
-                effective = Verdict.ALLOW
-            elif self.escalate_action == "judge" and self.judge is not None:
-                judgement = self.finalize_judgement(self.judge(ToolCall(function, args), result, self.context))
-                event.decision["judge"] = judgement
-                effective = Verdict(judgement["verdict"])
-            else:
-                effective = Verdict.BLOCK
+        effective, judgement = (self.resolve(ToolCall(function, args), result) if self.index is not None
+                                else (result.verdict, None))
+        if judgement is not None:
+            event.decision["judge"] = judgement
         event.decide_ms = (time.perf_counter() - start) * 1000
         event.decision["effective"] = effective.value
 
@@ -193,6 +187,17 @@ class GatedRuntime(FunctionsRuntime):
         return output, error
 
     # ------------------------------------------------------------------ version hooks
+    def resolve(self, call: ToolCall, result: EngineResult) -> tuple[Verdict, dict | None]:
+        """Effective verdict and judge record. v1: only ESCALATE is resolved (block | allow | judge)."""
+        if result.verdict != Verdict.ESCALATE:
+            return result.verdict, None
+        if self.escalate_action == "allow":
+            return Verdict.ALLOW, None
+        if self.escalate_action == "judge" and self.judge is not None:
+            judgement = self.finalize_judgement(self.judge(call, result, self.context))
+            return Verdict(judgement["verdict"]), judgement
+        return Verdict.BLOCK, None
+
     def label_response(self, source, event: TraceEvent) -> None:
         """Attach version labels to an executed response (v2 detector, v3 ToolSpec). v1: none."""
 
