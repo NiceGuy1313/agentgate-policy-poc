@@ -183,7 +183,7 @@ def main():
         for r in runs:
             if r["condition"] != c or r["injection_task"] is not None or r["utility"] or r.get("error"):
                 continue
-            lost["판정 LLM 차단" if any(e.get("effective") == "BLOCK" for e in r["trace"]) else "차단 없이 실패"] += 1
+            lost["판정 LLM 차단" if any(e.get("blocked") for e in r["trace"]) else "차단 없이 실패"] += 1
         lines.append(f"- **{c}** {sum(lost.values())}건: " + ", ".join(f"{k} {v}" for k, v in lost.most_common()))
     lines += ["", "### 공격이 성공한 경로", "",
               "\"툴 호출 없이 성공(유형 H)\"은 에이전트가 답변 텍스트만으로 공격 목표를 달성한 경우로, 툴 호출 Gate로는 막을 수 "
