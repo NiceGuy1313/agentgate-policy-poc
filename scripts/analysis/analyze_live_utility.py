@@ -20,8 +20,8 @@ from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
+from agentgate.agentdojo.suites import load_suite
 from agentgate.config import PROJECT_ROOT
-from agentgate.suites import load_suite
 
 
 def load_condition(run_dir: Path, condition: str, tmp: Path) -> dict:

@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -28,9 +28,9 @@ from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
 from agentdojo.functions_runtime import FunctionsRuntime
 
 from agentgate import SUITES
-from agentgate.evaluation.replay import build_injections
-from agentgate.llm.toolspec_extractor import ToolSpecExtractor
-from agentgate.suites import describe_tools, load_suite
+from agentgate.agentdojo.replay import build_injections
+from agentgate.agentdojo.suites import describe_tools, load_suite
+from agentgate.v3.toolspec import ToolSpecExtractor
 
 
 def _alnum(text: str) -> str:

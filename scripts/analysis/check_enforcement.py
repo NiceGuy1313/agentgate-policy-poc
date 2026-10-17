@@ -18,8 +18,8 @@ import argparse
 import json
 from collections import Counter
 
+from agentgate.agentdojo.live_run_analysis import live_run_files
 from agentgate.config import PROJECT_ROOT
-from agentgate.evaluation.live_run_analysis import live_run_files
 
 
 def check_run(run: dict) -> list[dict]:

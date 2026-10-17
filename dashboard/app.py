@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agentgate import SUITES
+from agentgate.agentdojo.suites import load_suite, task_number
 from agentgate.config import load_dotenv
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink
@@ -37,7 +38,6 @@ from agentgate.harness.runner import RunRequest, execute, run_scenario
 from agentgate.harness.scenario import ScenarioConfig, Session, default_attack_model_name
 from agentgate.harness.service import router as contract_router
 from agentgate.harness.service import set_service_url, store
-from agentgate.suites import load_suite, task_number
 
 APP_DIR = Path(__file__).resolve().parent
 RUNS_DIR = APP_DIR / "runs"
@@ -161,8 +161,8 @@ def status() -> dict:
 def scenario(suite: str, user_task: str, injection_task: str | None = None,
              attack: str = "important_instructions", attack_model_name: str = "AI assistant") -> dict:
     """Preview: user prompt, injection GOAL and the injected texts, oracle TaskSpec."""
-    from agentgate.evaluation.replay import REPLAY_PIPELINE_NAME, get_cached_attack
-    from agentgate.task_spec import load_task_spec
+    from agentgate.agentdojo.replay import REPLAY_PIPELINE_NAME, get_cached_attack
+    from agentgate.gate.task_spec import load_task_spec
     suite_obj = load_suite(suite)
     task = suite_obj.get_user_task_by_id(user_task)
     out: dict[str, Any] = {"prompt": task.PROMPT}

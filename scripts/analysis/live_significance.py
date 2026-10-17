@@ -18,9 +18,9 @@ import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from agentgate.agentdojo.live_run_analysis import live_run_files
+from agentgate.agentdojo.metrics import mcnemar_exact, wilson
 from agentgate.config import PROJECT_ROOT
-from agentgate.evaluation.live_run_analysis import live_run_files
-from agentgate.evaluation.metrics import mcnemar_exact, wilson
 
 # Metric name -> (run kind, record field).
 METRICS = {"asr": ("attack", "security"), "utility": ("benign", "utility"),

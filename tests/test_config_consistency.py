@@ -3,9 +3,9 @@
 import yaml
 from agentdojo.functions_runtime import FunctionsRuntime
 
-from agentgate import SUITES
-from agentgate.config import CONFIG_DIR, load_named_source_rules, load_policy_config
-from agentgate.suites import load_suite
+from agentgate import SUITES, v1
+from agentgate.agentdojo.suites import load_suite
+from agentgate.config import CONFIG_DIR, load_named_source_rules
 
 
 def _all_tools():
@@ -14,13 +14,13 @@ def _all_tools():
 
 def test_config_tool_names_exist():
     tools = _all_tools()
-    policy_config = load_policy_config()
+    policy_config = v1.load_config()
     names = set(policy_config["P1"]["targets"]) | set(policy_config["external_sinks"])
     names |= set(policy_config["P4"]["tools"]) | set(policy_config["P6"]["tools"])
     names |= set(policy_config["P7"]["message_tools"]) | set(policy_config["P7"]["visit_tools"])
     names |= set(policy_config["P8"]["tools"]) | set(policy_config["P9"]["tools"])
     names |= set(policy_config["reversibility"]["irreversible"]) | set(policy_config["reversibility"]["reversible"])
-    roles = yaml.safe_load((CONFIG_DIR / "tool_roles.yaml").read_text())
+    roles = yaml.safe_load((CONFIG_DIR / "agentdojo" / "tool_roles.yaml").read_text())
     names |= {t for v in roles["effect"].values() for t in v}
     names |= set(load_named_source_rules()["by_argument"]) | set(load_named_source_rules()["trusted_tools"])
     assert names - tools == set()
@@ -47,8 +47,8 @@ def test_trusted_tools_never_carry_injections():
 
 
 def test_every_tool_is_classified_for_reversibility_or_read_only():
-    policy_config = load_policy_config()
+    policy_config = v1.load_config()
     classified = set(policy_config["reversibility"]["irreversible"]) | set(policy_config["reversibility"]["reversible"])
-    roles = yaml.safe_load((CONFIG_DIR / "tool_roles.yaml").read_text())
+    roles = yaml.safe_load((CONFIG_DIR / "agentdojo" / "tool_roles.yaml").read_text())
     effect = {t for v in roles["effect"].values() for t in v}
     assert effect <= classified

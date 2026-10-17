@@ -1,12 +1,11 @@
-"""LLM 구성 요소이다. 게이트 안에서 LLM을 호출하는 것은 TaskSpec 추출기와 판정 LLM(escalation judge)뿐이다.
+"""버전과 무관한 LLM 구성 요소: API client, TaskSpec 추출기, 판정 LLM 입출력 helper.
 
-평가 대상 에이전트(`agentgate.agents`)도 `llm.client`를 사용한다(평가 대상 에이전트 예외).
-정책 패키지(`agentgate.policy`)는 이 패키지를 import하지 않는다.
+버전별 판정 LLM은 `agentgate.v1.judge`(C4), `agentgate.v2.judge`(C5), `agentgate.v3.judge`(C6·C7)에,
+ToolSpec 추출기는 `agentgate.v3.toolspec`에 있다. 평가 대상 에이전트(`agentgate.agents`)도 `llm.client`를 쓴다.
+정책 코드(`agentgate.gate`, `agentgate.v*/policies.py`)는 이 패키지를 import하지 않는다.
 """
 
 from agentgate.llm.client import LLMClient, OllamaClient
-from agentgate.llm.escalation_judge import EscalationJudge, as_runtime_judge
 from agentgate.llm.taskspec_extractor import ExtractionResult, TaskSpecExtractor, ToolInfo
 
-__all__ = ["EscalationJudge", "ExtractionResult", "LLMClient", "OllamaClient", "TaskSpecExtractor", "ToolInfo",
-           "as_runtime_judge"]
+__all__ = ["ExtractionResult", "LLMClient", "OllamaClient", "TaskSpecExtractor", "ToolInfo"]

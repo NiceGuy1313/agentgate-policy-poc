@@ -1,11 +1,11 @@
 """실제 AgentDojo AgentPipeline 안의 정책 게이트를 검사한다(scripted 에이전트, LLM 없음)."""
 
+from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline, run_live_task
+from agentgate.agentdojo.replay import build_injections
+from agentgate.agentdojo.suites import load_suite
 from agentgate.agents.scripted_agent import ScriptedAgent
-from agentgate.evaluation.replay import build_injections
-from agentgate.pipeline import RecordingPipeline, build_pipeline, run_live_task
-from agentgate.runtime import GatedRuntime
-from agentgate.suites import load_suite
-from agentgate.task_spec import load_task_spec
+from agentgate.gate.runtime import GatedRuntime
+from agentgate.gate.task_spec import load_task_spec
 
 
 def _run(mode, escalate_action="block"):

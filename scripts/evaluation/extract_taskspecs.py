@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from agentgate import SUITES
+from agentgate.agentdojo.suites import describe_tools, load_suite
 from agentgate.config import PROJECT_ROOT
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
-from agentgate.suites import describe_tools, load_suite
 
 
 def main():

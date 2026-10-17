@@ -36,8 +36,8 @@ def _signature(trace: list[dict]) -> list[tuple]:
 
 
 def reference(pair, condition: str) -> dict:
+    from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline, run_live_task
     from agentgate.agents.scripted_agent import ScriptedAgent
-    from agentgate.pipeline import RecordingPipeline, build_pipeline, run_live_task
 
     session = Session(ScenarioConfig(*pair, condition=condition, attack_model_name="GPT-4"))
     llm = ScriptedAgent(pair[0], session.user_task, session.injection_task)

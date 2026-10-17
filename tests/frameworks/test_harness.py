@@ -4,11 +4,11 @@ import logging
 
 import pytest
 
+from agentgate.agentdojo.suites import load_suite
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink, capture_loggers, parse_boundary_record
 from agentgate.harness.models import ModelSpec
 from agentgate.harness.tool_schema import arguments
-from agentgate.suites import load_suite
 
 
 def test_every_suite_tool_flattens():

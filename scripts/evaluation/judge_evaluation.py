@@ -17,11 +17,11 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 from agentgate import SUITES
+from agentgate.agentdojo.replay import replay_attack_pair, replay_benign_task
+from agentgate.agentdojo.suites import load_suite
 from agentgate.config import PROJECT_ROOT
-from agentgate.evaluation.replay import replay_attack_pair, replay_benign_task
-from agentgate.llm.escalation_judge import EscalationJudge
-from agentgate.suites import load_suite
-from agentgate.task_spec import load_task_spec
+from agentgate.gate.task_spec import load_task_spec
+from agentgate.v1.judge import EscalationJudge
 
 
 def main():

@@ -8,7 +8,7 @@
   # 저장된 live run 하나 (먼저 results/live/v1/<run>/runs.tar.gz 압축 해제)
   python scripts/analysis/inspect_trace.py live results/live/v1/<run>/C1/banking/user_task_0/injection_task_7.json
   # 가상의 단일 호출에 대한 엔진 판정
-  python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/specs/oracle/banking/user_task_0.yaml \\
+  python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/agentdojo/oracle_specs/banking/user_task_0.yaml \\
       --tool send_money --args '{"recipient": "US133000000121212121212", "amount": 10, "subject": "x", "date": "d"}'
 """
 
@@ -18,11 +18,11 @@ import argparse
 import json
 import textwrap
 
-from agentgate.evaluation.replay import replay_attack_pair, replay_benign_task
-from agentgate.policy.base import PolicyContext, SessionState, ToolCall
-from agentgate.policy.engine import PolicyEngine
-from agentgate.provenance import ValueIndex
-from agentgate.task_spec import TaskSpec, load_task_spec
+from agentgate.agentdojo.replay import replay_attack_pair, replay_benign_task
+from agentgate.gate.base import PolicyContext, SessionState, ToolCall
+from agentgate.gate.engine import PolicyEngine
+from agentgate.gate.provenance import ValueIndex
+from agentgate.gate.task_spec import TaskSpec, load_task_spec
 
 VERDICT_MARKERS = {"ALLOW": "  ", "ESCALATE": "? ", "BLOCK": "X "}
 

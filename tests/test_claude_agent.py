@@ -3,12 +3,12 @@
 from agentdojo.types import ChatUserMessage, text_content_block_from_string
 from anthropic.types import Message
 
+from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline
+from agentgate.agentdojo.suites import load_suite
 from agentgate.agents.claude_agent import RAW_CONTENT_KEY, ClaudeAgentLLM
+from agentgate.gate.runtime import GatedRuntime
+from agentgate.gate.task_spec import TaskSpec
 from agentgate.llm.client import supports_temperature
-from agentgate.pipeline import RecordingPipeline, build_pipeline
-from agentgate.runtime import GatedRuntime
-from agentgate.suites import load_suite
-from agentgate.task_spec import TaskSpec
 
 
 def _message(content, stop_reason):

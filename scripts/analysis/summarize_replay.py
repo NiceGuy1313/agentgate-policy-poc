@@ -15,8 +15,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from agentgate import SUITES
-from agentgate.config import PROJECT_ROOT
-from agentgate.evaluation.metrics import (
+from agentgate.agentdojo.metrics import (
     POLICY_IDS,
     compare_runs,
     count_benign_false_positives,
@@ -28,7 +27,8 @@ from agentgate.evaluation.metrics import (
     read_jsonl,
     run_key,
 )
-from agentgate.task_spec import load_task_spec
+from agentgate.config import PROJECT_ROOT
+from agentgate.gate.task_spec import load_task_spec
 
 
 def classify_miss(run: dict) -> str:

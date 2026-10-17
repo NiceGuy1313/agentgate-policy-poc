@@ -5,7 +5,7 @@
 입력: results/replay/v1/{oracle,llm_<model>}/, (6절) results/replay/v3·v31/, results/live/v2·v3·v31/,
       results/toolspec/v1/, results/rules/v1/, config/policy_rules_v31.yaml,
       results/live/v1/<run>/{summary,significance,enforcement_check,run_*}.json,
-      results/judge/v1/<model>/judge_eval.json, data/benchmark/, data/pairs/, data/specs/llm/, data/judge_cache/
+      results/judge/v1/<model>/judge_eval.json, data/agentdojo/benchmark/, data/agentdojo/pairs/, data/specs/llm/, data/judge_cache/
 출력: docs/final_report.md, results/figures/*.png, results/dashboard.html,
       v2_detector_trusted_llm/RESULTS.md, v3_trusted_llm_policy_doc/RESULTS.md
 """
@@ -21,14 +21,14 @@ from pathlib import Path
 import tomllib
 import yaml
 
-from agentgate import BENCHMARK_VERSION
-from agentgate.config import PROJECT_ROOT, load_policy_config
-from agentgate.evaluation.metrics import TYPE_NAMES, compare_runs
+from agentgate import BENCHMARK_VERSION, v1
+from agentgate.agentdojo.metrics import TYPE_NAMES, compare_runs
+from agentgate.config import PROJECT_ROOT
 
 DOCS_DIR, FIGURES_DIR = PROJECT_ROOT / "docs", PROJECT_ROOT / "results" / "figures"
 REPLAY_DIR = PROJECT_ROOT / "results/replay/v1/oracle"
 LIVE_ROOT = PROJECT_ROOT / "results/live/v1"
-PAIRS_FILE = "data/pairs/strat3_seed0.txt"
+PAIRS_FILE = "data/agentdojo/pairs/strat3_seed0.txt"
 CONDITION_LABELS_EN = {"C0": "no defense", "C1": "gate\nESC→block", "C2": "gate\nESC→allow",
                        "C3": "built-in\n(spotlighting)", "C4": "gate\nESC→judge"}
 CONDITION_NAMES = {"C0": "방어 없음", "C1": "게이트 (ESCALATE→block)", "C2": "게이트 (ESCALATE→allow)",
@@ -440,7 +440,7 @@ def enforcement_section(enforcement_checks) -> list[str]:
 
 
 def limitations_section(replay_summary) -> list[str]:
-    n_injection_tasks = len(load_json(PROJECT_ROOT / "data/benchmark/injection_tasks.json") or [])
+    n_injection_tasks = len(load_json(PROJECT_ROOT / "data/agentdojo/benchmark/injection_tasks.json") or [])
     design = pairs_file_design()
     return ["## 7. 한계 (1–5절)", "",
             f"- 정책과 공격 유형 분류를 평가에 쓴 injection task {n_injection_tasks}개를 보고 설계했다. 재생 탐지율은 일반화 성능이 "
@@ -457,7 +457,7 @@ def reproduce_section(llm_replay_summaries, live_summaries) -> list[str]:
     lines = ["## 8. 재현 명령", "",
              f"Python {tomllib.loads((PROJECT_ROOT / 'pyproject.toml').read_text())['project']['requires-python']}, "
              f"`agentdojo=={version('agentdojo')}`, 벤치마크 `{BENCHMARK_VERSION}`, 정책 설정 `config/policies.yaml` "
-             f"(version {load_policy_config()['version']}). "
+             f"(version {v1.load_config()['version']}). "
              "LLM 단계에는 `ANTHROPIC_API_KEY`, Ollama 모델에는 `OLLAMA_API_KEY`가 필요하다.", "",
              "```bash",
              "python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'",
@@ -489,13 +489,13 @@ def reproduce_section(llm_replay_summaries, live_summaries) -> list[str]:
               "python scripts/evaluation/toolspec_evaluation.py --out results/toolspec/v1",
               "python scripts/analysis/analyze_atr_corpora.py --atr <agent-threat-rules checkout> --out results/rules/v1",
               "python scripts/evaluation/extract_taskspecs.py --name claude-sonnet-5-5-v3 --cache-dir data/specs/llm_cache_v3",
-              "python scripts/evaluation/make_stratified_pairs.py --k 3 --seed 1 --benign --out data/pairs/strat3_seed1.txt",
+              "python scripts/evaluation/make_stratified_pairs.py --k 3 --seed 1 --benign --out data/agentdojo/pairs/strat3_seed1.txt",
               "for a in tool_knowledge important_instructions; do for e in judge_v3 judge_v3_norules; do",
               "  python scripts/evaluation/replay_evaluation.py --spec llm:claude-sonnet-5-5-v3 --gate v31 --escalate $e "
               "--attack $a --out results/replay/v31/${e}_llmspec_$a",
               "  python scripts/analysis/summarize_replay.py --run results/replay/v31/${e}_llmspec_$a; done; done",
               "AGENTGATE_AGENT_PROVIDER=ollama AGENTGATE_AGENT_MODEL=gpt-oss:120b python scripts/evaluation/live_evaluation.py "
-              "--agent llm --spec llm --attack tool_knowledge --pairs @data/pairs/strat3_seed1.txt "
+              "--agent llm --spec llm --attack tool_knowledge --pairs @data/agentdojo/pairs/strat3_seed1.txt "
               "--conditions C0 C1 C6 C7 C7n --spec-cache-dir data/specs/llm_cache_v3 "
               "--out results/live/v31/strat3s1_tk_gpt-oss_120b",
               "python scripts/analysis/analyze_live_utility.py --run results/live/v31/strat3s1_tk_gpt-oss_120b "
@@ -566,7 +566,7 @@ def v3_section() -> list[str]:
     seed0_summary, seed0_sig, seed1_summary, seed1_sig = _live_inputs()
     if not all((seed0_summary, seed0_sig, seed1_summary, seed1_sig)):
         return []
-    s0, s1 = _pairs(PROJECT_ROOT / "data/pairs/strat3_seed0.txt"), _pairs(PROJECT_ROOT / "data/pairs/strat3_seed1.txt")
+    s0, s1 = _pairs(PROJECT_ROOT / "data/agentdojo/pairs/strat3_seed0.txt"), _pairs(PROJECT_ROOT / "data/agentdojo/pairs/strat3_seed1.txt")
     attack0, attack1 = {x for x in s0 if not x.endswith(":none")}, {x for x in s1 if not x.endswith(":none")}
     return ["## 6. v2–v3.1 후속 실험", "",
             "1–5절의 v1 게이트 위에서 진행했다. 에이전트는 gpt-oss:120b(Ollama), 공격은 `tool_knowledge`, TaskSpec은 "
@@ -580,11 +580,11 @@ def v3_section() -> list[str]:
             "### 6.1 실제 에이전트 비교", "",
             "\"툴 호출 공격 성공\"은 공격 성공 중 툴 호출 없이 답변만 조작한 유형 H를 뺀 수다. \"C0 대비\"는 같은 짝의 차이와 "
             "exact McNemar p다.", "",
-            "**짝 A (`data/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 "
+            "**짝 A (`data/agentdojo/pairs/strat3_seed0.txt`, v3 손실 분석과 v3.1 설계에 쓴 짝)**. C0–C4는 v1, C5는 v2, C6은 v3 "
             "실행 결과를 재사용했다(같은 짝, 다른 실행 시점).", "",
             markdown_table(LIVE_HEADER, _live_rows(seed0_summary, seed0_sig, ["C0", "C1", "C2", "C4", "C5", "C6", "C7", "C7n"])),
             "",
-            f"**짝 B (`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. "
+            f"**짝 B (`data/agentdojo/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)**. 다섯 조건을 같은 시점에 실행했다. "
             f"정상 실행은 짝 A와 같은 97개 user task이고, 공격 쌍 {len(attack1)}개 중 {len(attack0 & attack1)}개는 짝 A와 "
             "겹친다. 완전한 held-out은 아니다.", "",
             markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), ""]
@@ -680,7 +680,7 @@ def v3_results() -> list[str]:
               markdown_table(["게이트", "공격", "저지", "lenient 탐지", "정상 Utility", "공격 중 Utility", "놓친 쌍"], rows), ""]
     lines += ["## 4. 실제 에이전트", "",
               markdown_table(LIVE_HEADER, _live_rows(seed1_summary, seed1_sig, ["C0", "C1", "C6", "C7", "C7n"])), "",
-              "짝 B(`data/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)의 같은 시점 실행이다. 짝 A 결과는 "
+              "짝 B(`data/agentdojo/pairs/strat3_seed1.txt`, v3.1 설계에 쓰지 않은 짝)의 같은 시점 실행이다. 짝 A 결과는 "
               "`docs/final_report.md` 6.1절에 있다.", ""]
     loss_rows = []
     for label, path in (("짝 A C6 (v3)", PROJECT_ROOT / "results/live/v3/strat3_tk_gpt-oss_120b/utility_analysis_C6.json"),
@@ -791,7 +791,7 @@ def write_dashboard(replay_summary, live_summaries):
     for line in (REPLAY_DIR / "attack_enforce.jsonl").open():
         record = json.loads(line)
         enforce_by_pair[(record["suite"], record["user_task"], record["injection_task"])] = record
-    labels = yaml.safe_load((PROJECT_ROOT / "data/benchmark/injection_labels.yaml").read_text())
+    labels = yaml.safe_load((PROJECT_ROOT / "data/agentdojo/benchmark/injection_labels.yaml").read_text())
     for line in (REPLAY_DIR / "attack_audit.jsonl").open():
         record = json.loads(line)
         pair_key = (record["suite"], record["user_task"], record["injection_task"])

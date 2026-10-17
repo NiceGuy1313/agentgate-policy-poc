@@ -12,14 +12,14 @@ import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from agentgate.config import PROJECT_ROOT, load_effect_tools
-from agentgate.evaluation.live_run_analysis import (
+from agentgate.agentdojo.live_run_analysis import (
     attack_attempted,
     attack_call_steps,
     live_run_files,
     load_benchmark_tasks,
 )
-from agentgate.evaluation.metrics import load_injection_labels
+from agentgate.agentdojo.metrics import load_injection_labels
+from agentgate.config import PROJECT_ROOT, load_effect_tools
 
 REFUSAL_WORDS = ("blocked", "security policy", "cannot", "can't", "unable", "not able", "not allowed", "refuse")
 

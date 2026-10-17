@@ -2,12 +2,13 @@
 
 import inspect
 
-from agentgate.llm import escalation_judge, taskspec_extractor
+from agentgate.gate.base import PolicyContext, SessionState, ToolCall
+from agentgate.gate.engine import PolicyEngine
+from agentgate.gate.provenance import ValueIndex
+from agentgate.gate.task_spec import TaskSpec
+from agentgate.llm import taskspec_extractor
 from agentgate.llm.client import Completion, extract_first_json_object
-from agentgate.policy.base import PolicyContext, SessionState, ToolCall
-from agentgate.policy.engine import PolicyEngine
-from agentgate.provenance import ValueIndex
-from agentgate.task_spec import TaskSpec
+from agentgate.v1 import judge as escalation_judge
 
 
 class FakeClient:

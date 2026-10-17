@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from agentgate.evaluation.pairs import stratified_pairs
+from agentgate.agentdojo.pairs import stratified_pairs
 
 
 def test_every_user_task_gets_k_distinct_injections_and_one_benign():

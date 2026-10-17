@@ -1,7 +1,7 @@
 """oracle TaskSpec 초안을 PROMPT 텍스트와 툴 목록만으로 작성한다.
 
 각 항목: (requested_ops, named_sources, allowed_dest, amount_cap, egress_requested, ambiguous, notes)
-한 번 실행해 data/specs/oracle/<suite>/<task>.yaml을 status: draft로 (재)생성한다. 이미 `status: reviewed`인
+한 번 실행해 data/agentdojo/oracle_specs/<suite>/<task>.yaml을 status: draft로 (재)생성한다. 이미 `status: reviewed`인
 파일은 덮어쓰지 않는다.
 
 사용법: python scripts/taskspec/seed_oracle_specs.py
@@ -13,7 +13,7 @@ import yaml
 
 from agentgate.config import PROJECT_ROOT
 
-OUTPUT_DIR = PROJECT_ROOT / "data" / "specs" / "oracle"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "agentdojo" / "oracle_specs"
 
 CREATE_EVENT = "create_calendar_event"
 TRANSACTIONS = "tool:get_most_recent_transactions"

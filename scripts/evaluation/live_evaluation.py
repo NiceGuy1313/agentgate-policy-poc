@@ -1,32 +1,25 @@
-"""live 평가(RQ2): 조건 C0–C4에서 에이전트로 AgentDojo를 실행하고 전 과정을 기록한다.
+"""live 평가(RQ2): 한 실행 안에서 여러 조건으로 에이전트를 AgentDojo에 돌리고 전 과정을 기록한다.
 
-조건
-  C0  방어 없음 (게이트는 audit 모드: 판정만 기록하고 차단하지 않음)
-  C1  게이트, ESCALATE -> block
-  C2  게이트, ESCALATE -> allow
-  C3  AgentDojo 내장 방어 (--c3-defense, 기본값 spotlighting_with_delimiting), 게이트는 audit 모드
-  C4  게이트, ESCALATE -> 판정 LLM
-  C5  v2 게이트(P0 사용자 고정 설정 + P1–P10), PIGuard chunks 판별기, ESCALATE -> Trusted LLM v2 + ④ (명세서.md 3.5)
-  C6  v3 게이트(P0 + P1–P9 + P11·P12, P7 공격 문구 없음, 판별기 없음), 툴 응답마다 ToolSpec(claude-haiku-5-5),
-      ESCALATE -> 판정 LLM v3(규칙 문서 config/policy_rules_v3.yaml)
-  C7  v3.1 게이트(A1·B1·B2·C1·D2 수정), ToolSpec, 판정 LLM v3 + 규칙 문서 config/policy_rules_v31.yaml
-  C7n C7과 같고 판정 LLM에 규칙 문서를 주지 않음(같은 사실만, 규칙 문서 ablation)
+조건(`agentgate.conditions`): C0·C3 기준선, C1·C2·C4 v1, C5 v2, C6·C7·C7n v3. 버전을 비교하려면 같은 실행에
+기준선 C0을 함께 넣는다(같은 짝·공격·모델·시점). 다른 실행의 C0과 섞어 비교하지 않는다.
+
+규모
+  기본(--pairs, --pilot, --sample 없음): AgentDojo v1.2.2 전체 = 사용자 작업 97개(공격 없음) + 공격 쌍 949개
+  --pairs @data/agentdojo/pairs/strat3_seed0.txt: 사용자 작업마다 공격 3개(층화 표본) = 97 + 291
+  --pilot: banking 4 × 3
 
 에이전트
   --agent llm       실제 LLM 에이전트 (키는 .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
   --agent scripted  결정론적 ScriptedAgent (키 불필요) - 모델 행동이 아니라 통합을 확인한다
 
-프레임워크 (--framework, 기본값 native = 위 AgentDojo pipeline, 변경 없음)
-  agentgate.harness.registry에 등록된 이름 (smolagents, config/frameworks.yaml의 contract Wrapper 등).
-  모델은 AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL (또는 --model provider:model)에서 가져온다.
-  --agent scripted이면 LLM 없는 fake endpoint(agentgate.harness.fake_llm)로 프레임워크를 구동한다.
-  C3는 native에서만 지원한다.
+프레임워크 (--framework, 기본값 native = AgentDojo pipeline)
+  agentgate.harness.registry에 등록된 이름. 프레임워크 경로는 C0·C1·C2·C4만 지원한다. C3는 native만이다.
 
 사용법
-  python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/live/v1/scripted
-  python scripts/evaluation/live_evaluation.py --agent llm --pilot --conditions C0 C1 --out results/live/v1/<model>
-  python scripts/evaluation/live_evaluation.py --framework smolagents --model ollama:gpt-oss:120b --pilot \
-      --conditions C0 C1 --out results/live/v2/smolagents_gpt-oss_120b
+  python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/v1/live/scripted
+  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C1 C4 --out results/v1/live/<run>
+  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C6 C7 C7n --attack important_instructions \
+      --out results/v3/live/<run>
 완료된 (condition, suite, user, injection) run은 건너뛰므로 중단된 실행을 이어서 할 수 있다.
 """
 
@@ -38,7 +31,6 @@ import multiprocessing as mp
 import os
 import random
 import re
-import threading
 import time
 import traceback
 from collections import Counter
@@ -46,71 +38,23 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from agentgate import SUITES
+from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline, run_live_task
+from agentgate.agentdojo.replay import REPLAY_PIPELINE_NAME, get_cached_attack
+from agentgate.agentdojo.suites import load_suite, task_number
 from agentgate.agents.factory import UsageMeter, make_llm, spec_provider
 from agentgate.agents.scripted_agent import ScriptedAgent
-from agentgate.config import (PROJECT_ROOT, load_dotenv, load_policy_config_v2, load_policy_config_v3,
-                              load_policy_config_v31)
-from agentgate.evaluation.replay import REPLAY_PIPELINE_NAME, get_cached_attack
-from agentgate.llm.escalation_judge import EscalationJudge, as_runtime_judge
-from agentgate.pipeline import RecordingPipeline, build_pipeline, run_live_task
-from agentgate.policy.engine import PolicyEngine
-from agentgate.runtime import GatedRuntime
-from agentgate.suites import load_suite, task_number
+from agentgate.conditions import CONDITIONS, get_condition, make_runtime
+from agentgate.config import load_dotenv
 
 PILOT = {"suites": ["banking"], "user_tasks": ["user_task_0", "user_task_2", "user_task_3", "user_task_13"],
          "injection_tasks": ["injection_task_0", "injection_task_4", "injection_task_7"]}
-# Condition -> (gate mode, escalate action).
-GATE = {"C0": ("audit", "block"), "C1": ("enforce", "block"), "C2": ("enforce", "allow"),
-        "C3": ("audit", "block"), "C4": ("enforce", "judge"), "C5": ("enforce", "judge"), "C6": ("enforce", "judge"),
-        "C7": ("enforce", "judge"), "C7n": ("enforce", "judge")}
-GATED_CONDITIONS = ("C1", "C2", "C4", "C5", "C6", "C7", "C7n")
-V3_CONDITIONS = {  # condition -> (config loader, rule document, judge reads the rule document)
-    "C6": (load_policy_config_v3, "policy_rules_v3.yaml", True),
-    "C7": (load_policy_config_v31, "policy_rules_v31.yaml", True),
-    "C7n": (load_policy_config_v31, "policy_rules_v31.yaml", False)}
-V2_DETECTOR = ("piguard", "chunks")
 
 
-class _SharedDetector:
-    """One detector model for all worker threads; inference is serialized with a lock."""
-
-    _instance = None
-    _init_lock = threading.Lock()
-
-    def __init__(self):
-        from agentgate.detector import make_detector
-        self._detector = make_detector(*V2_DETECTOR)
-        self._lock = threading.Lock()
-
-    @classmethod
-    def get(cls) -> "_SharedDetector":
-        with cls._init_lock:
-            if cls._instance is None:
-                cls._instance = cls()
-            return cls._instance
-
-    def detect(self, text: str):
-        with self._lock:
-            return self._detector.detect(text)
-
-
-_TOOLSPEC: dict = {}
-_TOOLSPEC_LOCK = threading.Lock()
-
-
-def _toolspec_extractor(suite_name: str):
-    from agentgate.llm.toolspec_extractor import ToolSpecExtractor
-    from agentgate.suites import describe_tools
-    with _TOOLSPEC_LOCK:
-        if suite_name not in _TOOLSPEC:
-            _TOOLSPEC[suite_name] = ToolSpecExtractor(describe_tools(load_suite(suite_name)))
-        return _TOOLSPEC[suite_name]
-
-
-def _judge_v2_stats(runtime: GatedRuntime) -> dict:
-    """C4-compatible judge totals from the Trusted LLM v2 / v3 records in the trace."""
+def _judge_stats(runtime) -> dict:
+    """Judge totals from the v2 / v3 judge records in the trace (same keys as the v1 EscalationJudge.stats)."""
     judgements = [e.decision["judge"] for e in runtime.trace if (e.decision or {}).get("judge")]
-    return {"judge": judgements[0].get("judge") if judgements else None, "calls": len(judgements), "human": sum(j["final"] == "HUMAN" for j in judgements),
+    return {"judge": judgements[0].get("judge") if judgements else None, "calls": len(judgements),
+            "human": sum(j["final"] == "HUMAN" for j in judgements),
             "rule4": sum(bool(j.get("rule4")) for j in judgements), "p0_human": sum(bool(j.get("by")) for j in judgements),
             "api_calls": sum(1 for j in judgements if j.get("answer") and not j.get("cached")),
             "input_tokens": sum(j.get("input_tokens", 0) for j in judgements),
@@ -172,40 +116,12 @@ def run_one(job: dict) -> str:
     else:
         llm = make_llm(meter)
         attack_model = job["attack_model_name"]
-    mode, escalate_action = GATE[condition]
-    gated = condition in GATED_CONDITIONS
-    provider = spec_provider(job["spec"] if gated else "oracle", suite_name, user_task_id)
-    judge = None
-    runtime_kwargs = {"mode": mode, "escalate_action": escalate_action, "record_env_hash": True}
-    if condition == "C4":
-        judge = EscalationJudge()
-        runtime_kwargs["judge"] = as_runtime_judge(judge, user_task.PROMPT)
-    if condition == "C5":
-        from agentgate.llm.trusted_judge import TrustedJudgeV2
-        from agentgate.llm.trusted_judge import as_runtime_judge as as_runtime_judge_v2
-        runtime_kwargs.update(engine=PolicyEngine(load_policy_config_v2()), detector=_SharedDetector.get(),
-                              judge=as_runtime_judge_v2(TrustedJudgeV2(), user_task.PROMPT))
-    toolspec_stats = Counter()
-    if condition in V3_CONDITIONS:
-        from agentgate.llm.trusted_judge_v3 import TrustedJudgeV3
-        from agentgate.llm.trusted_judge_v3 import as_runtime_judge as as_runtime_judge_v3
-        extractor = _toolspec_extractor(suite_name)
-
-        def toolspec(tool, args, text):
-            result = extractor.extract(tool, args, text)
-            toolspec_stats["calls"] += 1
-            toolspec_stats["api_calls"] += not result.cached and result.error is None
-            toolspec_stats["errors"] += result.error is not None
-            toolspec_stats["input_tokens"] += 0 if result.cached else result.input_tokens
-            toolspec_stats["output_tokens"] += 0 if result.cached else result.output_tokens
-            toolspec_stats["latency_ms"] += 0 if result.cached else result.latency_ms
-            return result.spec
-
-        loader, rules_file, use_rules = V3_CONDITIONS[condition]
-        runtime_kwargs.update(engine=PolicyEngine(loader()), toolspec=toolspec, judge=as_runtime_judge_v3(
-            TrustedJudgeV3(rules_path=PROJECT_ROOT / "config" / rules_file, use_rules=use_rules), user_task.PROMPT))
-    runtime = GatedRuntime(suite.tools, **runtime_kwargs)
-    pipeline = build_pipeline(llm, provider, defense=job["c3_defense"] if condition == "C3" else None)
+    cond = get_condition(condition)
+    provider = spec_provider(job["spec"] if cond.gated else "oracle", suite_name, user_task_id, cond.gate)
+    stats: dict = {}
+    runtime = make_runtime(cond, suite.tools, suite_name=suite_name, prompt=user_task.PROMPT, stats=stats,
+                           record_env_hash=True)
+    pipeline = build_pipeline(llm, provider, defense=job["c3_defense"] if cond.defense else None)
     recording_pipeline = RecordingPipeline(pipeline)
     injections = {}
     if injection_task is not None:
@@ -222,13 +138,15 @@ def run_one(job: dict) -> str:
         "condition": condition, "suite": suite_name, "user_task": user_task_id, "injection_task": injection_task_id,
         "agent": job["agent"], "agent_model": getattr(llm, "name", None),
         "attack": job["attack"] if injection_task else None,
-        "spec_source": job["spec"] if gated else "oracle(audit)", "spec_meta": runtime.spec_meta,
+        "version": cond.version, "gate": cond.gate,
+        "spec_source": job["spec"] if cond.gated else "oracle(audit)", "spec_meta": runtime.spec_meta,
         "error": error, **result,
         "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
-        "judge": judge.stats if judge else (_judge_v2_stats(runtime) if condition in ("C5", *V3_CONDITIONS) else None),
-        "toolspec": dict(toolspec_stats) if condition in V3_CONDITIONS else None,
+        "judge": (stats["judge_object"].stats if "judge_object" in stats
+                  else _judge_stats(runtime) if cond.judge in ("v2", "v3", "v3-norules") else None),
+        "toolspec": stats.get("toolspec") if cond.gate in ("v3", "v31") else None,
         "trace": runtime.trace_records(),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -240,7 +158,7 @@ def main():
     load_dotenv()
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent", choices=["llm", "scripted"], default="llm")
-    parser.add_argument("--conditions", nargs="+", default=["C0", "C1"])
+    parser.add_argument("--conditions", nargs="+", default=["C0", "C1"], choices=list(CONDITIONS))
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--user-tasks", nargs="*", default=None)
     parser.add_argument("--injection-tasks", nargs="*", default=None)
@@ -276,8 +194,10 @@ def main():
     agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
     if args.model:
         provider, _, agent_model = args.model.partition(":")
-    if args.framework != "native" and "C3" in args.conditions:
-        parser.error("C3 (AgentDojo pipeline defense) is native only")
+    for condition in args.conditions:
+        get_condition(condition)
+    if args.framework != "native" and not set(args.conditions) <= {"C0", "C1", "C2", "C4"}:
+        parser.error("--framework supports C0 C1 C2 C4 only (C3 is an AgentDojo pipeline defense, C5–C7n native only)")
     attack_model = args.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
         provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
     framework_fields = {"framework": args.framework, "framework_options": args.framework_options,

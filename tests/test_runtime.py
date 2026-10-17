@@ -4,12 +4,12 @@ import pytest
 from agentdojo.agent_pipeline.ground_truth_pipeline import GroundTruthPipeline
 from agentdojo.functions_runtime import Function
 
-from agentgate.policy.base import PolicyDecision, Verdict
-from agentgate.policy.engine import AllowAllPolicyEngine, EngineResult
-from agentgate.provenance import Origin
-from agentgate.runtime import INSIDE_GATE, GatedRuntime, compute_environment_hash
-from agentgate.suites import load_suite, load_task_environment
-from agentgate.task_spec import TaskSpec, load_task_spec
+from agentgate.agentdojo.suites import load_suite, load_task_environment
+from agentgate.gate.base import PolicyDecision, Verdict
+from agentgate.gate.engine import AllowAllPolicyEngine, EngineResult
+from agentgate.gate.provenance import Origin
+from agentgate.gate.runtime import INSIDE_GATE, GatedRuntime, compute_environment_hash
+from agentgate.gate.task_spec import TaskSpec, load_task_spec
 
 
 class BlockTool:

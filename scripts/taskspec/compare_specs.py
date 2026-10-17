@@ -12,8 +12,8 @@ import json
 
 from agentgate import SUITES
 from agentgate.config import PROJECT_ROOT
-from agentgate.normalization import normalize_value
-from agentgate.task_spec import TaskSpec
+from agentgate.gate.normalization import normalize_value
+from agentgate.gate.task_spec import TaskSpec
 
 
 def _normalized_set(values):
@@ -21,7 +21,7 @@ def _normalized_set(values):
 
 
 def compare(model: str) -> dict:
-    oracle_root = PROJECT_ROOT / "data" / "specs" / "oracle"
+    oracle_root = PROJECT_ROOT / "data" / "agentdojo" / "oracle_specs"
     llm_root = PROJECT_ROOT / "data" / "specs" / "llm" / model
     true_positives = false_positives = false_negatives = 0
     rows, agree = [], {"allowed_dest": 0, "named_sources": 0, "amount_cap": 0, "egress_requested": 0}

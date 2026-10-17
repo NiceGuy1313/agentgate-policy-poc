@@ -8,9 +8,9 @@ from agentdojo.functions_runtime import EmptyEnv
 from agentdojo.task_suite.task_suite import model_output_from_messages
 from agentdojo.types import get_text_content_as_str
 
+from agentgate.agentdojo.pipeline import _serialize_message, build_pipeline
 from agentgate.agents.frameworks.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.scenario import CONDITIONS
-from agentgate.pipeline import _serialize_message, build_pipeline
 
 
 def make_native_llm(model):

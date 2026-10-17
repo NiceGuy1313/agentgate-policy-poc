@@ -1,7 +1,7 @@
 """One AgentDojo scenario behind the gate: environment + injections + GatedRuntime + TaskSpec + scoring.
 
 `Session` is what every agent framework talks to (through `GateToolBridge`). It follows the same steps as
-`agentgate.pipeline.run_live_task` / `scripts/evaluation/live_evaluation.run_one`, but leaves the agent loop to
+`agentgate.agentdojo.pipeline.run_live_task` / `scripts/evaluation/live_evaluation.run_one`, but leaves the agent loop to
 the caller: the framework calls tools through `invoke` and hands in its final answer with `finish`.
 """
 
@@ -15,11 +15,11 @@ from dataclasses import asdict, dataclass
 from agentdojo.functions_runtime import FunctionCall
 from agentdojo.types import text_content_block_from_string
 
+from agentgate.agentdojo.pipeline import score_task
+from agentgate.agentdojo.replay import REPLAY_PIPELINE_NAME, get_cached_attack
+from agentgate.agentdojo.suites import load_suite
 from agentgate.agents.factory import spec_provider
-from agentgate.evaluation.replay import REPLAY_PIPELINE_NAME, get_cached_attack
-from agentgate.pipeline import score_task
-from agentgate.runtime import GatedRuntime
-from agentgate.suites import load_suite
+from agentgate.gate.runtime import GatedRuntime
 
 # Condition -> (gate mode, escalate action). Same table as scripts/evaluation/live_evaluation.py.
 CONDITIONS = {"C0": ("audit", "block"), "C1": ("enforce", "block"), "C2": ("enforce", "allow"),
@@ -77,9 +77,9 @@ class Session:
         runtime_kwargs = {"mode": mode, "escalate_action": escalate_action, "record_env_hash": True}
         if config.condition == "C4":
             if judge is None:
-                from agentgate.llm.escalation_judge import EscalationJudge
+                from agentgate.v1.judge import EscalationJudge
                 self.judge = EscalationJudge()
-            from agentgate.llm.escalation_judge import as_runtime_judge
+            from agentgate.v1.judge import as_runtime_judge
             runtime_kwargs["judge"] = as_runtime_judge(self.judge, self.user_task.PROMPT)
         self.runtime = GatedRuntime(self.suite.tools, **runtime_kwargs)
         self.spec_source = config.spec if config.condition in GATED else "oracle(audit)"
@@ -114,7 +114,7 @@ class Session:
 
     def decide(self, tool: str, args: dict) -> dict:
         """Gate decision only (no execution, no state change), e.g. for a Wrapper's own native tools."""
-        from agentgate.policy.base import ToolCall
+        from agentgate.gate.base import ToolCall
         with self.lock:
             return self.runtime.engine.decide(ToolCall(tool, dict(args or {})), self.runtime.context).as_dict()
 

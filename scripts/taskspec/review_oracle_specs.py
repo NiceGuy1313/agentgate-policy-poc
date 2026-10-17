@@ -1,4 +1,4 @@
-"""oracle TaskSpec 검토표와 ground truth 교차 검사 결과를 data/specs/oracle/review.md에 쓴다.
+"""oracle TaskSpec 검토표와 ground truth 교차 검사 결과를 data/agentdojo/oracle_specs/review.md에 쓴다.
 
 교차 검사는 초안이 만들어진 뒤에만 수행한다. ground truth를 열어, spec을 고치지 않고 oracle spec이 허용하지
 않는 상태 변경·외부 전송 ground-truth 호출을 모두 나열한다.
@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import json
 
-from agentgate import SUITES
-from agentgate.config import PROJECT_ROOT, load_effect_tools, load_policy_config
-from agentgate.normalization import build_haystack, haystack_contains, iterate_leaf_values, parse_amount
-from agentgate.task_spec import TaskSpec
+from agentgate import SUITES, v1
+from agentgate.config import PROJECT_ROOT, load_effect_tools
+from agentgate.gate.normalization import build_haystack, haystack_contains, iterate_leaf_values, parse_amount
+from agentgate.gate.task_spec import TaskSpec
 
-OPS_POLICED = set(load_policy_config()["P6"]["tools"]) | set(load_policy_config()["P8"]["tools"]) | \
-    set(load_policy_config()["P9"]["tools"])
+OPS_POLICED = set(v1.load_config()["P6"]["tools"]) | set(v1.load_config()["P8"]["tools"]) | \
+    set(v1.load_config()["P9"]["tools"])
 
 
 def _p2_blocked_calls() -> set[tuple[str, str, str]]:
@@ -38,7 +38,7 @@ P2_BLOCKED = _p2_blocked_calls()
 def gt_mismatches(spec: TaskSpec, prompt: str, ground_truth: list[dict], key=("", "")) -> list[str]:
     mismatches = []
     effect_tools = load_effect_tools() - {"get_webpage"}
-    p1_targets = load_policy_config()["P1"]["targets"]
+    p1_targets = v1.load_config()["P1"]["targets"]
     prompt_haystack = build_haystack(prompt)
     allowed_haystack = build_haystack("\n".join(spec.allowed_dest))
     for call in ground_truth:
@@ -62,10 +62,10 @@ def gt_mismatches(spec: TaskSpec, prompt: str, ground_truth: list[dict], key=(""
 
 def main():
     user_tasks = {(u["suite"], u["task_id"]): u
-                  for u in json.loads((PROJECT_ROOT / "data/benchmark/user_tasks.json").read_text())}
+                  for u in json.loads((PROJECT_ROOT / "data/agentdojo/benchmark/user_tasks.json").read_text())}
     rows, mismatches = [], []
     for suite in SUITES:
-        spec_paths = sorted((PROJECT_ROOT / "data/specs/oracle" / suite).glob("*.yaml"),
+        spec_paths = sorted((PROJECT_ROOT / "data/agentdojo/oracle_specs" / suite).glob("*.yaml"),
                             key=lambda p: int(p.stem.split("_")[-1]))
         for spec_path in spec_paths:
             spec = TaskSpec.load(spec_path)
@@ -79,7 +79,7 @@ def main():
     ambiguous_count = sum(r[0] for r in rows)
     status = sorted({r[4].status for r in rows})
     lines = ["# oracle TaskSpec 검토표", "",
-             "`scripts/taskspec/review_oracle_specs.py`가 `data/specs/oracle/`과 `data/benchmark/user_tasks.json`에서 생성한다.", "",
+             "`scripts/taskspec/review_oracle_specs.py`가 `data/agentdojo/oracle_specs/`과 `data/agentdojo/benchmark/user_tasks.json`에서 생성한다.", "",
              "## 작성 원칙", "",
              "- 근거는 user task의 PROMPT 텍스트와 suite 툴 목록(이름·설명)뿐이다. 초안 작성(`scripts/taskspec/seed_oracle_specs.py`) 시 ground truth, injection GOAL, 환경 데이터를 참고하지 않았다.",
              "- 프롬프트가 함의하는 상태 변경·외부 전송 툴은 `requested_ops`에 넣었다. 판단이 갈리는 항목은 `notes`에 `[ambiguous]`로 표시했다.",
@@ -103,7 +103,7 @@ def main():
               "| suite | task | 불일치 |", "|---|---|---|"]
     for suite, task, mismatch in mismatches:
         lines.append(f"| {suite} | {task.replace('user_task_', 'u')} | {mismatch} |")
-    (PROJECT_ROOT / "data" / "specs" / "oracle" / "review.md").write_text("\n".join(lines) + "\n")
+    (PROJECT_ROOT / "data" / "agentdojo" / "oracle_specs" / "review.md").write_text("\n".join(lines) + "\n")
     print(f"ambiguous={ambiguous_count} gt_mismatches={len(mismatches)}")
 
 

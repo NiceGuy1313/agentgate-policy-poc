@@ -4,14 +4,14 @@ import json
 
 import pytest
 
+from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline
+from agentgate.agentdojo.suites import load_suite
 from agentgate.agents.ollama_agent import OllamaAgentLLM, parse_tool_arguments
+from agentgate.gate.runtime import GatedRuntime
+from agentgate.gate.task_spec import TaskSpec
 from agentgate.llm import client
 from agentgate.llm.client import OllamaClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor
-from agentgate.pipeline import RecordingPipeline, build_pipeline
-from agentgate.runtime import GatedRuntime
-from agentgate.suites import load_suite
-from agentgate.task_spec import TaskSpec
 
 
 class FakeResponse:

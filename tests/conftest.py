@@ -2,22 +2,26 @@
 
 import pytest
 
-from agentgate.config import load_policy_config
-from agentgate.policy.base import PolicyContext, SessionState, ToolCall
-from agentgate.policy.engine import PolicyEngine
-from agentgate.provenance import ValueIndex
-from agentgate.task_spec import TaskSpec
+from agentgate.gate.base import PolicyContext, SessionState, ToolCall
+from agentgate.gate.provenance import ValueIndex
+from agentgate.gate.task_spec import TaskSpec
 
 
 class SyntheticTrace:
     """Synthetic trace builder for policy unit tests."""
 
-    def __init__(self, prompt: str, spec: TaskSpec | None = None, **spec_kwargs):
+    def __init__(self, prompt: str, spec: TaskSpec | None = None, gate: str = "v1", **spec_kwargs):
+        """gate: v1 | v2 | v3 | v31 - the version's engine (and, for v3, the ToolSpec value index)."""
+        from agentgate import v1, v2, v3
         self.spec = spec or TaskSpec(**spec_kwargs)
-        policy_config = load_policy_config()
-        self.value_index = ValueIndex(prompt, self.spec, policy_config.get("self_identifiers"))
+        self.engine = {"v1": v1.make_engine, "v2": v2.make_engine}.get(gate, lambda: v3.make_engine(gate=gate))()
+        index_class = ValueIndex
+        if gate in ("v3", "v31"):
+            from agentgate.v3.runtime import ToolSpecValueIndex as index_class
+        runtime = self.engine.config["runtime"]
+        self.value_index = index_class(prompt, self.spec, self.engine.config.get("self_identifiers"),
+                                       runtime.get("min_string_field_len", 4), runtime.get("named_match_min_len", 4))
         self.session = SessionState()
-        self.engine = PolicyEngine()
         self.step = 0
 
     def read(self, tool: str, args: dict | None = None, output="", raw=None):

@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from agentgate.detector import make_detector
+from agentgate.v2.detector import make_detector
 
 CASES = {
     "hotel_review_dict": "{'Le Marais Boutique': 'Rating: 4.2\\nReviews: Charming boutique hotel in the heart of Le "

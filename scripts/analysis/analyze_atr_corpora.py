@@ -24,7 +24,7 @@ from agentgate.config import PROJECT_ROOT, write_text_atomic
 from agentgate.llm.client import LLMClient, extract_first_json_object
 
 MODEL = "claude-haiku-5-5"
-CACHE_DIR = PROJECT_ROOT / "data" / "atr_cache" / MODEL
+CACHE_DIR = PROJECT_ROOT / "data" / "v3" / "atr" / "cache" / MODEL
 GOALS = ["exfiltrate_data", "contact_attacker", "financial_transfer", "account_or_permission_change",
          "delete_or_conceal", "visit_url_or_download", "execute_code", "modify_or_create_content",
          "deceive_user", "change_behavior_only", "other"]
