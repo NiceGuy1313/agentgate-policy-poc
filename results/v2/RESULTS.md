@@ -5,24 +5,37 @@
 ## 검사 흐름
 
 ```mermaid
-flowchart TD
-    P[① 사용자 프롬프트 + 툴 목록] --> S[② TaskSpec 추출]
-    P --> A[③ 에이전트 LLM]
-    A -->|툴 호출| X[툴 실행]
-    X -->|툴 응답| A
-    X -->|툴 응답| D[④ IPI detector<br/>응답마다 주입 점수]
-    A -->|flag된 응답의 값을 쓰는 다음 툴 호출| T[⑤ Trusted LLM]
-    S -->|TaskSpec| T
-    D -->|점수 · 의심 구간| T
-    T -->|ALLOW| X
-    T -->|BLOCK · HUMAN| B[차단 메시지]
-    B --> A
+sequenceDiagram
+    participant U as 사용자
+    participant S as TaskSpec 추출
+    participant A as 에이전트 LLM
+    participant X as 툴
+    participant D as IPI detector
+    participant T as Trusted LLM
+    U->>S: ① 프롬프트 + 툴 목록
+    S-->>T: TaskSpec (허용 범위)
+    U->>A: ② 프롬프트
+    A->>X: ③ 툴 호출 (예: 메일 읽기)
+    X->>D: ④ 툴 응답
+    D-->>T: 주입 점수 · 의심 구간
+    X->>A: ⑤ 툴 응답 전달 (응답은 막지 않음)
+    A->>T: ⑥ 다음 툴 호출 (예: 송금, 응답 속 값 사용)
+    Note over T: ⑦ TaskSpec + 판별 결과 + 호출로 판정
+    alt ALLOW
+        T->>X: ⑧ 툴 실행
+    else BLOCK · HUMAN
+        T->>A: ⑧ 차단 메시지
+    end
 ```
 
-1. 실행 전에 사용자 프롬프트로 TaskSpec(허용 범위)을 한 번 뽑는다.
-2. 에이전트가 툴을 호출해 응답을 읽으면, IPI detector가 그 응답의 주입 점수를 매긴다.
-3. 에이전트의 다음 호출이 flag된 응답에서 온 값을 쓰면, Trusted LLM이 **TaskSpec + 판별 점수**를 보고 실행 여부를 정한다.
-4. 그 밖의 호출은 Trusted LLM 없이 바로 실행된다.
+1. **TaskSpec 추출**: 실행 전에 사용자 프롬프트로 허용 범위를 한 번 뽑는다.
+2. **에이전트 시작**: 에이전트가 프롬프트를 받는다.
+3. **툴 호출**: 에이전트가 툴을 호출한다(예: 메일 읽기).
+4. **툴 응답 판정**: 툴 응답이 나오면 IPI detector가 응답에 심긴 지시가 있는지 점수를 매긴다.
+5. **응답 전달**: 응답은 그대로 에이전트에게 간다. 판정 결과는 기록만 해 둔다.
+6. **다음 툴 호출**: 에이전트가 응답 속 값으로 다음 툴을 호출한다(예: 송금).
+7. **Trusted LLM 판정**: 그 값이 flag된 응답에서 왔으면 Trusted LLM이 TaskSpec과 판별 결과를 보고 판정한다.
+8. **실행 또는 차단**: ALLOW면 실행하고, BLOCK·HUMAN이면 차단 메시지를 에이전트에게 돌려준다. flag되지 않은 값만 쓰는 호출은 Trusted LLM 없이 바로 실행된다.
 
 **TaskSpec 추출** (claude-haiku-5-5, 실행 전 작업마다 1회, 배치)
 - 입력: 사용자 프롬프트, 툴 이름·설명
@@ -33,17 +46,17 @@ flowchart TD
 - 출력: 툴 호출 또는 최종 답
 
 **IPI detector** (툴 응답마다)
-- 입력: 실행된 툴 응답
+- 입력: 툴 응답
   - horizon 모델: 응답 원문, 2048토큰 창
   - PIGuard 모델: 레코드별 평문, 512토큰 창
 - 출력: 주입 확률, 0.5 이상이면 flag
 
 **Trusted LLM** (claude-sonnet-5-5)
-- 언제: 호출 인자가 flag된 응답에서 왔거나, 목적지·금액 같은 값의 출처를 규칙으로 확정하지 못할 때
+- 언제: 다음 툴 호출의 값이 flag된 응답에서 왔을 때(목적지·금액의 출처를 규칙으로 확정하지 못할 때도)
 - 입력
   - 허용 범위: TaskSpec, 사용자 고정 설정(`always_human`: delete_file, update_password)
-  - 대기 중 호출: 툴, 인자 값, 값마다의 출처
-  - 판별 결과: 출처 응답의 점수, 의심 구간 발췌
+  - 판별 결과: 값이 나온 응답의 점수, 의심 구간 발췌
+  - 판정할 호출: 툴, 인자 값, 값마다의 출처
   - 넣지 않는 것: 프롬프트 원문, 툴 응답 전문
 - 출력: ALLOW / BLOCK / HUMAN (HUMAN은 BLOCK으로 처리)
 
