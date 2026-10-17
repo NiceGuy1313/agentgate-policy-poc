@@ -6,7 +6,7 @@ import yaml
 
 from agentgate.config import PROJECT_ROOT
 from agentgate.v2.detector.base import DetectionResult, Detector, Span
-from agentgate.v2.detector.hf import HFDetector, load_hf_scorer
+from agentgate.v2.detector.hf import HFDetector, load_hf_scorer, load_hf_window_scorer
 
 DETECTOR_CONFIG_PATH = PROJECT_ROOT / "config" / "v2" / "detector.yaml"
 
@@ -21,10 +21,15 @@ def make_detector(name: str | None = None, mode: str | None = None, threshold: f
     name = name or config["default"]
     model = config["models"][name]
     chunking = config["chunking"]
-    scorer = load_hf_scorer(model["hf_id"], model.get("revision"), model["injection_label"],
-                            model.get("trust_remote_code", False), model.get("max_length", 512))
-    return HFDetector(name, scorer, threshold if threshold is not None else model["threshold"],
-                      mode or chunking["mode"], chunking["chunk_chars"], chunking["overlap_chars"],
+    mode = mode or model.get("mode") or chunking["mode"]
+    threshold = threshold if threshold is not None else model["threshold"]
+    args = (model["hf_id"], model.get("revision"), model["injection_label"], model.get("trust_remote_code", False))
+    if mode == "windows":
+        window, stride = model.get("window_tokens", 2048), model.get("stride_tokens", 512)
+        return HFDetector(name, None, threshold, mode, cache_key=f"{name}@{model.get('revision') or 'main'}|{window}|{stride}",
+                          window_scorer=load_hf_window_scorer(*args, window, stride))
+    scorer = load_hf_scorer(*args, model.get("max_length", 512))
+    return HFDetector(name, scorer, threshold, mode, chunking["chunk_chars"], chunking["overlap_chars"],
                       cache_key=f"{name}@{model.get('revision') or 'main'}")
 
 

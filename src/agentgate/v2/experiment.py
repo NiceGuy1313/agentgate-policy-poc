@@ -8,13 +8,12 @@ import threading
 from agentgate.v2 import make_engine
 from agentgate.v2.runtime import DetectorGatedRuntime
 
-DEFAULT_DETECTOR = ("piguard", "chunks")
 _DETECTORS: dict = {}
 _LOCK = threading.Lock()
 
 
 class _SharedDetector:
-    def __init__(self, name: str, mode: str):
+    def __init__(self, name: str | None, mode: str | None):
         from agentgate.v2.detector import make_detector
         self._detector = make_detector(name, mode)
         self._lock = threading.Lock()
@@ -24,7 +23,7 @@ class _SharedDetector:
             return self._detector.detect(text)
 
 
-def shared_detector(name: str, mode: str):
+def shared_detector(name: str | None = None, mode: str | None = None):
     with _LOCK:
         if (name, mode) not in _DETECTORS:
             _DETECTORS[(name, mode)] = _SharedDetector(name, mode)
@@ -32,12 +31,13 @@ def shared_detector(name: str, mode: str):
 
 
 def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, stats=None):
-    """Detector: AGENTGATE_V2_DETECTOR=name[:mode] (default piguard:chunks), "none" = no detector (v1-equivalent P10)."""
-    choice = os.environ.get("AGENTGATE_V2_DETECTOR") or ":".join(DEFAULT_DETECTOR)
+    """Detector: AGENTGATE_V2_DETECTOR=name[:mode] from config/v2/detector.yaml (empty = its default model and mode),
+    "none" = no detector (P10 never fires)."""
+    choice = os.environ.get("AGENTGATE_V2_DETECTOR") or ""
     detector = None
     if choice != "none":
         name, _, mode = choice.partition(":")
-        detector = shared_detector(name, mode or DEFAULT_DETECTOR[1])
+        detector = shared_detector(name or None, mode or None)
     kwargs = {"engine": make_engine(disabled), "detector": detector}
     if escalate == "judge":
         from agentgate.v2.judge import TrustedJudgeV2, as_runtime_judge

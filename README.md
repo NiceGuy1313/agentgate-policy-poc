@@ -45,7 +45,7 @@ export OLLAMA_API_KEY=<키>
 | `AGENTGATE_LLM_PROVIDER` · `AGENTGATE_LLM_MODEL` | TaskSpec 추출 LLM(캐시가 있으면 키 없이 재사용) |
 | `AGENTGATE_JUDGE_MODEL` | ESCALATE 판정 LLM(C4·C5·C6·C7) |
 | `AGENTGATE_TOOLSPEC_MODEL` | v3 ToolSpec 추출 LLM(기본 `claude-haiku-5-5`) |
-| `AGENTGATE_V2_DETECTOR` | v2 판별기(`piguard:chunks` 기본, `none`) |
+| `AGENTGATE_V2_DETECTOR` | v2 판별기(비우면 `config/v2/detector.yaml` 기본 `horizon-base`, `piguard:chunks`, `none`) |
 
 ## 3. 대시보드 실행
 

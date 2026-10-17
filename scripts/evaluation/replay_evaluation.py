@@ -8,7 +8,7 @@
 조건은 `agentgate.conditions`(C1·C2·C4 v1, C5 v2, C6·C7·C7n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
 않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C7 --escalate block).
 `--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1·v2는 v1 프롬프트, v3는 v3 프롬프트).
-v2 판별기: AGENTGATE_V2_DETECTOR=piguard:chunks(기본) | piguard:full | none
+v2 판별기: AGENTGATE_V2_DETECTOR=<config/v2/detector.yaml 모델>[:mode], 비우면 기본(horizon-base:windows), none = 끔
 
 출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
 """
@@ -59,7 +59,7 @@ def _run_job(job):
 
 def _init_worker():
     load_dotenv()
-    if os.environ.get("AGENTGATE_V2_DETECTOR", "piguard").split(":")[0] != "none":
+    if os.environ.get("AGENTGATE_V2_DETECTOR", "").split(":")[0] != "none":
         try:
             import torch
             torch.set_num_threads(1)
@@ -129,7 +129,7 @@ def main():
             "gate": cond.gate, "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
             "modes": args.mode, "disabled": list(disabled), "attack": args.attack,
             "policy_config_version": config_version["version"], "pairs": args.pairs,
-            "v2_detector": (os.environ.get("AGENTGATE_V2_DETECTOR") or "piguard:chunks") if cond.gate == "v2" else None,
+            "v2_detector": (os.environ.get("AGENTGATE_V2_DETECTOR") or "default") if cond.gate == "v2" else None,
             "git_commit": commit, "python": platform.python_version(), "elapsed_s": round(time.time() - started, 1)}
     (output_dir / "meta.json").write_text(json.dumps(meta, indent=1))
 

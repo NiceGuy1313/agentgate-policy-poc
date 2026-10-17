@@ -1,9 +1,18 @@
 # v2 툴 응답 판별기 설정. 임계값·리비전을 바꾸면 결과를 새 버전 경로(results/v2/...)에 남긴다.
 version: v1
-default: piguard
+default: horizon-base
 
 models:
-  piguard:                      # 제안 구조의 판별기. InjecGuard에서 이름이 바뀐 모델 (github.com/leolee99/PIGuard)
+  horizon-base:                 # 기본. 툴 출력·문서 속 간접 주입까지 학습(모델 카드). mmBERT-base(ModernBERT), 308M, Apache-2.0
+    hf_id: Horizon-Labs/prompt-injection-guard-base
+    revision: e4fbfc6f603e24c675cdf310c3b8d7abaa825666   # 2026-10-07 main
+    trust_remote_code: false
+    injection_label: INJECTION  # id2label {0: SAFE, 1: INJECTION}
+    threshold: 0.5              # 모델 카드 기본값. 비신뢰 콘텐츠에는 0.5 이하 권장
+    mode: windows               # 모델 카드의 긴 입력 방식: 토큰 창마다 점수, 응답 점수는 창 최고값
+    window_tokens: 2048
+    stride_tokens: 512          # 창 사이 겹치는 토큰 수
+  piguard:                      # 이전 v2 실험의 판별기(비교용). InjecGuard에서 이름이 바뀐 모델 (github.com/leolee99/PIGuard)
     hf_id: leolee99/PIGuard
     revision: dd78b24e330193a22d2293ac66922dd4f982f563   # 2026-10-15 main. trust_remote_code가 원격 코드를 실행하므로 고정
     trust_remote_code: true
@@ -11,7 +20,7 @@ models:
     threshold: 0.5
     max_length: 512
 
-chunking:
-  mode: chunks                  # full: 512토큰에서 잘라 한 번만 봄(OSS 기본) | chunks: 겹치는 조각마다 검사
+chunking:                       # 모델 항목에 mode가 없을 때 쓰는 기본값
+  mode: chunks                  # full: max_length에서 잘라 한 번만 봄 | chunks: 글자 조각마다 | windows: 토큰 창마다
   chunk_chars: 1000             # 영어 기준 약 250토큰. 512토큰을 넘지 않게 둔다
   overlap_chars: 200

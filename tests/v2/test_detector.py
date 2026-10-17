@@ -48,3 +48,29 @@ def test_full_mode_scores_whole_text_once():
     result = HFDetector("fake", scorer, 0.5, mode="full", use_cache=False).detect(text)
     assert len(calls) == 1 and len(calls[0]) == 1
     assert not result.flagged and result.spans[0].end == 5000
+
+
+def test_windows_mode_uses_window_scorer_spans(tmp_path, monkeypatch):
+    from agentgate.v2.detector import hf
+    monkeypatch.setattr(hf, "CACHE_DIR", tmp_path)
+    text = "a" * 100 + "INJECT" + "b" * 100
+    windows = lambda t: [(0, 120, 0.1), (90, len(t), 0.97)]   # noqa: E731
+    detector = HFDetector("fake", None, 0.5, "windows", window_scorer=windows)
+    result = detector.detect(text)
+    assert result.flagged and result.score == 0.97
+    assert [s.start for s in result.suspicious_spans()] == [90]
+    assert result.covers(100, 106) == 0.97 and result.covers(0, 50) == 0.1
+    assert detector.detect(text).cached
+
+
+def test_windows_mode_requires_window_scorer():
+    with pytest.raises(ValueError):
+        HFDetector("fake", lambda texts: [0.0] * len(texts), 0.5, "windows")
+
+
+def test_default_detector_is_horizon_windows():
+    from agentgate.v2.detector import load_detector_config
+    config = load_detector_config()
+    model = config["models"][config["default"]]
+    assert config["default"] == "horizon-base" and model["mode"] == "windows"
+    assert model["hf_id"] == "Horizon-Labs/prompt-injection-guard-base" and model["injection_label"] == "INJECTION"
