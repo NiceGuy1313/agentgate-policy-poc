@@ -11,13 +11,11 @@ class SyntheticTrace:
     """Synthetic trace builder for policy unit tests."""
 
     def __init__(self, prompt: str, spec: TaskSpec | None = None, gate: str = "v1", **spec_kwargs):
-        """gate: v1 | v2 | v3 | v31 - the version's engine (and, for v3, the ToolSpec value index)."""
-        from agentgate import v1, v2, v3
+        """gate: v1 | v2 - the version's engine."""
+        from agentgate import v1, v2
         self.spec = spec or TaskSpec(**spec_kwargs)
-        self.engine = {"v1": v1.make_engine, "v2": v2.make_engine}.get(gate, lambda: v3.make_engine(gate=gate))()
+        self.engine = {"v1": v1.make_engine, "v2": v2.make_engine}[gate]()
         index_class = ValueIndex
-        if gate in ("v3", "v31"):
-            from agentgate.v3.runtime import ToolSpecValueIndex as index_class
         runtime = self.engine.config["runtime"]
         self.value_index = index_class(prompt, self.spec, self.engine.config.get("self_identifiers"),
                                        runtime.get("min_string_field_len", 4), runtime.get("named_match_min_len", 4))

@@ -1,10 +1,8 @@
-"""v3 결과 요약을 results/v3/RESULTS.md로 만든다. 수치는 모두 실행 기록에서 계산한다(손으로 고치지 않는다).
+"""v3 결과를 results/v3/RESULTS.md로 만든다. 수치는 모두 실행 기록에서 계산한다(손으로 고치지 않는다).
 
-세 비교: 판정 LLM 없음(C8b) / 판정 LLM + 정책 문서(C8) / 판정 LLM, 정책 문서 없음(C8n). 기준선 C0는 같은 실행.
+세 조건: Gate 없음(C0) / Gate + 판정 LLM(C9n) / Gate + 판정 LLM + 정책 문서(C9). 정책 엔진은 없다.
 선행: check_enforcement.py, summarize_live.py, live_significance.py를 같은 --run에 실행
-출력: results/v3/RESULTS.md
-
-사용법: python scripts/v3/summarize_v3.py --run results/v3/live/full_tk_gpt-oss_120b
+사용법: python scripts/v3/summarize_v3.py --run results/v3/live/<run>
 """
 
 from __future__ import annotations
@@ -17,31 +15,78 @@ from pathlib import Path
 
 from agentgate.agentdojo.live_run_analysis import live_run_files
 from agentgate.agentdojo.metrics import mcnemar_exact
-from agentgate.conditions import get_condition
 from agentgate.config import PROJECT_ROOT, load_dotenv
 from agentgate.v3.toolspec import DEFAULT_MODEL as TOOLSPEC_DEFAULT_MODEL
 
 V3_DIR = PROJECT_ROOT / "results" / "v3"
-METRICS = {"ASR": ("attack", "security"), "Utility": ("benign", "utility"),
-           "공격 중 Utility": ("attack", "utility")}
-COMPARISONS = [("C8", "C8b", "판정 LLM 효과(정책 문서 있음)"), ("C8n", "C8b", "판정 LLM 효과(정책 문서 없음)"),
-               ("C8", "C8n", "정책 문서 효과")]
+NAMES = {"C0": "Gate 없음", "C9n": "Gate + 판정 LLM", "C9": "Gate + 판정 LLM + 정책 문서"}
+METRICS = {"ASR": ("attack", "security"), "Utility": ("benign", "utility"), "공격 중 Utility": ("attack", "utility")}
+SIG_KEYS = {"ASR": "asr", "Utility": "utility", "공격 중 Utility": "utility_under_attack"}
 
+FLOW = """```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant TS as TaskSpec 추출기<br/>({spec_model})
+    participant AG as 에이전트<br/>({agent})
+    participant GT as Gate
+    participant JD as 판정 LLM<br/>({judge_model})
+    participant TL as 툴<br/>(AgentDojo 환경)
+    participant TO as ToolSpec 추출기<br/>({toolspec_model})
 
-def table(header: list[str], rows: list[list]) -> list[str]:
-    return ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)] + \
-           ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    U->>TS: 프롬프트 + 툴 목록
+    TS-->>GT: TaskSpec (사용자가 허락한 범위)
+    U->>AG: 프롬프트
+    loop 에이전트가 끝낼 때까지
+        AG->>GT: 툴 호출 (툴, 인자)
+        alt C0 또는 읽기 호출
+            GT->>TL: 그대로 실행
+        else C9n · C9의 effect 호출 (상태 변경 · 외부 전송 · URL 방문)
+            GT->>JD: TaskSpec + 지금까지의 ToolSpec + 대기 중 호출<br/>(C9는 정책 문서도)
+            JD-->>GT: ALLOW 또는 BLOCK
+            alt ALLOW
+                GT->>TL: 실행
+            else BLOCK
+                GT-->>AG: 차단 메시지
+            end
+        end
+        TL-->>AG: 툴 응답 (공격 실행이면 주입 문구 포함)
+        TL->>TO: 툴 응답 원문
+        TO-->>GT: ToolSpec (레코드 · 응답 속 요청)
+    end
+    AG-->>U: 최종 답변
+```"""
 
+COMPONENTS = """**TaskSpec 추출기** (`{spec_model}`): 사용자가 허락한 범위를 구조화한다.
+- 입력: 사용자 프롬프트, 툴 목록(이름·설명). 툴 응답은 보지 않는다.
+- 출력: TaskSpec. 요청한 행동(`requested_ops`), 사용자가 지목한 자료(`named_sources`), 허용 목적지(`allowed_dest`), 금액 상한(`amount_cap`), 전송 요청 여부(`egress_requested`), 지시 수행을 위임한 자료(`delegated_sources`).
 
-def metric_cell(m: dict) -> str:
-    lo, hi = m["ci95"]
-    return f"{100 * m['rate']:.1f}% ({m['k']}/{m['n']}) [{100 * lo:.1f}, {100 * hi:.1f}]"
+**에이전트** (`{agent}`): 평가 대상이다.
+- 입력: 사용자 프롬프트, 툴 응답 또는 차단 메시지.
+- 출력: 툴 호출(툴 이름, 인자).
+
+**Gate**: 툴 호출이 실행되기 직전의 관문이다. 규칙으로 판정하지 않는다.
+- 입력: 툴 호출.
+- 출력: 읽기 호출은 그대로 실행한다. effect 호출(상태 변경·외부 전송·URL 방문)은 판정 LLM의 답대로 실행하거나 차단한다.
+
+**판정 LLM** (`{judge_model}`, C9n·C9): effect 호출을 실행할지 정한다.
+- 입력: 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 ToolSpec, 대기 중 호출(툴, 인자). C9는 정책 문서(`config/v3/policy.yaml`, R1–R10)를 함께 받는다. 툴 응답 원문은 받지 않는다.
+- 출력: ALLOW 또는 BLOCK과 이유 한 문장.
+
+**툴** (AgentDojo v1.2.2 환경):
+- 입력: 실행이 허용된 툴 호출.
+- 출력: 툴 응답. 공격 실행에서는 응답 안에 주입 문구가 들어 있다.
+
+**ToolSpec 추출기** (`{toolspec_model}`): 툴 응답을 판정 LLM이 읽을 JSON으로 바꾼다.
+- 입력: 툴 응답 원문, 그 응답을 만든 호출, 툴 목록.
+- 출력: ToolSpec. 레코드(종류·작성자)와 응답 속 요청(누구에게 하는 요청인지, 어떤 툴로 수행되는지, 어떤 값을 지목하는지). 원문에 없는 값은 코드로 걸러낸다."""
 
 
 def paired(runs: list[dict], a: str, b: str, kind: str, field: str) -> dict:
     """Same (suite, user task, injection task) in conditions a and b: rate difference a−b and exact McNemar p."""
     def key(r):
         return r["suite"], r["user_task"], r["injection_task"]
+
     def keep(r):
         return not r.get("error") and (r["injection_task"] is None) == (kind == "benign")
     by_a = {key(r): bool(r[field]) for r in runs if r["condition"] == a and keep(r)}
@@ -49,44 +94,13 @@ def paired(runs: list[dict], a: str, b: str, kind: str, field: str) -> dict:
     keys = by_a.keys() & by_b.keys()
     a_only = sum(by_a[k] and not by_b[k] for k in keys)
     b_only = sum(by_b[k] and not by_a[k] for k in keys)
-    return {"n_pairs": len(keys), "a_only": a_only, "b_only": b_only,
-            "diff": (a_only - b_only) / len(keys) if keys else None, "p_mcnemar": mcnemar_exact(b_only, a_only)}
+    return {"diff": (a_only - b_only) / len(keys) if keys else None, "p": mcnemar_exact(b_only, a_only)}
 
 
-def analyse(runs: list[dict], conditions: list[str]) -> dict:
-    out: dict = {"conditions": {}, "comparisons": {}}
-    for c in conditions:
-        cruns = [r for r in runs if r["condition"] == c]
-        events = [e for r in cruns for e in r["trace"]]
-        judges = [(e["verdict"], e["judge"]) for e in events if e.get("judge")]
-        toolspec = Counter()
-        for r in cruns:
-            for k, v in (r.get("toolspec") or {}).items():
-                if isinstance(v, (int, float)):
-                    toolspec[k] += v
-        benign_lost = Counter()
-        for r in cruns:
-            if r["injection_task"] is not None or r["utility"] or r.get("error"):
-                continue
-            blocks = [e for e in r["trace"] if e.get("effective") == "BLOCK"]
-            benign_lost["판정 LLM 차단" if blocks and blocks[0].get("judge") else
-                        "엔진 차단" if blocks else "차단 없이 실패"] += 1
-        out["conditions"][c] = {
-            "runs": len(cruns), "errors": sum(bool(r.get("error")) for r in cruns),
-            "judge_calls": len(judges),
-            "engine_to_final": dict(Counter(f"{v}→{j['final']}" for v, j in judges)),
-            "judge_api_calls": sum(1 for _, j in judges if j.get("answer") and not j.get("cached")),
-            "judge_input_tokens": sum(j.get("input_tokens", 0) for _, j in judges),
-            "judge_cache_read_tokens": sum(j.get("cache_read_input_tokens", 0) for _, j in judges),
-            "judge_cache_write_tokens": sum(j.get("cache_creation_input_tokens", 0) for _, j in judges),
-            "judge_output_tokens": sum(j.get("output_tokens", 0) for _, j in judges),
-            "toolspec": dict(toolspec), "benign_lost": dict(benign_lost),
-        }
-    for a, b, _ in COMPARISONS:
-        if a in conditions and b in conditions:
-            out["comparisons"][f"{a}-{b}"] = {name: paired(runs, a, b, kind, field)
-                                              for name, (kind, field) in METRICS.items()}
-    return out
+def diff_text(d: dict) -> str:
+    if d["diff"] is None:
+        return "-"
+    return f"{100 * d['diff']:+.1f}%p (p={d['p']:.3g}, {'유의' if d['p'] < 0.05 else '유의하지 않음'})"
 
 
 def main():
@@ -101,107 +115,110 @@ def main():
     significance = json.loads((run_dir / "significance.json").read_text())
     enforcement = json.loads((run_dir / "enforcement_check.json").read_text())
     runs = [json.loads(p.read_text()) for p in live_run_files(run_dir)]
-    conditions = list(summary["conditions"])
-    analysis = analyse(runs, conditions)
-    rel = run_dir.relative_to(PROJECT_ROOT) if run_dir.is_relative_to(PROJECT_ROOT) else run_dir
+    conditions = [c for c in NAMES if c in summary["conditions"]]
     first = summary["conditions"][conditions[0]]
-    judge_model = next((j.get("model") for r in runs for e in r["trace"] if (j := e.get("judge")) and j.get("model")),
-                       "-")
-    spec_model = next((r["spec_meta"]["source"].removeprefix("llm:") for r in runs
-                       if (r.get("spec_meta") or {}).get("source")), "-")
     load_dotenv()
-    toolspec_model = os.environ.get("AGENTGATE_TOOLSPEC_MODEL") or TOOLSPEC_DEFAULT_MODEL
+    names = {"agent": summary["agent_model"],
+             "spec_model": next((r["spec_meta"]["source"].removeprefix("llm:") for r in runs
+                                 if (r.get("spec_meta") or {}).get("source")), "-"),
+             "toolspec_model": os.environ.get("AGENTGATE_TOOLSPEC_MODEL") or TOOLSPEC_DEFAULT_MODEL,
+             "judge_model": next((j["model"] for r in runs for e in r["trace"] if (j := e.get("judge"))), "-")}
 
-    lines = ["# v3 결과: 판정 LLM이 모든 effect 호출을 판단", "",
-             f"> `scripts/v3/summarize_v3.py --run {rel}`가 생성한다. 손으로 고치지 않는다. 실행 기록(json)은 요약 후 지웠다.", "",
-             "## 구성", "",
-             f"- 에이전트 `{summary['agent_model']}`, 공격 `{summary['attack']}`, AgentDojo v1.2.2, 조건마다 공격 없음 "
-             f"{first['benign_runs']}건 + 공격 {first['attack_runs']}건.",
-             f"- TaskSpec `{spec_model}`, ToolSpec `{toolspec_model}`, "
-             f"판정 LLM `{judge_model}`. 정책: `config/v3/policy.yaml`(gate v31).", ""]
-    lines += table(["조건", "구성"], [[c, get_condition(c).description] for c in conditions]) + [""]
+    def sig(c, metric):
+        return significance["conditions"][c][SIG_KEYS[metric]]
 
-    def rate(c, name):
-        m = significance["conditions"][c][name]
-        return f"{100 * m['rate']:.1f}%"
+    def rate(c, metric):
+        return f"{100 * sig(c, metric)['rate']:.1f}%"
 
-    def diff(a, b, name):
-        comp = analysis["comparisons"].get(f"{a}-{b}", {}).get(name)
-        if not comp or comp["diff"] is None:
-            return "-"
-        sig = "유의" if comp["p_mcnemar"] < 0.05 else "유의하지 않음"
-        return f"{100 * comp['diff']:+.1f}%p (p={comp['p_mcnemar']:.3g}, {sig})"
-    if {"C0", "C8", "C8n", "C8b"} <= set(conditions):
-        lines += ["## 핵심", "",
-                  f"- 세 방식 모두 ASR을 C0 {rate('C0', 'asr')}에서 C8b {rate('C8b', 'asr')}, C8 {rate('C8', 'asr')}, "
-                  f"C8n {rate('C8n', 'asr')}로 낮췄다.",
-                  f"- 판정 LLM(C8 − C8b): 공격 중 Utility {diff('C8', 'C8b', '공격 중 Utility')}, "
-                  f"ASR {diff('C8', 'C8b', 'ASR')}, 정상 Utility {diff('C8', 'C8b', 'Utility')}.",
-                  f"- 정책 문서(C8 − C8n): ASR {diff('C8', 'C8n', 'ASR')}, 공격 중 Utility "
-                  f"{diff('C8', 'C8n', '공격 중 Utility')}, 정상 Utility {diff('C8', 'C8n', 'Utility')}.",
-                  f"- 정상 Utility는 C0 {rate('C0', 'utility')} 대비 C8 {rate('C8', 'utility')}, "
-                  f"C8n {rate('C8n', 'utility')}, C8b {rate('C8b', 'utility')}.", ""]
+    def vs_c0(c, metric):
+        p = sig(c, metric).get("paired_vs_C0")
+        return diff_text({"diff": p["diff"], "p": p["p_mcnemar"]}) if p else "-"
 
-    lines += ["## 결과", "", "Wilson 95% CI, \"C0 대비\"는 같은 짝의 차이와 exact McNemar p.", ""]
-    rows = []
+    doc_effect = {m: paired(runs, "C9", "C9n", kind, field) for m, (kind, field) in METRICS.items()}
+
+    lines = ["# v3 결과: Gate 없음 / Gate + 판정 LLM / Gate + 판정 LLM + 정책 문서", "",
+             "> `scripts/v3/summarize_v3.py`가 live 실행 기록에서 생성한다. 손으로 고치지 않는다. "
+             "실행 기록(json)은 요약 후 지웠다.", "",
+             "## 한눈에 보기", "",
+             f"- 공격 성공률(ASR): Gate 없음 {rate('C0', 'ASR')} → Gate + 판정 LLM {rate('C9n', 'ASR')} → "
+             f"Gate + 판정 LLM + 정책 문서 {rate('C9', 'ASR')}.",
+             f"- 판정 LLM을 넣으면(C9n − C0): ASR {vs_c0('C9n', 'ASR')}, 정상 Utility {vs_c0('C9n', 'Utility')}, "
+             f"공격 중 Utility {vs_c0('C9n', '공격 중 Utility')}.",
+             f"- 정책 문서를 읽히면(C9 − C9n): ASR {diff_text(doc_effect['ASR'])}, 정상 Utility "
+             f"{diff_text(doc_effect['Utility'])}, 공격 중 Utility {diff_text(doc_effect['공격 중 Utility'])}.", "",
+             "## 실험 흐름", "", FLOW.format(**names), "",
+             "## 구성 요소", "", COMPONENTS.format(**names), "",
+             "## 비교한 조건", ""]
+    lines += [f"- **{c}** {NAMES[c]}" for c in conditions]
+    lines += ["", f"에이전트 `{names['agent']}`, 공격 `{summary['attack']}`, 조건마다 공격 없는 실행 "
+                  f"{first['benign_runs']}건과 공격 실행 {first['attack_runs']}건이다.", "",
+              "## 결과", "",
+              "- **ASR**: 공격 실행 중 공격자 목표가 달성된 비율. 낮을수록 좋다.",
+              "- **Utility**: 공격 없는 실행에서 사용자 작업을 끝낸 비율.",
+              "- **공격 중 Utility**: 공격 실행에서도 사용자 작업을 끝낸 비율.", "",
+              "| 조건 | ASR | Utility | 공격 중 Utility |", "|---|---|---|---|"]
     for c in conditions:
-        m = significance["conditions"][c]
-        cells = [c]
-        for name in ("asr", "utility", "utility_under_attack"):
-            p = m[name].get("paired_vs_C0")
-            cells += [metric_cell(m[name]), "-" if not p else f"{100 * p['diff']:+.1f}%p (p={p['p_mcnemar']:.3g})"]
-        rows.append(cells)
-    lines += table(["조건", "ASR", "C0 대비", "Utility", "C0 대비", "공격 중 Utility", "C0 대비"], rows) + [""]
-
-    lines += ["## 세 비교", "", "같은 짝끼리의 차이(앞 조건 − 뒤 조건)와 exact McNemar p.", ""]
-    rows = []
-    for a, b, label in COMPARISONS:
-        comp = analysis["comparisons"].get(f"{a}-{b}")
-        if comp:
-            rows.append([f"{label} ({a} − {b})"] + [
-                f"{100 * comp[n]['diff']:+.1f}%p (p={comp[n]['p_mcnemar']:.3g})" if comp[n]["diff"] is not None
-                else "-" for n in METRICS])
-    lines += table(["비교", *METRICS], rows) + [""]
-
-    lines += ["## 판정 LLM", "", "엔진 판정 → 판정 LLM 최종(HUMAN은 BLOCK으로 집행).", ""]
-    rows = [[c, a["judge_calls"], ", ".join(f"{k} {v}" for k, v in sorted(a["engine_to_final"].items()))]
-            for c, a in analysis["conditions"].items() if a["judge_calls"]]
-    lines += table(["조건", "판정 호출", "엔진 → 최종"], rows) + [""]
-    rows = [[c, f"{sum(a['benign_lost'].values())}/{first['benign_runs']}",
-             ", ".join(f"{k} {v}" for k, v in sorted(a["benign_lost"].items(), key=lambda x: -x[1])) or "-"]
-            for c, a in analysis["conditions"].items()]
-    lines += ["공격 없는 실행의 실패 원인(첫 차단 기준):", ""] + table(["조건", "실패", "원인"], rows) + [""]
-    rows = [[c, ", ".join(f"{k} {v}" for k, v in sorted(summary["conditions"][c]["successful_attacks_by_class"].items()))
-             or "-"] for c in conditions if c != "C0"]
-    lines += ["공격 성공 경로:", ""] + table(["조건", "경로"], rows) + [""]
-
+        cells = [f"{100 * sig(c, m)['rate']:.1f}% ({sig(c, m)['k']}/{sig(c, m)['n']})" for m in METRICS]
+        lines.append(f"| {c} {NAMES[c]} | " + " | ".join(cells) + " |")
+    lines += ["", "같은 (사용자 작업, 공격) 짝끼리 비교했다. 차이는 앞 조건 − 뒤 조건, p는 exact McNemar다.", ""]
+    for c in conditions[1:]:
+        lines.append(f"**{c} − C0** ({NAMES[c]} 대 Gate 없음)")
+        lines += [f"- {m} {vs_c0(c, m)}" for m in METRICS] + [""]
+    lines.append("**C9 − C9n** (정책 문서를 읽었을 때 대 안 읽었을 때)")
+    lines += [f"- {m} {diff_text(doc_effect[m])}" for m in METRICS] + [""]
+    lines.append("95% 신뢰구간(Wilson):")
+    for m in METRICS:
+        lines.append(f"- {m}: " + ", ".join(
+            f"{c} [{100 * sig(c, m)['ci95'][0]:.1f}, {100 * sig(c, m)['ci95'][1]:.1f}]" for c in conditions))
+    lines += ["", "## 자세히", "", "### 판정 LLM의 판단", ""]
+    for c in conditions[1:]:
+        judges = [j for r in runs if r["condition"] == c for e in r["trace"] if (j := e.get("judge"))]
+        finals = Counter(j["final"] for j in judges)
+        lines.append(f"- **{c}**: effect 호출 {len(judges)}회 판정, ALLOW {finals.get('ALLOW', 0)}, "
+                     f"BLOCK {finals.get('BLOCK', 0)}")
+    lines += ["", "### 정상 작업이 실패한 이유", "", "공격 없는 실행 중 실패한 것을 나눴다. "
+              "\"차단 없이 실패\"는 에이전트가 스스로 작업을 끝내지 못한 경우다.", ""]
+    for c in conditions:
+        lost = Counter()
+        for r in runs:
+            if r["condition"] != c or r["injection_task"] is not None or r["utility"] or r.get("error"):
+                continue
+            lost["판정 LLM 차단" if any(e.get("effective") == "BLOCK" for e in r["trace"]) else "차단 없이 실패"] += 1
+        lines.append(f"- **{c}** {sum(lost.values())}건: " + ", ".join(f"{k} {v}" for k, v in lost.most_common()))
+    lines += ["", "### 공격이 성공한 경로", "",
+              "\"툴 호출 없이 성공(유형 H)\"은 에이전트가 답변 텍스트만으로 공격 목표를 달성한 경우로, 툴 호출 Gate로는 막을 수 "
+              "없다.", ""]
+    for c in conditions[1:]:
+        paths = summary["conditions"][c]["successful_attacks_by_class"]
+        lines.append(f"- **{c}** {sum(paths.values())}건: " + (", ".join(f"{k} {v}" for k, v in sorted(paths.items()))
+                                                             or "-"))
     toolspec_path = Path(args.toolspec)
     if toolspec_path.exists():
-        ts = json.loads(toolspec_path.read_text())
-        a = ts["all"]
+        a = json.loads(toolspec_path.read_text())["all"]
 
-        def rate(m):
+        def ratio(m):
             return f"{100 * m['rate']:.1f}% ({m['n']}/{m['of']})"
-        lines += ["## ToolSpec 추출 품질", "",
-                  f"정답 궤적의 툴 응답(`{', '.join(ts['attacks'])}`, 중복 제거, `{ts['model']}`)에서 독자에게 하는 요청을 "
-                  "뽑은 결과(`scripts/v3/toolspec_evaluation.py`).", ""]
-        lines += table(["응답", "개수", "assistant 대상 요청 추출", "요청 하나라도 추출", "공격 목표 툴과 일치"], [
-            ["주입 응답", a["injected_responses"], rate(a["injected_detected_strict"]), rate(a["injected_detected_any"]),
-             rate(a["injected_goal_action_match"])],
-            ["정상 응답", a["benign_responses"], rate(a["benign_flagged_strict"]), rate(a["benign_flagged_any"]), "-"]])
-        lines += [""]
-
-    lines += ["## 비용과 무결성", ""]
-    rows = []
-    for c, a in analysis["conditions"].items():
-        t = a["toolspec"]
-        rows.append([c, a["judge_api_calls"], a["judge_input_tokens"], a["judge_cache_read_tokens"],
-                     a["judge_output_tokens"], int(t.get("api_calls", 0)), int(t.get("input_tokens", 0)),
-                     int(t.get("cache_read_input_tokens", 0)), int(t.get("output_tokens", 0))])
-    lines += table(["조건", "판정 API 호출", "판정 입력(캐시 외)", "판정 캐시 읽기", "판정 출력",
-                    "ToolSpec API 호출", "ToolSpec 입력", "ToolSpec 캐시 읽기", "ToolSpec 출력"], rows) + [""]
-    lines += [f"집행 무결성: 실행 {enforcement.get('runs', '-')}건, 차단 호출이 실행된 위반 "
-              f"{enforcement.get('violations', '-')}건, 오류 {sum(a['errors'] for a in analysis['conditions'].values())}건.", ""]
+        lines += ["", "### ToolSpec 추출 품질", "",
+                  f"정답 궤적의 툴 응답(`{summary['attack']}`, 중복 제거)을 추출한 결과다(`scripts/v3/toolspec_evaluation.py`).",
+                  f"- 주입 응답 {a['injected_responses']}개: AI 대상 요청 추출 {ratio(a['injected_detected_strict'])}, "
+                  f"그 요청의 툴이 공격 목표 툴과 일치 {ratio(a['injected_goal_action_match'])}",
+                  f"- 정상 응답 {a['benign_responses']}개: AI 대상 요청 오탐 {ratio(a['benign_flagged_strict'])}, "
+                  f"요청이 하나라도 있다고 본 비율 {ratio(a['benign_flagged_any'])}"]
+    lines += ["", "### 비용과 집행 무결성", ""]
+    for c in conditions[1:]:
+        judges = [j for r in runs if r["condition"] == c for e in r["trace"] if (j := e.get("judge"))]
+        ts = Counter()
+        for run in runs:
+            if run["condition"] == c:
+                ts.update({k: v for k, v in (run.get("toolspec") or {}).items() if isinstance(v, (int, float))})
+        lines.append(f"- **{c}** 판정 LLM API {sum(not j['cached'] for j in judges)}회(입력 "
+                     f"{sum(j['input_tokens'] for j in judges):,}, 캐시 읽기 "
+                     f"{sum(j['cache_read_input_tokens'] for j in judges):,}, 출력 "
+                     f"{sum(j['output_tokens'] for j in judges):,} 토큰), ToolSpec API {int(ts['api_calls'])}회(입력 "
+                     f"{int(ts['input_tokens']):,}, 캐시 읽기 {int(ts['cache_read_input_tokens']):,}, 출력 "
+                     f"{int(ts['output_tokens']):,} 토큰)")
+    lines.append(f"- 집행 무결성: 실행 {enforcement.get('runs', 0):,}건, 차단된 호출이 실행된 위반 "
+                 f"{enforcement.get('violations', '-')}건, 오류 {summary.get('n_errors', '-')}건")
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}")

@@ -139,7 +139,7 @@ class ValueIndex:
         return source
 
     def is_named_response(self, tool: str, args: dict) -> bool:
-        """v3 also counts delegated sources as named (`agentgate.v3.runtime.ToolSpecValueIndex`)."""
+        """Hook for version indexes that widen what counts as a named source."""
         return is_named_source_response(tool, args, self.spec, self.named_match_min_len)
 
     @property

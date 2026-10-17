@@ -2,7 +2,7 @@
 
 LLM 에이전트가 툴 응답에 심어진 지시(간접 프롬프트 인젝션)를 따라 송금·반출·삭제를 하지 않도록, 모든 툴 호출을 **실행 직전에 결정론 정책(P1–P9)으로 검사**하는 Gate다. AgentDojo v1.2.2(`agentdojo==0.1.35`)와 외부 에이전트 프레임워크(smolagents 등)에서 검증한다.
 
-> **버전**: v1(P1–P9), v2(판별기 + Trusted LLM), v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 `src/agentgate/v1`·`v2`·`v3`에 나뉘어 있다. v3 재실험 결과(C8·C8n·C8b)는 [`results/v3/RESULTS.md`](results/v3/RESULTS.md)에 있다. 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](archive/v2_v3_results_2026-10-17/README.md)에 있다.
+> **버전**: v1(P1–P9), v2(판별기 + Trusted LLM), v3(정책 엔진 없이 TaskSpec + ToolSpec + 판정 LLM, 정책 문서 유무 비교)은 `src/agentgate/v1`·`v2`·`v3`에 나뉘어 있다. v3 결과는 [`results/v3/RESULTS.md`](results/v3/RESULTS.md)에 있다. 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](archive/v2_v3_results_2026-10-17/README.md)에 있다.
 
 자세한 내용은 [`docs/architecture.md`](docs/architecture.md)(구조·Wrapper 규약), [`docs/policy_spec.md`](docs/policy_spec.md)(정책 상세), [`docs/final_report.md`](docs/final_report.md)(평가 결과)에 있다. 정적 결과 요약은 [`results/dashboard.html`](results/dashboard.html)이다.
 
@@ -43,7 +43,7 @@ export OLLAMA_API_KEY=<키>
 | `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | 해당 제공자 모델을 쓸 때 |
 | `AGENTGATE_AGENT_PROVIDER` · `AGENTGATE_AGENT_MODEL` | 배치 평가에서 쓸 에이전트 모델 |
 | `AGENTGATE_LLM_PROVIDER` · `AGENTGATE_LLM_MODEL` | TaskSpec 추출 LLM(캐시가 있으면 키 없이 재사용) |
-| `AGENTGATE_JUDGE_MODEL` | ESCALATE 판정 LLM(C4·C5·C6·C7) |
+| `AGENTGATE_JUDGE_MODEL` | 판정 LLM(C4·C5·C9·C9n) |
 | `AGENTGATE_TOOLSPEC_MODEL` | v3 ToolSpec 추출 LLM(기본 `claude-haiku-5-5`) |
 | `AGENTGATE_V2_DETECTOR` | v2 판별기(비우면 `config/v2/detector.yaml` 기본 `horizon-base`, `piguard:chunks`, `none`) |
 
@@ -87,7 +87,7 @@ python scripts/analysis/summarize_live.py --run results/v1/live/<run>
 | P8 예약 | 요청 없는 호텔·차량·식당 예약 | [`ReservationPolicy`](src/agentgate/v1/policies.py) |
 | P9 일정 | 요청 없는 일정 생성·변경·취소 | [`CalendarChangePolicy`](src/agentgate/v1/policies.py) |
 
-판정은 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 것을 고른다([`engine.py`](src/agentgate/gate/engine.py)). 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/gate/runtime.py) 한 곳을 지난다. v2·v3 추가 정책(P0, P10, P11, P12, v3.1 수정)은 [`docs/policy_spec.md`](docs/policy_spec.md) 5절에 있다.
+판정은 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 것을 고른다([`engine.py`](src/agentgate/gate/engine.py)). 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/gate/runtime.py) 한 곳을 지난다. v2 정책(P0, P10)과 v3(정책 엔진 없이 판정 LLM)은 [`docs/policy_spec.md`](docs/policy_spec.md) 5절에 있다.
 
 정책을 수정하면 다음을 지킨다.
 - `tests/v1/`·`tests/v2/`·`tests/v3/`의 해당 테스트를 고치고 `python -m pytest -q`를 통과시킨다.
@@ -95,7 +95,7 @@ python scripts/analysis/summarize_live.py --run results/v1/live/<run>
 
 ## 5. 실험 조건과 재현
 
-조건은 [`src/agentgate/conditions.py`](src/agentgate/conditions.py)에 있다. C0(방어 없음)·C3(AgentDojo 내장 방어)은 기준선, C1·C2·C4는 v1, C5는 v2, C6·C7·C7n·C8은 v3다. C8은 ESCALATE만이 아니라 모든 effect 호출을 판정 LLM이 최종 판단한다. 버전을 비교할 때는 같은 실행에 C0을 함께 넣는다.
+조건은 [`src/agentgate/conditions.py`](src/agentgate/conditions.py)에 있다. C0(방어 없음)·C3(AgentDojo 내장 방어)은 기준선, C1·C2·C4는 v1, C5는 v2, C9n(Gate + 판정 LLM)·C9(Gate + 판정 LLM + 정책 문서)는 v3다. 버전을 비교할 때는 같은 실행에 C0을 함께 넣는다.
 
 규모: AgentDojo v1.2.2는 사용자 작업 97개 × 같은 suite의 injection task(workspace 14, travel 7, banking 9, slack 5) = 공격 쌍 949개다. `--pairs`를 주지 않으면 live도 이 전체(공격 없음 97 + 공격 949)를 돌린다. `--pairs @data/agentdojo/pairs/strat3_seed0.txt`는 사용자 작업마다 공격 3개를 고른 층화 표본(97 + 291)이다.
 
@@ -115,8 +115,7 @@ python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions
 # v3 (TaskSpec·ToolSpec은 Haiku, 둘 다 Message Batches로 미리 추출해 디스크 캐시를 채운다)
 python scripts/taskspec/extract_llm_specs.py --version v3
 python scripts/v3/toolspec_evaluation.py --out results/v3/toolspec
-python scripts/evaluation/replay_evaluation.py --condition C8 --spec llm:claude-haiku-5-5 --out results/v3/replay/C8
-python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C8b C8n C8 \
+python scripts/evaluation/live_evaluation.py --agent llm --spec llm --conditions C0 C9n C9 \
   --attack important_instructions --out results/v3/live/<run>
 
 python scripts/analysis/check_enforcement.py --run results/<version>/live/<run>
@@ -134,7 +133,7 @@ src/agentgate/
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
   llm/           LLM client, TaskSpec 추출기, 판정 LLM 공용 입출력
   v1/  v2/  v3/  버전별 정책·판정 LLM·런타임 확장·조건 조립(experiment.py)
-  conditions.py  실험 조건 등록부 (C0–C8)
+  conditions.py  실험 조건 등록부 (C0–C9)
 config/          agentdojo/(툴 역할·민감 읽기·지목 자료 규칙), v1/, v2/, v3/, frameworks.yaml
 prompts/         v1/, v2/, v3/
 scripts/         agentdojo · taskspec · evaluation · analysis · reporting · v2 · v3 · cloud

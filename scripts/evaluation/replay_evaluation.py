@@ -2,11 +2,11 @@
 
 사용법:
   python scripts/evaluation/replay_evaluation.py --condition C1 --spec oracle --out results/v1/replay/oracle
-  python scripts/evaluation/replay_evaluation.py --condition C7 --spec llm:claude-sonnet-5-5 --attack tool_knowledge \\
+  python scripts/evaluation/replay_evaluation.py --condition C9 --spec llm:claude-haiku-5-5 --attack tool_knowledge \\
       --mode enforce --out results/v3/replay/c7_llmspec_tool_knowledge
 
-조건은 `agentgate.conditions`(C1·C2·C4 v1, C5 v2, C6·C7·C7n·C8 v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
-않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C7 --escalate block).
+조건은 `agentgate.conditions`(C1·C2·C4 v1, C5 v2, C9·C9n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
+않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C4 --escalate block).
 `--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1·v2는 v1 프롬프트, v3는 v3 프롬프트).
 v2 판별기: AGENTGATE_V2_DETECTOR=<config/v2/detector.yaml 모델>[:mode], 비우면 기본(horizon-base:windows), none = 끔
 

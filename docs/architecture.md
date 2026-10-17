@@ -103,7 +103,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 
 ## 7. 한계
 
-- **지목 자료 안의 인젝션**: 사용자가 지목한 웹페이지·파일에 심은 값은 NAMED_SOURCE가 되어 ALLOW나 ESCALATE에 머문다. v3의 P11은 그 값이 툴 응답 속 *요청*의 대상일 때 잡지만, 지시 없이 데이터만 바꿔치기한 값은 여전히 구분하지 못한다.
+- **지목 자료 안의 인젝션**: 사용자가 지목한 웹페이지·파일에 심은 값은 NAMED_SOURCE가 되어 ALLOW나 ESCALATE에 머문다. v3에서는 판정 LLM이 ToolSpec 속 *요청*의 대상으로 그 값을 볼 수 있지만, 지시 없이 데이터만 바꿔치기한 값은 구분하지 못한다.
 - **요청된 툴의 인자 오염**: 요청된 일정·예약 툴에 공격 값이 섞이면 P8·P9의 툴 단위 검사로는 구분하지 못한다.
 - **툴 호출 없는 공격**(유형 H): 답변 문장만 바꾸는 공격은 범위 밖이다.
 - **TaskSpec 품질 의존**: `requested_ops`·`named_sources`가 틀리면 판정도 틀린다.
@@ -163,13 +163,13 @@ src/agentgate/
   llm/         API client, TaskSpec 추출기(버전별 프롬프트), 판정 LLM 공용 입출력
   v1/          P1–P9, 판정 LLM v1(C4)
   v2/          P10(모든 툴 호출을 Trusted LLM으로), 판별기(detector/), Trusted LLM v2, DetectorGatedRuntime
-  v3/          P11·P12, v3.1 서브클래스, ToolSpec 추출기, 판정 LLM v3, ToolSpecGatedRuntime
-  conditions.py  실험 조건 C0–C7n → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
+  v3/          정책 엔진 없음: ToolSpec 추출기, 판정 LLM v3, ToolSpecGatedRuntime(effect 호출 → 판정 LLM)
+  conditions.py  실험 조건 C0–C9 → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
 ```
 
 설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v2,v3}/`, `prompts/{v1,v2,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
 
-- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v2 판별기 라벨, v3 ToolSpec), `index_class`(v3 위임 자료).
-- v2는 규칙 정책 설정이 없다(`config/v2/`에는 사용자 허용 범위와 판별기 설정만 있다). v3 설정은 v1 파일을 복사하지 않는 독립 파일이다.
+- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v2 판별기 라벨, v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
+- v2는 규칙 정책 설정이 없다(`config/v2/`에는 사용자 허용 범위와 판별기 설정만 있다). v3는 정책 엔진이 없고 `config/v3/policy.yaml`은 판정 LLM이 읽는 정책 문서다.
 - TaskSpec 추출 프롬프트는 v1·v2가 `prompts/v1/extract_taskspec.md`, v3가 `prompts/v3/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
 - 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.
