@@ -1,6 +1,6 @@
 """v3 정책 P11·P12와 v3.1 수정(A1·B1·C1·D2). P0은 `agentgate.gate.user_policy`, P1–P9는 v1 클래스다.
 
-v3.1 수정은 v1 클래스를 고치지 않고 서브클래스로 둔다. 정책 문서: config/v3/policy_rules_v3.yaml, policy_rules_v31.yaml
+v3.1 수정은 v1 클래스를 고치지 않고 서브클래스로 둔다. 설정·정책 문서: config/v3/policy.yaml
 """
 
 from __future__ import annotations

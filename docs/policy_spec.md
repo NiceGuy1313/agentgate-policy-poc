@@ -59,7 +59,7 @@ v3부터 P7의 인젝션 문구 목록(`instruction_phrases`)은 비운다. Agen
 
 ## 5. v2·v3 정책
 
-v2·v3는 v1의 P1–P9 클래스를 그대로 쓰고 아래 정책을 더한다. 버전마다 설정 파일이 따로 있다(`config/v2/policies.yaml`, `config/v3/policies_v3.yaml`, `config/v3/policies_v31.yaml`). 정책 순서는 각 버전 패키지의 `POLICY_CLASSES`가 정한다.
+v2·v3는 v1의 P1–P9 클래스를 그대로 쓰고 아래 정책을 더한다. 버전마다 설정 파일이 따로 있다(`config/v2/policies.yaml`, `config/v3/policy.yaml`). v3는 한 파일에 위협 통제 영역(`controls`: 요청 범위, 주입된 지시, 목적지, 데이터 반출, 자금 이동, 삭제·은폐, 계정·권한, 외부 콘텐츠, 사용자 고정 설정), 판정 규칙(`rules`), 환경 바인딩(`environment`: 툴별 능력과 인자 역할), 사용자 고정 설정, v3.1 수정(`v31`)을 둔다. 통제 영역은 ATR 공격 목표로 나눈 추상 분류이고 툴 이름은 바인딩에만 있다. `agentgate.v3.compile_engine_config`가 이를 P0–P12 클래스가 읽는 엔진 설정으로 바꾼다. 정책 순서는 각 버전 패키지의 `POLICY_CLASSES`가 정한다.
 
 | 정책 | 버전 | 클래스 | 규칙 → 판정 |
 |---|---|---|---|
@@ -82,4 +82,4 @@ v3.1은 v1 클래스를 고치지 않고 서브클래스로 바꾼다(`v3/polici
 | C1 | P3 | 전송을 요청했고 수신자가 신뢰 출처나 지목 자료에서 왔으면 BLOCK 대신 ESCALATE |
 | D2 | P0 | `always_human` 툴이라도 `requested_ops`에 있으면 사람 확인 생략 |
 
-판정 LLM v3는 정책 문서(`config/v3/policy_rules_v3.yaml`, v3.1은 `policy_rules_v31.yaml`)의 규칙 인덱스 전체를 system에, 트리거(`policy:<id>`, `tool_class:<분류>`, `signal:<신호>`)로 고른 조항만 user에 받는다. 정책 문서의 근거는 ATR test-corpora 공격 사례 분류(`data/v3/atr/`)이고 AgentDojo 공격 문구는 쓰지 않았다. 판정 LLM은 툴 응답 원문을 보지 않는다.
+판정 LLM v3는 정책 문서(`config/v3/policy.yaml`의 `rules`, v3.1은 `v31.rule_overrides` 적용)의 규칙 인덱스 전체를 system에, 트리거(`policy:<id>`, `tool_class:<분류>`, `signal:<신호>`)로 고른 조항만 user에 받는다. 정책 문서의 근거는 ATR test-corpora 공격 사례 1,139건(전체 1,140건 중 분류 실패 1건 제외)의 분류(`data/v3/atr/atr_taxonomy.json`)이고 규칙마다 `evidence`에 해당 건수를 적었다. `evidence`는 판정 LLM 입력에 들어가지 않는다. AgentDojo 공격 문구는 쓰지 않았다. 판정 LLM은 툴 응답 원문을 보지 않는다.

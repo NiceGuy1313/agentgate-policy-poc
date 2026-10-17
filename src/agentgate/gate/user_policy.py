@@ -1,4 +1,4 @@
-"""P0 사용자 고정 설정: v2와 v3이 함께 쓰는 정책이다(config/v2·v3/user_policy.yaml). v1에는 없다."""
+"""P0 사용자 고정 설정: v2와 v3이 함께 쓰는 정책이다(config/v2/user_policy.yaml, config/v3/policy.yaml의 user_policy). v1에는 없다."""
 
 from __future__ import annotations
 

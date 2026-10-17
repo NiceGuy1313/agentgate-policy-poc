@@ -39,6 +39,6 @@ def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, s
     kwargs = {"engine": v3.make_engine(disabled, cond.gate), "toolspec": toolspec}
     if escalate == "judge":
         from agentgate.v3.judge import TrustedJudgeV3, as_runtime_judge
-        judge = TrustedJudgeV3(rules_path=v3.rules_path(cond.gate), use_rules=cond.judge != "v3-norules")
+        judge = TrustedJudgeV3(gate=cond.gate, use_rules=cond.judge != "v3-norules")
         kwargs["judge"] = as_runtime_judge(judge, prompt)
     return ToolSpecGatedRuntime, kwargs
