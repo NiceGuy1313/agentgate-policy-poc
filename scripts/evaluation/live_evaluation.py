@@ -203,7 +203,7 @@ def main():
     parser.add_argument("--framework", default="native",
                         help="agent framework from agentgate.harness.registry (default native = AgentDojo pipeline)")
     parser.add_argument("--framework-options", default="{}", help="framework options as JSON")
-    parser.add_argument("--model", default=None, help="provider:model for --framework (default from .env)")
+    parser.add_argument("--model", default=None, help="agent provider:model, e.g. ollama:gpt-oss:120b (default from .env)")
     parser.add_argument("--max-steps", type=int, default=None, help="--framework step limit (default 15)")
     parser.add_argument("--spec-cache-dir", default=None,
                         help="TaskSpec extraction cache dir; a new directory makes the extractor call the LLM live")
@@ -220,6 +220,8 @@ def main():
     agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
     if args.model:
         provider, _, agent_model = args.model.partition(":")
+        # the native pipeline builds its agent from these variables (make_llm); worker threads share them
+        os.environ["AGENTGATE_AGENT_PROVIDER"], os.environ["AGENTGATE_AGENT_MODEL"] = provider, agent_model
     conditions = list(args.conditions)
     for condition in conditions:
         get_condition(condition)
