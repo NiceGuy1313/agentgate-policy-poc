@@ -13,6 +13,8 @@
   - 원문에 없어서 버린 값 수, 오류 수, 토큰
 
 사용법: python scripts/v3/toolspec_evaluation.py --out results/v3/toolspec [--attacks important_instructions tool_knowledge]
+캐시에 없는 응답은 suite마다 Message Batches 한 번으로 추출한다(50% 가격, --no-batch면 하나씩). 추출 결과는 재생·live와
+같은 디스크 캐시(data/v3/cache/toolspec/)에 남으므로, 재생 평가 전에 이 스크립트를 먼저 돌리면 재생의 ToolSpec 호출이 캐시로 끝난다.
 """
 
 from __future__ import annotations
@@ -90,6 +92,8 @@ def main():
     parser.add_argument("--attacks", nargs="+", default=["important_instructions", "tool_knowledge"])
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int, default=0, help="debug: max items")
+    parser.add_argument("--no-batch", action="store_true",
+                        help="extract cache misses one by one instead of one Message Batches request per suite")
     args = parser.parse_args()
     started = time.time()
     items = collect(args.attacks)
@@ -98,6 +102,12 @@ def main():
     extractors = {s: ToolSpecExtractor(describe_tools(load_suite(s))) for s in SUITES}
     print(f"{len(items)} unique responses "
           f"({sum(i['label'] == 'benign' for i in items)} benign, {sum(i['label'] == 'injected' for i in items)} injected)")
+
+    if not args.no_batch:   # fills the disk cache at 50% price; the rows below then read it
+        for suite_name, extractor in extractors.items():
+            suite_items = [i for i in items if i["suite"] == suite_name]
+            if suite_items:
+                extractor.extract_many([(i["tool"], i["args"], i["text"]) for i in suite_items])
 
     def run(item):
         result = extractors[item["suite"]].extract(item["tool"], item["args"], item["text"])

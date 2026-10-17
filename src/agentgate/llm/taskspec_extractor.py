@@ -65,6 +65,9 @@ def compute_cache_key(prompt: str, tools: list[ToolInfo], model: str, template_p
     return digest.hexdigest()[:24]
 
 
+SPEC_MODEL_V3 = "claude-haiku-5-5"   # v3 TaskSpec (ToolSpec uses the same model) when AGENTGATE_LLM_MODEL is unset
+
+
 class TaskSpecExtractor:
     """`model` defaults to AGENTGATE_LLM_MODEL; the API client is only created on a cache miss, so cached
     extractions can be reused without a key."""
@@ -76,7 +79,7 @@ class TaskSpecExtractor:
         self.template_path = VERSION_PROMPTS[version]
         self._client = client
         self.model = client.model if client else (model or os.environ.get("AGENTGATE_LLM_MODEL")
-                                                  or DEFAULT_ANTHROPIC_MODEL)
+                                                  or (SPEC_MODEL_V3 if version == "v3" else DEFAULT_ANTHROPIC_MODEL))
         # AGENTGATE_TASKSPEC_CACHE_DIR: a fresh directory forces live extraction (e.g. a live run that must not reuse
         # earlier specs); the default reuses the committed cache.
         cache_dir = cache_dir or Path(os.environ.get("AGENTGATE_TASKSPEC_CACHE_DIR") or cache_dir_for(version))

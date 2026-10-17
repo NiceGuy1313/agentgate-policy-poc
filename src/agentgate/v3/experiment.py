@@ -27,13 +27,17 @@ def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, s
         result = extractor.extract(tool, args, text)
         if stats is not None:
             toolspec_stats = stats.setdefault("toolspec", {"calls": 0, "api_calls": 0, "errors": 0, "input_tokens": 0,
-                                                           "output_tokens": 0, "latency_ms": 0.0})
+                                                           "output_tokens": 0, "latency_ms": 0.0,
+                                                           "cache_read_input_tokens": 0,
+                                                           "cache_creation_input_tokens": 0})
             toolspec_stats["calls"] += 1
             toolspec_stats["api_calls"] += not result.cached and result.error is None
             toolspec_stats["errors"] += result.error is not None
             toolspec_stats["input_tokens"] += 0 if result.cached else result.input_tokens
             toolspec_stats["output_tokens"] += 0 if result.cached else result.output_tokens
             toolspec_stats["latency_ms"] += 0 if result.cached else result.latency_ms
+            toolspec_stats["cache_read_input_tokens"] += result.cache_read_input_tokens
+            toolspec_stats["cache_creation_input_tokens"] += result.cache_creation_input_tokens
         return result.spec
 
     scope = "all" if cond.judge == "v3-all" else "escalate"
