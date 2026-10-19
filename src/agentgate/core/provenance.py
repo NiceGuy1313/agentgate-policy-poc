@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentgate.config import load_named_source_rules, sensitive_categories_for_tool
+from agentgate.core.binding import ToolBinding, default_tool_binding
 from agentgate.core.normalization import (
     build_haystack,
     flatten_string_fields,
@@ -82,10 +82,12 @@ def compute_kgram_hashes(text: str, k: int) -> set[int]:
     return {hash(normalized[i : i + k]) for i in range(len(normalized) - k + 1)}
 
 
-def is_named_source_response(tool: str, args: dict, spec: TaskSpec, min_len: int = 4) -> bool:
+def is_named_source_response(tool: str, args: dict, spec: TaskSpec, min_len: int = 4,
+                             binding: ToolBinding | None = None) -> bool:
+    """`binding` names the arguments that point to a source (default: the AgentDojo binding)."""
     if f"tool:{tool}" in spec.named_sources:
         return True
-    argument_names = load_named_source_rules()["by_argument"].get(tool, [])
+    argument_names = (binding or default_tool_binding()).named_by_argument.get(tool, [])
     if not argument_names or not spec.named_sources:
         return False
     for argument_name in argument_names:
@@ -122,14 +124,15 @@ class ValueIndex:
     """
 
     def __init__(self, prompt: str, spec: TaskSpec, self_identifiers: list[str] | None = None,
-                 min_string_field_len: int = 4, named_match_min_len: int = 4):
+                 min_string_field_len: int = 4, named_match_min_len: int = 4, binding: ToolBinding | None = None):
         self.spec = spec
+        self.binding = binding or default_tool_binding()   # trusted tools, named-source arguments, sensitive reads
         self.min_string_field_length = min_string_field_len
         self.named_match_min_len = named_match_min_len
         self.self_identifiers = [normalize_value(s) for s in (self_identifiers or [])]
         self.sources: list[IndexedSource] = []
         self.allowed_destination_haystack = build_haystack("\n".join(spec.allowed_dest))
-        self.trusted_tools = set(load_named_source_rules().get("trusted_tools", []))
+        self.trusted_tools = set(self.binding.trusted_tools)
         self._add_source("prompt", -1, None, {}, prompt)
 
     def _add_source(self, source_id, step, tool, args, text, is_named=False, is_trusted=False,
@@ -141,7 +144,7 @@ class ValueIndex:
 
     def is_named_response(self, tool: str, args: dict) -> bool:
         """Hook for subclass indexes that widen what counts as a named source."""
-        return is_named_source_response(tool, args, self.spec, self.named_match_min_len)
+        return is_named_source_response(tool, args, self.spec, self.named_match_min_len, self.binding)
 
     @property
     def prompt(self) -> IndexedSource:
@@ -154,7 +157,7 @@ class ValueIndex:
             f"step{step}", step, tool, args, text,
             is_named=self.is_named_response(tool, args),
             is_trusted=tool in self.trusted_tools,
-            sensitive_categories=sensitive_categories_for_tool(tool),
+            sensitive_categories=self.binding.sensitive_categories(tool),
         )
         source.exact_values = (
             {normalize_value(f) for f in flatten_string_fields(raw_output, 1)} | _collect_dict_keys(raw_output)

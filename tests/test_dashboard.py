@@ -13,8 +13,8 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
 import dashboard.app as dash  # noqa: E402
+from agentgate.experiment import batch as runner  # noqa: E402
 from agentgate.harness import models as harness_models  # noqa: E402
-from agentgate.scenarios import runner  # noqa: E402
 
 BODY = {"framework": "native", "model": "openai_compat:fake-model", "condition": "gate_static_rules"}
 ARCH = Path(dash.APP_DIR) / "static" / "arch"
@@ -22,7 +22,7 @@ ARCH = Path(dash.APP_DIR) / "static" / "arch"
 
 def fake_record(job: dict) -> dict:
     """What `runner.run_one` writes for one scenario, shaped by the condition (no_gate lets the attack through)."""
-    cond, injection = job["cond"], job["injection_task"]
+    cond, injection = job["condition"], job["injection_task"]
     gated, attacked = cond != "no_gate", injection is not None
     trace = [{"step": 0, "tool": "read_file", "args": {"file_path": "bill.txt"}, "verdict": "ALLOW",
               "effective": "ALLOW", "decisions": [], "judge": None, "blocked": False, "executed": True,

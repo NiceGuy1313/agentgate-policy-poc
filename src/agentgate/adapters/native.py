@@ -16,7 +16,7 @@ from agentdojo.task_suite.task_suite import model_output_from_messages
 from agentdojo.types import get_text_content_as_str
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
-from agentgate.agents.factory import UsageMeter
+from agentgate.agents.usage import UsageMeter
 from agentgate.scenarios.pipeline import build_pipeline, serialize_message
 
 

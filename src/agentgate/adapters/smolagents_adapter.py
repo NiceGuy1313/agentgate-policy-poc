@@ -19,7 +19,7 @@ def make_tools(bridge):
     from smolagents import Tool
 
     tools = []
-    for spec in bridge.tool_specs():
+    for spec in bridge.tool_schemas():
         inputs = {}
         for arg in arguments(spec["parameters"]):
             entry = {"type": arg.types[0] if len(arg.types) == 1 else arg.types, "description": arg.description}

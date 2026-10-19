@@ -9,6 +9,7 @@ from agentgate import config
 from agentgate.core.task_spec import TaskSpec
 from agentgate.core.types import ToolCall
 from agentgate.llm import client as client_module
+from agentgate.llm import ollama as ollama_module
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, Completion, LLMClient, OllamaClient, parse_think
 from agentgate.policy_gate import llm_judge as judge_module
 from agentgate.policy_gate.runtime import PolicyGateRuntime
@@ -23,6 +24,7 @@ def env(monkeypatch):
     """No .env and no AGENTGATE_* variables: each test sets exactly what it checks."""
     monkeypatch.setattr(judge_module, "load_dotenv", lambda: None)
     monkeypatch.setattr(client_module, "load_dotenv", lambda: None)
+    monkeypatch.setattr(ollama_module, "load_dotenv", lambda: None)
     for name in SETTINGS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")   # no OLLAMA_API_KEY needed
@@ -149,7 +151,7 @@ def test_judge_lets_a_quota_error_through_and_caches_nothing(agent_on_ollama, tm
     monkeypatch.setattr(OllamaClient, "chat", chat)
     with pytest.raises(RuntimeError) as error:
         _judge_call(judge_module.LLMJudge())
-    assert "429" in str(error.value) and "usage" in str(error.value).lower()   # agentgate.scenarios.runner._is_quota_error
+    assert "429" in str(error.value) and "usage" in str(error.value).lower()   # agentgate.experiment.batch._is_quota_error
     assert not list(tmp_path.rglob("*.json"))
 
 

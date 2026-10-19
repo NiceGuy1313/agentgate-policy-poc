@@ -15,7 +15,7 @@
 프레임워크 (--framework, 기본값 native = AgentDojo pipeline)
   agentgate.harness.registry에 등록된 이름. native도 Adapter -> GateToolBridge -> Session 경로로 돈다.
 
-실행 코드는 `agentgate.scenarios.runner`에 있고, 이 스크립트는 `python -m agentgate.scenarios.run`의 얇은 wrapper다.
+실행 코드는 `agentgate.experiment.batch`에 있고, 이 스크립트는 `python -m agentgate.experiment.cli`의 얇은 wrapper다.
 차이는 기본값 두 가지다. TaskSpec 캐시를 <out>/taskspec_cache에 새로 만들고(live 추출), --injection-tasks가 없으면
 모든 injection task와 공격 없는 run을 넣는다. 모든 프레임워크가 모든 조건으로 돈다. 정책 Gate를 우회한 툴 실행이
 있는 run은 무효(valid: false)로 기록하고 점수를 집계에서 뺀다.
@@ -29,7 +29,7 @@
 
 from __future__ import annotations
 
-from agentgate.scenarios.run import main
+from agentgate.experiment.cli import main
 
 if __name__ == "__main__":
     main(legacy=True)

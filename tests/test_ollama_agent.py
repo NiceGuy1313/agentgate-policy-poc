@@ -7,7 +7,7 @@ import pytest
 from agentgate.agents.ollama_agent import OllamaAgentLLM, parse_tool_arguments
 from agentgate.core.runtime import GatedRuntime
 from agentgate.core.task_spec import TaskSpec
-from agentgate.llm import client
+from agentgate.llm import ollama as ollama_module
 from agentgate.llm.client import OllamaClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor
 from agentgate.policy_gate.rule_checker import RuleChecker
@@ -32,7 +32,7 @@ def fake_post(monkeypatch):
         sent.append({"url": url, "headers": headers, "json": json})
         return replies.pop(0)
 
-    monkeypatch.setattr(client.requests, "post", post)
+    monkeypatch.setattr(ollama_module.requests, "post", post)
     return sent, replies
 
 
@@ -98,7 +98,7 @@ def test_blocked_call_result_reaches_model(fake_post):
 
 def test_retry_then_error(fake_post, monkeypatch):
     sent, replies = fake_post
-    monkeypatch.setattr(client.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ollama_module.time, "sleep", lambda s: None)
     replies += [FakeResponse({"error": "busy"}, 503), FakeResponse({"error": "bad"}, 400)]
     ollama_client = OllamaClient(host="https://ollama.com", api_key="k")
     with pytest.raises(RuntimeError, match="HTTP 400"):
@@ -108,7 +108,7 @@ def test_retry_then_error(fake_post, monkeypatch):
 
 def test_cloud_requires_key(monkeypatch):
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
-    monkeypatch.setattr(client, "load_dotenv", lambda: None)
+    monkeypatch.setattr(ollama_module, "load_dotenv", lambda: None)
     with pytest.raises(RuntimeError):
         OllamaClient(host="https://ollama.com", api_key=None)
 
@@ -124,11 +124,11 @@ def test_retry_on_connection_error(monkeypatch):
     def post(url, headers=None, json=None, timeout=None):
         calls.append(1)
         if len(calls) < 3:
-            raise client.requests.ConnectionError("proxy closed")
+            raise ollama_module.requests.ConnectionError("proxy closed")
         return FakeResponse(FINAL_TURN)
 
-    monkeypatch.setattr(client.requests, "post", post)
-    monkeypatch.setattr(client.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ollama_module.requests, "post", post)
+    monkeypatch.setattr(ollama_module.time, "sleep", lambda s: None)
     ollama_client = OllamaClient(host="https://ollama.com", api_key="k")
     assert ollama_client.chat({"model": "m", "messages": []})["message"]["content"].startswith("Your balance")
     assert len(calls) == 3

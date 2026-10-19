@@ -1,6 +1,6 @@
 """Wilson 구간과 exact McNemar 검정 계산을 검사한다."""
 
-from agentgate.scenarios.metrics import mcnemar_exact, wilson
+from agentgate.experiment.metrics import mcnemar_exact, wilson
 
 
 def test_wilson_interval():

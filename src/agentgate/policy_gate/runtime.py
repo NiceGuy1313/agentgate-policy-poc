@@ -7,18 +7,21 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from agentgate.core.binding import ToolBinding, default_tool_binding
 from agentgate.core.runtime import GatedRuntime, TraceEvent
-from agentgate.policy_gate import effect_tools
 
 
 class PolicyGateRuntime(GatedRuntime):
     """`GatedRuntime` whose judge scope is the effect tools. `toolspec`: (tool, args, output_text) -> validated
-    ToolSpec dict | None (`agentgate.policy_gate.toolspec`); `judge`: `agentgate.policy_gate.judge.Judge`."""
+    ToolSpec dict | None (`agentgate.policy_gate.toolspec`); `judge`: `agentgate.policy_gate.judge.Judge`;
+    `binding`: the tool environment (`ToolBinding`, default AgentDojo)."""
 
-    def __init__(self, functions=(), *, toolspec: Callable[[str, dict, str], dict | None] | None = None, **kwargs):
-        self.effect_tools = effect_tools()
+    def __init__(self, functions=(), *, toolspec: Callable[[str, dict, str], dict | None] | None = None,
+                 binding: ToolBinding | None = None, **kwargs):
+        binding = binding or default_tool_binding()
+        self.effect_tools = set(binding.effect_tools)
         kwargs.setdefault("judge_scope", self.effect_tools.__contains__)
-        super().__init__(functions, **kwargs)
+        super().__init__(functions, binding=binding, **kwargs)
         self.toolspec = toolspec
         self.trace_label_keys = ("toolspec",) if toolspec is not None else ()
 

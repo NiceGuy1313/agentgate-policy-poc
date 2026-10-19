@@ -50,7 +50,7 @@
 
 `run`의 인자:
 - `task`: 사용자 프롬프트(str).
-- `bridge`: `GateToolBridge`([`harness/bridge.py`](../src/agentgate/harness/bridge.py)). `tool_specs()`는 `[{name, description, parameters(JSON schema)}]`, `invoke(tool, args)`는 에이전트에게 돌려줄 문자열, `invoke_detail(tool, args)`는 `(문자열, 판정 기록)`을 돌려준다.
+- `bridge`: `GateToolBridge`([`harness/bridge.py`](../src/agentgate/harness/bridge.py)). `tool_schemas()`(옛 이름 `tool_specs()`)는 `[{name, description, parameters(JSON schema)}]`, `invoke(tool, args)`는 에이전트에게 돌려줄 문자열, `invoke_detail(tool, args)`는 `(문자열, 판정 기록)`을 돌려준다.
 - `model`: `ModelSpec`([`harness/models.py`](../src/agentgate/harness/models.py)). `litellm_kwargs()` 또는 `openai_kwargs()`로 프레임워크의 모델 인자를 만든다. 제공자를 코드에 고정하지 않는다.
 - `options`: `options_schema()`에 선언한 프레임워크 옵션(dict).
 - `sink`: `EventSink`. `sink.emit(kind, message, level=..., step=..., data=...)`로 단계 이벤트를 남긴다.
@@ -77,7 +77,7 @@ class MyFrameworkAdapter(FrameworkAdapter):
         import my_framework
 
         tools = []
-        for spec in bridge.tool_specs():
+        for spec in bridge.tool_schemas():
             params = {a.name: a.description for a in arguments(spec["parameters"])}
 
             def call(_name=spec["name"], **kwargs):

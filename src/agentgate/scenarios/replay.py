@@ -11,7 +11,7 @@ from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.attacks.attack_registry import load_attack
 from agentdojo.types import text_content_block_from_string
 
-from agentgate.config import load_effect_tools
+from agentgate.core.binding import default_tool_binding
 from agentgate.core.task_spec import TaskSpec
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
 from agentgate.scenarios.suites import load_suite
@@ -96,7 +96,7 @@ def replay_attack_pair(suite_name: str, user_task_id: str, injection_task_id: st
     suite._check_user_task_utility(user_task, model_output, pre_copy, post_copy, executed)
     security_executed = suite._check_injection_task_security(injection_task, model_output, pre_copy, post_copy,
                                                              executed)
-    effect_tools = load_effect_tools()
+    effect_tools = (getattr(runtime, "binding", None) or default_tool_binding()).effect_tools
     trace = runtime.trace_records()
     for record in trace:
         record["role"] = (("effect" if record["tool"] in effect_tools else "prep")

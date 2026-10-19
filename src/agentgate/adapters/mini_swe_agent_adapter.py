@@ -224,7 +224,7 @@ class MiniSweAgentAdapter(FrameworkAdapter):
                                 format_error_template=FORMAT_ERROR_TEMPLATE)
         agent = StepAgent(llm, GatedShell(bridge), system_template=SYSTEM_TEMPLATE,
                           instance_template=INSTANCE_TEMPLATE, step_limit=max_steps, cost_limit=0)
-        info = agent.run(task, tools=tool_reference(bridge.tool_specs()))
+        info = agent.run(task, tools=tool_reference(bridge.tool_schemas()))
         submitted = info.get("exit_status") == "Submitted"
         return FrameworkResult(
             final_output=info.get("submission") if submitted else None, steps=agent.n_calls,

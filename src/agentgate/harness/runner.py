@@ -81,7 +81,7 @@ def run_scenario(request: RunRequest, sink: EventSink | None = None, session: Se
                      f"{request.scenario.suite}/{request.scenario.user_task}/{request.scenario.injection_task or '-'}"
                      f" · {request.scenario.condition}",
               data={"manifest": run_manifest, "task": session.prompt,
-                    "injection_goal": getattr(session.injection_task, "GOAL", None),
+                    "injection_goal": session.scenario.injection_goal,
                     "injections": session.injections, "spec": session.runtime.spec.model_dump(),
                     "spec_source": session.spec_source})
     error = None

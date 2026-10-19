@@ -19,7 +19,6 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from agentgate.core.runtime import to_plain_data
-from agentgate.scenarios.attack_trajectories import plan_attack_calls
 from agentgate.scenarios.replay import ATTACK_MARKER
 
 
@@ -54,22 +53,18 @@ class ScriptedPlan:
 
     def next(self, messages: list[dict]) -> tuple[str, str, dict | str]:
         self.requests += 1
-        session = self.session
+        session, scenario = self.session, self.session.scenario
         if self.plan is None:
-            self.plan = list(session.user_task.ground_truth(session.env.model_copy(deep=True)))
+            self.plan = scenario.ground_truth_calls()
         seen = " ".join(_text(m.get("content")) for m in messages if m.get("role") != "system")
         if session.injection_task is not None and not self.hijacked and self.marker in seen:
             self.hijacked = True
-            calls, _ = plan_attack_calls(session.config.suite, session.injection_task, session.env)
-            self.plan = list(calls) + self.plan
+            self.plan = scenario.attack_calls() + self.plan
         stopped = self.on_block == "stop" and any(event.blocked for event in session.runtime.trace)
         if self.plan and not stopped:
             call = self.plan.pop(0)
             return "call", call.function, to_plain_data(dict(call.args))
-        outputs = [session.user_task.GROUND_TRUTH_OUTPUT]
-        if self.hijacked:
-            outputs.append(session.injection_task.GROUND_TRUTH_OUTPUT)
-        return "final", "", "\n".join(o for o in outputs if o) or "Done."
+        return "final", "", scenario.ground_truth_output(self.hijacked) or "Done."
 
 
 class FakeLLMServer:

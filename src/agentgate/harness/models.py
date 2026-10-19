@@ -51,8 +51,10 @@ class ModelSpec:
             raise ValueError("model is required")
 
     @property
-    def spec(self) -> Provider:
+    def provider_info(self) -> Provider:
         return PROVIDERS[self.provider]
+
+    spec = provider_info   # former name
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -60,7 +62,7 @@ class ModelSpec:
     def resolved_base_url(self) -> str | None:
         """OpenAI-compatible base URL including /v1, or None for the vendor default."""
         load_dotenv()
-        provider = self.spec
+        provider = self.provider_info
         base = self.base_url or (os.environ.get(provider.base_url_env) if provider.base_url_env else None) \
             or provider.default_base_url
         if base is None:
@@ -72,7 +74,7 @@ class ModelSpec:
 
     def api_key(self) -> str | None:
         load_dotenv()
-        env = self.api_key_env or self.spec.api_key_env
+        env = self.api_key_env or self.provider_info.api_key_env
         key = os.environ.get(env) if env else None
         # local OpenAI-compatible servers (ollama on localhost, vLLM, fakes) ignore the key but SDKs require one
         return key or ("not-needed" if self.provider in ("ollama", "openai_compat") else None)
@@ -80,7 +82,7 @@ class ModelSpec:
     def missing_key(self) -> str | None:
         """Name of the required but unset key variable, or None."""
         load_dotenv()
-        env = self.api_key_env or self.spec.api_key_env
+        env = self.api_key_env or self.provider_info.api_key_env
         if env is None or os.environ.get(env):
             return None
         if self.provider == "ollama" and not (self.resolved_base_url() or "").startswith("https://ollama.com"):
@@ -89,7 +91,7 @@ class ModelSpec:
 
     def litellm_kwargs(self) -> dict:
         """Arguments for LiteLLM-based frameworks (smolagents LiteLLMModel, mini-swe-agent)."""
-        kwargs = {"model_id": f"{self.spec.litellm_prefix}/{self.model}", "api_key": self.api_key()}
+        kwargs = {"model_id": f"{self.provider_info.litellm_prefix}/{self.model}", "api_key": self.api_key()}
         base_url = self.resolved_base_url()
         if base_url:
             kwargs["api_base"] = base_url

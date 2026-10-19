@@ -1,4 +1,4 @@
-"""agentgate.scenarios.run 테스트: 작업 선택, 프레임워크 x 조건 전체, run별 레코드와 요약.
+"""agentgate.experiment.cli·batch 테스트: 작업 선택, 프레임워크 x 조건 전체, run별 레코드와 요약.
 
 네트워크·LLM 없음: scripted agent / 가짜 LLM, oracle TaskSpec, offline ToolSpec.
 """
@@ -7,9 +7,10 @@ import json
 
 import pytest
 
+from agentgate.experiment import batch as runner
+from agentgate.experiment import cli as run
 from agentgate.harness import bridge, registry
 from agentgate.harness.conformance import offline_toolspec
-from agentgate.scenarios import run, runner
 
 
 @pytest.fixture(autouse=True)

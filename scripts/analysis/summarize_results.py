@@ -15,9 +15,9 @@ from collections import Counter
 from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT, load_dotenv
+from agentgate.experiment.live_run_analysis import live_run_files
+from agentgate.experiment.metrics import mcnemar_exact
 from agentgate.policy_gate.toolspec import DEFAULT_MODEL as TOOLSPEC_DEFAULT_MODEL
-from agentgate.scenarios.live_run_analysis import live_run_files
-from agentgate.scenarios.metrics import mcnemar_exact
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 BASELINE, LLM_JUDGE, STATIC_RULES = "no_gate", "gate_llm_judge", "gate_static_rules"

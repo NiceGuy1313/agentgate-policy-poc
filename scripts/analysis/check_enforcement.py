@@ -20,8 +20,8 @@ import json
 from collections import Counter
 
 from agentgate.config import PROJECT_ROOT
+from agentgate.experiment.live_run_analysis import live_run_files
 from agentgate.harness.enforcement import check_run, unexecuted_requests
-from agentgate.scenarios.live_run_analysis import live_run_files
 
 
 def main():

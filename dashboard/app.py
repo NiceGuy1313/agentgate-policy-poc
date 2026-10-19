@@ -1,6 +1,6 @@
 """agentgate 대시보드: 에이전트 프레임워크·모델·검증 방식을 골라 실행하고 결과를 본다.
 
-시나리오 선택은 없다. `agentgate.scenarios.runner`의 고정 파일럿 세트(`PILOT`: banking, 사용자 작업 4 x injection task 3과
+시나리오 선택은 없다. `agentgate.experiment.batch`의 고정 파일럿 세트(`PILOT`: banking, 사용자 작업 4 x injection task 3과
 공격 없는 run 4개, 공격 `tool_knowledge`)를 고른 조건마다 `runner.run_jobs`로 background thread에서 돌린다. 페이지는
 `GET /api/runs/{id}`로 진행(n/total)을 polling한 뒤 집계(`runner.summarize`: utility, ASR, 공격 하 utility, 차단 호출)와
 시나리오별 표(행을 펼치면 호출별 Gate 판정)를 보여 준다.
@@ -30,13 +30,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentgate.config import load_dotenv
+from agentgate.experiment import batch as runner
 from agentgate.experiment.conditions import CONDITIONS
 from agentgate.harness import registry
 from agentgate.harness.models import ModelSpec, model_from_dict
 from agentgate.harness.service import router as contract_router
 from agentgate.harness.service import set_service_url
 from agentgate.harness.session import default_attack_model_name
-from agentgate.scenarios import runner
 from agentgate.scenarios.suites import load_suite, task_number
 
 APP_DIR = Path(__file__).resolve().parent
@@ -117,7 +117,7 @@ def call_row(index: int, entry: dict) -> dict:
 
 def scenario_row(job: dict, record: dict | None, *, finished: bool) -> dict:
     """One row of the per-scenario table. `record` is the runner's record, or None while the scenario is pending."""
-    row = {"condition": job["cond"], "suite": job["suite"], "user_task": job["user_task"],
+    row = {"condition": job["condition"], "suite": job["suite"], "user_task": job["user_task"],
            "injection_task": job["injection_task"], "attacked": job["injection_task"] is not None}
     if record is None:
         return {**row, "state": "missing" if finished else "pending"}
@@ -417,7 +417,7 @@ def run_status(run_id: str) -> dict:
 def run_record(run_id: str, condition: str, user_task: str, injection_task: str) -> JSONResponse:
     """The runner's full record of one scenario (trace, messages, spec): debugging detail."""
     run = _find(run_id)
-    job = next((j for j in run.jobs if (j["cond"], j["user_task"], j["injection_task"] or "none")
+    job = next((j for j in run.jobs if (j["condition"], j["user_task"], j["injection_task"] or "none")
                 == (condition, user_task, injection_task)), None)
     if job is None:
         raise HTTPException(404, "unknown scenario")

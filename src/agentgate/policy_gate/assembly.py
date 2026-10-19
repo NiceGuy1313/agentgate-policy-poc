@@ -10,11 +10,11 @@ _LOCK = threading.Lock()
 
 
 def toolspec_extractor(suite_name: str):
+    from agentgate.environments import get_environment
     from agentgate.policy_gate.toolspec import ToolSpecExtractor
-    from agentgate.scenarios.suites import describe_tools, load_suite
     with _LOCK:
         if suite_name not in _EXTRACTORS:
-            _EXTRACTORS[suite_name] = ToolSpecExtractor(describe_tools(load_suite(suite_name)))
+            _EXTRACTORS[suite_name] = ToolSpecExtractor(get_environment().tool_infos(suite_name))
         return _EXTRACTORS[suite_name]
 
 

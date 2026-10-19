@@ -55,7 +55,7 @@ def make_tools(bridge):
 
     defaults = list(Tools().registry.registry.actions)
     tools = Tools(exclude_actions=[name for name in defaults if name != "done" and name not in FILE_ACTIONS])
-    for spec in bridge.tool_specs():
+    for spec in bridge.tool_schemas():
         name = spec["name"]
         if name in tools.registry.exclude_actions:   # an AgentDojo tool named like a browser action
             tools.registry.exclude_actions.remove(name)

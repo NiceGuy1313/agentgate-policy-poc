@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from agentgate import SUITES
 from agentgate.config import PROJECT_ROOT, load_dotenv
 from agentgate.core.types import Verdict
+from agentgate.experiment.metrics import mcnemar_exact, wilson
 from agentgate.llm.client import LLMClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.policy_gate import effect_tools
@@ -41,7 +42,6 @@ from agentgate.policy_gate.llm_judge import (
 from agentgate.policy_gate.rule_checker import RULE_IDS, RuleChecker
 from agentgate.policy_gate.runtime import PolicyGateRuntime
 from agentgate.policy_gate.toolspec import ToolSpecExtractor
-from agentgate.scenarios.metrics import mcnemar_exact, wilson
 from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
 from agentgate.scenarios.suites import describe_tools, load_suite
 

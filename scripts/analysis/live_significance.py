@@ -20,8 +20,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT
-from agentgate.scenarios.live_run_analysis import live_run_files
-from agentgate.scenarios.metrics import mcnemar_exact, wilson
+from agentgate.experiment.live_run_analysis import live_run_files
+from agentgate.experiment.metrics import mcnemar_exact, wilson
 
 BASELINE = "no_gate"
 

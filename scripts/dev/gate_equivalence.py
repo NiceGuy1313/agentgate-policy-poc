@@ -91,8 +91,8 @@ def _freeze_clock() -> None:
 
     class FrozenDatetime(datetime.datetime):
         @classmethod
-        def now(cls, tz=None):
-            return cls(2024, 5, 15, 12, 0, 0, tzinfo=tz)
+        def now(cls, tz=None):   # a plain datetime, not cls: yaml (environment dumps) cannot represent the subclass
+            return datetime.datetime(2024, 5, 15, 12, 0, 0, tzinfo=tz)
 
     shim = types.SimpleNamespace(**{k: getattr(datetime, k) for k in dir(datetime) if not k.startswith("__")})
     shim.datetime = FrozenDatetime

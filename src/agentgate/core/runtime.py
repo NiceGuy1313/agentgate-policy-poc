@@ -12,83 +12,32 @@
 from __future__ import annotations
 
 import contextvars
-import hashlib
-import re
 import time
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
-from typing import Any
+from collections.abc import Callable
 
 from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
-from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime, TaskEnvironment
+from agentdojo.functions_runtime import FunctionsRuntime
 
 from agentgate.config import load_config_yaml
+from agentgate.core.binding import ToolBinding
 from agentgate.core.provenance import ValueIndex
 from agentgate.core.task_spec import TaskSpec
-from agentgate.core.types import PolicyContext, SessionState, ToolCall, Verdict
+from agentgate.core.trace import (  # noqa: F401  (re-exported: former home of these names)
+    BLOCK_REASON_CHARS,
+    NO_TASKSPEC_MESSAGE,
+    TraceEvent,
+    _to_plain_data,
+    compute_environment_hash,
+    format_judge_block_message,
+    to_plain_data,
+)
+from agentgate.core.types import PolicyContext, SessionBindings, SessionState, ToolCall, Verdict
 
 INSIDE_GATE: contextvars.ContextVar[bool] = contextvars.ContextVar("agentgate_in_gate", default=False)
 
 
-@dataclass
-class TraceEvent:
-    step: int
-    tool: str
-    args: dict
-    raw_output: Any = None
-    output_text: str = ""
-    error: str | None = None
-    blocked: bool = False
-    executed: bool = False
-    phase: str = ""                   # replay bookkeeping: "user" | "injection" | "agent"
-    decision: dict | None = None      # {"verdict", "decisions", "judge", "effective"}: see run_function
-    decide_ms: float = 0.0
-    labels: dict = field(default_factory=dict)   # label summaries of this response (ToolSpec)
-    env_hash_before: str | None = None
-
-
 JudgeFn = Callable[[ToolCall, PolicyContext], dict]
 """Returns {"verdict": "ALLOW"|"BLOCK", ...} (the judge record stored in the trace); `agentgate.policy_gate.judge.Judge`."""
-
-
-def to_plain_data(value: Any) -> Any:
-    if isinstance(value, FunctionCall):
-        return {"__call__": value.function, "args": to_plain_data(dict(value.args))}
-    if isinstance(value, Mapping):
-        return {k: to_plain_data(item) for k, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_plain_data(item) for item in value]
-    if hasattr(value, "model_dump"):
-        return value.model_dump(mode="json")
-    return value
-
-
-_to_plain_data = to_plain_data   # former private name
-
-
-def compute_environment_hash(environment: TaskEnvironment | None) -> str | None:
-    if environment is None:
-        return None
-    return hashlib.sha1(environment.model_dump_json().encode()).hexdigest()
-
-
-BLOCK_REASON_CHARS = 240
-_RULE_ID = re.compile(r"\bR(?:10|[1-9])\b")
-
-
-def format_judge_block_message(judgement: dict) -> str:
-    """What the agent receives when the judge blocks: rule ids and a short one-line reason from the judge record,
-    e.g. "Tool call blocked by policy gate (R2, R3): ...". The full judge record stays in the trace only."""
-    reason = " ".join(str(judgement.get("reason") or judgement.get("text") or "").split())
-    reason = re.sub(r"^[*#`_ ]*(?:BLOCK|ALLOW)\b[\s:.\-]*", "", reason, flags=re.IGNORECASE)   # LLM answer word
-    rule_ids = list(judgement.get("rule_ids") or dict.fromkeys(_RULE_ID.findall(reason)))
-    if len(reason) > BLOCK_REASON_CHARS:
-        reason = reason[:BLOCK_REASON_CHARS - 1].rstrip() + "…"
-    label = f" ({', '.join(rule_ids)})" if rule_ids else ""
-    return f"Tool call blocked by policy gate{label}: {reason or 'the call is outside the requested task'}"
-
-
-NO_TASKSPEC_MESSAGE = "Tool call blocked by policy gate: no TaskSpec is configured for this task (fail closed)."
 
 
 class UngatedExecutionError(PermissionError):
@@ -123,8 +72,10 @@ class GatedRuntime(FunctionsRuntime):
         judge_scope: Callable[[str], bool] | None = None,
         record_env_hash: bool = False,
         config: dict | None = None,
+        binding: ToolBinding | None = None,
     ):
         super().__init__(functions)
+        self.binding = binding   # tool environment binding (None: the default AgentDojo binding)
         # every tool function refuses to run outside run_function (bypass guard); refusals are listed here
         self.ungated_executions: list[dict] = []
         self.functions = {name: _guarded(f, self.ungated_executions) for name, f in self.functions.items()}
@@ -138,7 +89,7 @@ class GatedRuntime(FunctionsRuntime):
         self.record_env_hash = record_env_hash
         self.trace: list[TraceEvent] = []
         self.phase = ""
-        self.session = SessionState()
+        self.session = SessionState(bindings=SessionBindings.from_binding(binding) if binding is not None else None)
         self.prompt = ""
         self.spec: TaskSpec | None = None
         self.index: ValueIndex | None = None
@@ -165,7 +116,7 @@ class GatedRuntime(FunctionsRuntime):
         self.spec_meta = meta or {}
         self.index = self.index_class(prompt, spec, self.config.get("self_identifiers"),
                                       self.config["runtime"].get("min_string_field_len", 4),
-                                      self.config["runtime"].get("named_match_min_len", 4))
+                                      self.config["runtime"].get("named_match_min_len", 4), binding=self.binding)
 
     @property
     def context(self) -> PolicyContext:

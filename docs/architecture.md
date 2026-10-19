@@ -38,10 +38,10 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 ## 3. 프레임워크 연결 계층
 
 ```
-대시보드 / 시나리오 CLI (agentgate.scenarios.run)
+대시보드 / 시나리오 CLI (agentgate.experiment.cli)
         │ RunRequest(framework, ModelSpec, ScenarioConfig)
-   harness.runner ── Session: AgentDojo 환경 + 인젝션 + PolicyGateRuntime + TaskSpec + 채점
-        │ GateToolBridge.tool_specs() / invoke(name, args)
+   harness.runner ── Session: 환경(environments.agentdojo: 툴·인젝션·채점) + PolicyGateRuntime + TaskSpec
+        │ GateToolBridge.tool_schemas() / invoke(name, args)
    Adapter(프로세스 내) 또는 contract v1 Wrapper(HTTP, harness.service)
         │
    프레임워크 agent loop ── 모델(ModelSpec: ollama·anthropic·openai·OpenAI 호환)

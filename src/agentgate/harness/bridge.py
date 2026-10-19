@@ -26,12 +26,15 @@ class GateToolBridge:
         self.sink = sink
         self.calls: list[dict] = []   # what the agent actually received, in order
 
-    def tool_specs(self) -> list[dict]:
-        return self.session.tool_specs()
+    def tool_schemas(self) -> list[dict]:
+        """[{name, description, parameters (JSON schema)}] of the scenario's tools."""
+        return self.session.tool_schemas()
+
+    tool_specs = tool_schemas   # former name (third-party adapters)
 
     @property
     def tool_names(self) -> set[str]:
-        return {spec["name"] for spec in self.tool_specs()}
+        return {schema["name"] for schema in self.tool_schemas()}
 
     def invoke(self, tool: str, args: dict | None) -> str:
         """Run one tool call through the policy gate; the text is what the agent receives (a block message if blocked)."""

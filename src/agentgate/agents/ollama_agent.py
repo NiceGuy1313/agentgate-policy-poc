@@ -23,7 +23,8 @@ from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
 from agentdojo.types import ChatAssistantMessage, ChatMessage, get_text_content_as_str, text_content_block_from_string
 
-from agentgate.llm.client import OllamaClient, parse_think
+from agentgate.llm.client import parse_think
+from agentgate.llm.ollama import OllamaClient
 
 RAW_MESSAGE_KEY = "_ollama_message"
 _VALID_TOOL_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")

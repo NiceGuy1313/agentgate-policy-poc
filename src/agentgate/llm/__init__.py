@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import importlib
 
-_EXPORTS = {"LLMClient": "client", "OllamaClient": "client", "ExtractionResult": "taskspec_extractor",
+_EXPORTS = {"LLMClient": "client", "OllamaClient": "ollama", "ExtractionResult": "taskspec_extractor",
             "TaskSpecExtractor": "taskspec_extractor", "ToolInfo": "taskspec_extractor"}
 
 

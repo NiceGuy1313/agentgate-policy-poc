@@ -113,7 +113,7 @@ def session_info(session_id: str, authorization: str | None = Header(None)) -> d
 
 @router.get("/sessions/{session_id}/tools")
 def session_tools(session_id: str, authorization: str | None = Header(None)) -> dict:
-    return {"tools": store.get(session_id, authorization).bridge.tool_specs()}
+    return {"tools": store.get(session_id, authorization).bridge.tool_schemas()}
 
 
 @router.post("/sessions/{session_id}/invoke")

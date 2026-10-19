@@ -16,7 +16,7 @@ class DummyAdapter(FrameworkAdapter):
         import openai
 
         client = openai.OpenAI(**{k: v for k, v in model.openai_kwargs().items() if k != "model"})
-        tools = [{"type": "function", "function": spec} for spec in bridge.tool_specs()]
+        tools = [{"type": "function", "function": spec} for spec in bridge.tool_schemas()]
         messages = [{"role": "user", "content": task}]
         for _ in range(max_steps):
             reply = client.chat.completions.create(model=model.model, messages=messages, tools=tools).choices[0]

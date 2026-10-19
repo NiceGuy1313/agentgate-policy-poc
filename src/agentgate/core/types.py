@@ -6,23 +6,26 @@ import enum
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from agentgate.core.binding import ToolBinding, default_tool_binding
 from agentgate.core.provenance import ValueIndex
 from agentgate.core.task_spec import TaskSpec
 
 
 @dataclass(frozen=True)
 class SessionBindings:
-    """Which calls SessionState records, from the tool environment binding (config/agentdojo/tool_args.yaml
+    """Which calls SessionState records, from the tool environment binding (`ToolBinding`: tool_args.yaml
     message_tools and tool_roles.yaml external_send), so the gate core names no tool."""
 
     sent_message_tools: frozenset[str]      # external_send tools of kind message: output id_ = a sent message
 
     @classmethod
+    def from_binding(cls, binding: ToolBinding) -> "SessionBindings":
+        return cls(frozenset(set(binding.effect_roles.get("external_send", [])) & binding.message_tools))
+
+    @classmethod
     def from_config(cls) -> "SessionBindings":
-        from agentgate.config import load_tool_args, load_tool_roles
-        tool_args, categories = load_tool_args(), load_tool_roles()
-        messages = set(tool_args.get("message_tools", []))
-        return cls(frozenset(set(categories.get("external_send", [])) & messages))
+        """The default (AgentDojo) binding."""
+        return cls.from_binding(default_tool_binding())
 
 
 @lru_cache(maxsize=1)

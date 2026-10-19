@@ -14,13 +14,13 @@ from pathlib import Path
 
 from agentgate.config import PROJECT_ROOT, load_effect_tools
 from agentgate.experiment.conditions import get_condition
-from agentgate.scenarios.live_run_analysis import (
+from agentgate.experiment.live_run_analysis import (
     attack_attempted,
     attack_call_steps,
     live_run_files,
     load_benchmark_tasks,
 )
-from agentgate.scenarios.metrics import load_injection_labels
+from agentgate.experiment.metrics import load_injection_labels
 
 REFUSAL_WORDS = ("blocked", "security policy", "cannot", "can't", "unable", "not able", "not allowed", "refuse")
 

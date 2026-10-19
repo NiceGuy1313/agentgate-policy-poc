@@ -249,7 +249,7 @@ def test_browser_use_prose_reply_and_file_actions():
     from agentgate.adapters.browser_use_adapter import lenient_output, make_tools
 
     class Bridge:
-        def tool_specs(self):
+        def tool_schemas(self):
             return [{"name": "read_file", "description": "Reads a file",
                      "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}},
                                     "required": ["file_path"]}}]
