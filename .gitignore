@@ -18,11 +18,11 @@ htmlcov/
 .env.*
 !.env.example
 
-# Claude Code / agent tooling: CLAUDE.md and .claude/settings.json are committed for cloud sessions
+# Claude Code / agent tooling (local only, not committed)
+CLAUDE.md
 CLAUDE.local.md
 AGENTS.md
-.claude/*
-!.claude/settings.json
+.claude/
 .omc/
 .mcp.json
 
