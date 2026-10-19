@@ -43,14 +43,26 @@ def main() -> int:
         except Exception as exc:
             record(f"net {url}", False, f"{type(exc).__name__}: {exc}")
 
+    try:   # .env values count as set (real environment variables still win)
+        from agentgate.config import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
     for key in ("ANTHROPIC_API_KEY", "OLLAMA_API_KEY"):
         record(f"env {key}", bool(os.environ.get(key)), "set" if os.environ.get(key) else "missing")
+
+    try:   # the LLM judge (gate_llm_judge) must resolve to a provider/model pair that can start
+        from agentgate.policy_gate.llm_judge import resolve_judge_settings
+        provider, model, _ = resolve_judge_settings()
+        record("judge settings", True, f"{provider} {model}")
+    except Exception as exc:
+        record("judge settings", False, f"{type(exc).__name__}: {exc}")
 
     width = max(len(name) for name, _, _ in CHECKS)
     for name, ok, detail in CHECKS:
         print(f"{'OK  ' if ok else 'FAIL'} {name:<{width}}  {detail}")
     required = [ok for name, ok, _ in CHECKS if name.startswith(("import agentgate", "import agentdojo",
-                                                                  "AgentDojo"))]
+                                                                  "AgentDojo", "judge"))]
     return 0 if all(required) else 1
 
 
