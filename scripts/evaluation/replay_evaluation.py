@@ -6,7 +6,7 @@
       --attack tool_knowledge --mode enforce --out results/replay/llmspec_tool_knowledge
 
 조건은 `agentgate.experiment.conditions`의 enforce 조건(gate_llm_judge, gate_static_rules)이다. audit 모드는 호출을
-기록만 하고 판정기를 부르지 않는다. `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다.
+기록만 하고 판정기를 부르지 않는다.
 `--spec llm:<model>`은 data/cache/specs/<model>/의 저장된 TaskSpec을 읽는다(scripts/taskspec/extract_llm_specs.py).
 
 출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
@@ -32,10 +32,10 @@ from agentgate.scenarios.task_specs import load_task_spec
 
 
 def _run_job(job):
-    kind, suite, user_task_id, injection_task_id, spec_kind, mode, attack, condition, escalate = job
+    kind, suite, user_task_id, injection_task_id, spec_kind, mode, attack, condition = job
     spec = load_task_spec(spec_kind, suite, user_task_id)
     prompt = load_suite(suite).get_user_task_by_id(user_task_id).PROMPT
-    factory = functools.partial(make_runtime, condition, suite_name=suite, escalate=escalate)
+    factory = functools.partial(make_runtime, condition, suite_name=suite)
     started = time.perf_counter()
 
     def runtime_factory(functions, *, prompt=prompt, spec, mode):
@@ -66,8 +66,6 @@ def main():
     parser.add_argument("--spec", default="oracle")
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--mode", nargs="*", default=["audit", "enforce"], choices=["audit", "enforce"])
-    parser.add_argument("--escalate", default=None, choices=["block", "allow", "judge"],
-                        help="override the condition's ESCALATE handling")
     parser.add_argument("--attack", default="important_instructions")
     parser.add_argument("--out", required=True)
     parser.add_argument("--workers", type=int, default=max(1, mp.cpu_count()))
@@ -93,12 +91,12 @@ def main():
             for user_task_id in user_task_ids:
                 if pair_filter is None or any(p[:2] == (suite_name, user_task_id) for p in pair_filter):
                     jobs[mode]["benign"].append(("benign", suite_name, user_task_id, None, args.spec, mode,
-                                                 args.attack, args.condition, args.escalate))
+                                                 args.attack, args.condition))
                 for injection_task_id in injection_task_ids:
                     if pair_filter is not None and (suite_name, user_task_id, injection_task_id) not in pair_filter:
                         continue
                     jobs[mode]["attack"].append(("attack", suite_name, user_task_id, injection_task_id, args.spec,
-                                                 mode, args.attack, args.condition, args.escalate))
+                                                 mode, args.attack, args.condition))
 
     started = time.time()
     with mp.Pool(args.workers, initializer=_init_worker) as pool:
@@ -115,7 +113,7 @@ def main():
         commit = None
     from agentgate.policy_gate import RULEBOOK_FILE, TOOL_ARGS_FILE
     meta = {"benchmark_version": BENCHMARK_VERSION, "condition": args.condition, "judge": cond.judge,
-            "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
+            "spec": args.spec, "suites": args.suites,
             "modes": args.mode, "attack": args.attack, "rulebook": f"config/{RULEBOOK_FILE}",
             "tool_args": f"config/{TOOL_ARGS_FILE}", "pairs": args.pairs,
             "git_commit": commit, "python": platform.python_version(), "elapsed_s": round(time.time() - started, 1)}

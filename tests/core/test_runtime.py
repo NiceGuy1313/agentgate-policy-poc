@@ -4,30 +4,29 @@ import pytest
 from agentdojo.agent_pipeline.ground_truth_pipeline import GroundTruthPipeline
 from agentdojo.functions_runtime import Function
 
-from agentgate.core.engine import AllowAllPolicyEngine, EngineResult
 from agentgate.core.provenance import Origin
 from agentgate.core.runtime import INSIDE_GATE, GatedRuntime, compute_environment_hash
 from agentgate.core.task_spec import TaskSpec
-from agentgate.core.types import PolicyDecision, Verdict
 from agentgate.scenarios.suites import load_suite, load_task_environment
 from agentgate.scenarios.task_specs import load_task_spec
 
 
 class BlockTool:
+    kind = "stub"
+
     def __init__(self, tool):
-        self.tool, self.config = tool, {}
+        self.tool = tool
 
-    def decide(self, call, context):
-        if call.tool == self.tool:
-            return EngineResult(Verdict.BLOCK, [PolicyDecision(Verdict.BLOCK, "PX", "stub block")])
-        return EngineResult(Verdict.ALLOW, [])
+    def __call__(self, call, context):
+        verdict = "BLOCK" if call.tool == self.tool else "ALLOW"
+        return {"judge": self.kind, "verdict": verdict, "rule_ids": ["PX"], "reason": "stub block"}
 
 
-def _run_ground_truth(suite_name, user_task_id, spec, engine, mode):
+def _run_ground_truth(suite_name, user_task_id, spec, mode):
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     environment = load_task_environment(suite, user_task)
-    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, engine=engine, mode=mode)
+    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=spec, mode=mode)
     for call in user_task.ground_truth(environment.model_copy(deep=True)):
         runtime.run_function(environment, call.function, call.args)
     return runtime, environment
@@ -35,7 +34,7 @@ def _run_ground_truth(suite_name, user_task_id, spec, engine, mode):
 
 def test_bill_payment_recipient_is_named_source():
     spec = load_task_spec("oracle", "banking", "user_task_0")
-    runtime, _ = _run_ground_truth("banking", "user_task_0", spec, AllowAllPolicyEngine(), "audit")
+    runtime, _ = _run_ground_truth("banking", "user_task_0", spec, "audit")
     send = next(event for event in runtime.trace if event.tool == "send_money")
     provenance = runtime.index.origin_of(send.args["recipient"])
     assert provenance.origin == Origin.NAMED_SOURCE and provenance.tool == "read_file"
@@ -45,7 +44,7 @@ def test_enforce_block_does_not_touch_environment():
     suite = load_suite("banking")
     user_task = suite.get_user_task_by_id("user_task_0")
     environment = load_task_environment(suite, user_task)
-    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=TaskSpec(), engine=BlockTool("send_money"),
+    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=TaskSpec(), judge=BlockTool("send_money"),
                            mode="enforce")
     calls = user_task.ground_truth(environment.model_copy(deep=True))
     runtime.run_function(environment, calls[0].function, calls[0].args)
@@ -64,12 +63,12 @@ def test_audit_mode_executes_and_records():
     user_task = suite.get_user_task_by_id("user_task_0")
     environment = load_task_environment(suite, user_task)
     before = compute_environment_hash(environment)
-    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=TaskSpec(), engine=BlockTool("send_money"),
+    runtime = GatedRuntime(suite.tools, prompt=user_task.PROMPT, spec=TaskSpec(), judge=BlockTool("send_money"),
                            mode="audit")
     for call in user_task.ground_truth(environment.model_copy(deep=True)):
         runtime.run_function(environment, call.function, call.args)
     assert compute_environment_hash(environment) != before
-    assert runtime.trace[-1].decision["verdict"] == "BLOCK" and runtime.trace[-1].executed
+    assert runtime.trace[-1].decision["effective"] == "BLOCK" and runtime.trace[-1].executed
     assert all(event.decide_ms >= 0 for event in runtime.trace)
 
 
@@ -94,7 +93,7 @@ def test_no_tool_runs_outside_the_gate(monkeypatch, suite_name):
 
     monkeypatch.setattr(Function, "__call__", spy)
     suite = load_suite(suite_name)
-    factory = GatedRuntime.factory(spec=TaskSpec(), prompt="", engine=AllowAllPolicyEngine(), mode="audit")
+    factory = GatedRuntime.factory(spec=TaskSpec(), prompt="", mode="audit")
     for user_task in list(suite.user_tasks.values())[:5]:
         suite.run_task_with_pipeline(GroundTruthPipeline(user_task), user_task, None, {}, runtime_class=factory)
     assert outside == []

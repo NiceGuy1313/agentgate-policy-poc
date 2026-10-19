@@ -4,7 +4,7 @@
 호출뿐이다. 툴 응답 원문은 ValueIndex의 출처 판정(origin_of)과 겹침 검사(R4)에만 쓴다. 인자 역할은
 config/agentdojo/tool_args.yaml(AgentDojo 바인딩)이다.
 
-판정은 ALLOW / BLOCK 두 가지뿐이다(ESCALATE 없음). 규칙 함수는 BLOCK 이유(str) 또는 None을 낸다. 모든 규칙을
+판정은 ALLOW / BLOCK 두 가지뿐이다. 규칙 함수는 BLOCK 이유(str) 또는 None을 낸다. 모든 규칙을
 돌려 막은 규칙 id를 모두 남기고, 하나라도 막으면 BLOCK, 아무도 막지 않으면 ALLOW(R10)다. 규칙 함수가 예외를 내면
 그 규칙의 BLOCK으로 친다(fail closed). TaskSpec이 없으면 BLOCK(rule id "TaskSpec")이다.
 
@@ -287,7 +287,9 @@ class _Facts:
 
 
 class RuleChecker:
-    """Static rulebook checker with the judge interface: (call, result, context) -> judge record."""
+    """Static rulebook checker with the judge interface (`agentgate.policy_gate.judge.Judge`)."""
+
+    kind = "rules"
 
     def __init__(self, tool_args: dict | None = None):
         config = tool_args or load_tool_args()
@@ -303,7 +305,7 @@ class RuleChecker:
             "R1": self.r1, "R2": self.r2, "R3": self.r3, "R4": self.r4_egress, "R5": self.r5, "R6": self.r6,
             "R7": self.r7, "R8": self.r8}
 
-    def __call__(self, call: ToolCall, result, context: PolicyContext) -> dict:
+    def __call__(self, call: ToolCall, context: PolicyContext) -> dict:
         return self.check(call, context)
 
     def check(self, call: ToolCall, context: PolicyContext | None) -> dict:

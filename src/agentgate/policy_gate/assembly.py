@@ -1,11 +1,9 @@
-"""실험 조건(no_gate, gate_llm_judge, gate_static_rules)의 런타임 조립. ToolSpec 추출기는 suite마다 하나를
-스레드 사이에 공유한다."""
+"""ToolSpec 부착 함수 조립(`agentgate.experiment.conditions.make_runtime`이 쓴다). ToolSpec 추출기는 suite마다 하나를
+스레드 사이에 공유한다. 테스트·오프라인 검사는 `toolspec_extractor`를 바꿔 끼운다."""
 
 from __future__ import annotations
 
 import threading
-
-from agentgate.policy_gate.runtime import PolicyGateRuntime
 
 _EXTRACTORS: dict = {}
 _LOCK = threading.Lock()
@@ -20,9 +18,9 @@ def toolspec_extractor(suite_name: str):
         return _EXTRACTORS[suite_name]
 
 
-def build(cond, *, suite_name: str, prompt: str, escalate: str, stats=None):
-    if cond.judge is None:   # no_gate: record calls only, no ToolSpec extraction, no judge
-        return PolicyGateRuntime, {}
+def toolspec_labeller(suite_name: str, stats: dict | None = None):
+    """(tool, args, output_text) -> ToolSpec dict | None for `PolicyGateRuntime(toolspec=...)`; `stats` collects
+    the extractor's LLM usage."""
     extractor = toolspec_extractor(suite_name)
 
     def toolspec(tool, args, text):
@@ -42,12 +40,4 @@ def build(cond, *, suite_name: str, prompt: str, escalate: str, stats=None):
             toolspec_stats["cache_creation_input_tokens"] += result.cache_creation_input_tokens
         return result.spec
 
-    kwargs = {"toolspec": toolspec}
-    if escalate == "judge" and cond.judge == "rules":
-        from agentgate.policy_gate.rule_checker import RuleChecker
-        kwargs["judge"] = RuleChecker()
-    elif escalate == "judge":
-        from agentgate.policy_gate.llm_judge import LLMJudge, as_runtime_judge
-        judge = LLMJudge(use_rules=cond.judge == "llm")
-        kwargs["judge"] = as_runtime_judge(judge, prompt)
-    return PolicyGateRuntime, kwargs
+    return toolspec

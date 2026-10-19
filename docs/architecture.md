@@ -17,7 +17,7 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 호출 한 건의 처리 순서:
 
 1. TaskSpec이 없으면 BLOCK한다.
-2. `resolve`가 최종 판정을 정한다(`PolicyGateRuntime`이 재정의).
+2. `resolve`가 최종 판정을 정한다. `judge_scope` 밖의 툴은 ALLOW, 안의 툴은 판정기 `judge`(call, context) -> 판정 기록의 `verdict`를 쓴다. 판정 범위가 있는 enforce 런타임에 판정기가 없으면 예외를 낸다.
 3. enforce 모드에서 BLOCK이면 실행하지 않고 차단 메시지를 툴 결과로 돌려준다.
 4. ALLOW면 실행한다. 응답은 `ValueIndex`에 출처 정보와 함께 등록하고, `label_response`가 ToolSpec을 붙이며, `SessionState`(보낸 메시지 등)를 갱신한다.
 5. 판정·근거·실행 여부·소요 시간을 trace에 남긴다.
@@ -26,15 +26,14 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 
 ### `PolicyGateRuntime`
 
-[`policy_gate/runtime.py`](../src/agentgate/policy_gate/runtime.py). `GatedRuntime`의 hook만 바꾼다.
+[`policy_gate/runtime.py`](../src/agentgate/policy_gate/runtime.py). 판정 범위(`judge_scope`)를 effect 툴로 정하고 hook 하나를 더한다.
 
 | hook | 동작 |
 |---|---|
-| `resolve` | 읽기 호출은 ALLOW. effect 호출은 판정기에 보내 그 답을 쓴다. enforce 모드인데 판정기가 없으면 예외를 낸다 |
 | `label_response` | 실행된 응답마다 ToolSpec 추출기를 불러 `labels["toolspec"]`에 붙인다 |
-| `block_message` | `Tool call blocked by policy gate (R2, R3): <이유>`(이유 240자 이내). 판정 기록 전체는 trace에만 남는다 |
+| `block_message` | (`GatedRuntime`) `Tool call blocked by policy gate (R2, R3): <이유>`(이유 240자 이내). 판정 기록 전체는 trace에만 남는다 |
 
-판정기 조립은 [`policy_gate/assembly.py`](../src/agentgate/policy_gate/assembly.py), 조건 정의는 [`experiment/conditions.py`](../src/agentgate/experiment/conditions.py)다.
+판정기 인터페이스 `Judge`와 등록부(`rules`, `llm`, `llm-norules`)는 [`policy_gate/judge.py`](../src/agentgate/policy_gate/judge.py), 조건 정의(`register_condition`)와 런타임 조립(`make_runtime`)은 [`experiment/conditions.py`](../src/agentgate/experiment/conditions.py)다. 판정 LLM은 사용자 프롬프트를 `PolicyContext.prompt`에서 읽는다.
 
 ## 3. 프레임워크 연결 계층
 

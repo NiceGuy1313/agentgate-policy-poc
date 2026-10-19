@@ -142,13 +142,13 @@ def _run_job(job):
         runtime = factory(functions, prompt=prompt, spec=spec, mode=mode)
         original = runtime.resolve
 
-        def resolve(call, result):
+        def resolve(call, *rest):   # (call) now; (call, engine result) before the Judge interface
             if call.tool in runtime.effect_tools and runtime.index is not None:
                 record = checker.check(call, runtime.context)
                 effects.append({"tool": call.tool, "verdict": record["verdict"], "rule_ids": record["rule_ids"],
                                 "reason": record["reason"],
                                 "judge_prompt": _sha(system + render_user(build_facts(call, runtime.context, prompt)))})
-            return original(call, result)
+            return original(call, *rest)
 
         runtime.resolve = resolve
         return runtime
@@ -160,8 +160,8 @@ def _run_job(job):
         else:
             run = replay_attack_pair(suite_name, user_task_id, injection_task_id, spec, mode, ATTACK,
                                      runtime_factory=runtime_factory)
-    except Exception as error:   # e.g. no_gate in enforce mode refuses to run: the refusal is behaviour too
-        return key, {"error": f"{type(error).__name__}: {error}", "effects": effects}
+    except Exception as error:   # e.g. no_gate in enforce mode refuses to run: the refusal is behaviour too (type only:
+        return key, {"error": type(error).__name__, "effects": effects}   # the message wording is not behaviour)
     for event in run["trace"]:
         event.pop("decide_ms", None)
     stub = _STUBS.get(suite_name)

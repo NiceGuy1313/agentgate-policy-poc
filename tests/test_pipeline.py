@@ -16,8 +16,7 @@ def _run(mode):
     agent = ScriptedAgent("banking", user_task, injection_task)
     pipeline = RecordingPipeline(build_pipeline(
         agent, lambda p: (load_task_spec("oracle", "banking", "user_task_0"), {"source": "oracle"})))
-    runtime = PolicyGateRuntime(suite.tools, mode=mode, escalate_action="judge" if mode == "enforce" else "block",
-                                judge=RuleChecker(), toolspec=lambda tool, args, text: {"records": [], "requests": []},
+    runtime = PolicyGateRuntime(suite.tools, mode=mode, judge=RuleChecker() if mode == "enforce" else None, toolspec=lambda tool, args, text: {"records": [], "requests": []},
                                 record_env_hash=True)
     result = run_live_task(suite, pipeline, user_task, injection_task,
                            build_injections("banking", user_task, injection_task), runtime)

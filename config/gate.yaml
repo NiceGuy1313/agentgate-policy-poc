@@ -3,6 +3,5 @@
 self_identifiers: []
 
 runtime:
-  escalate_action: block       # block | allow | judge (판정기가 없는 ESCALATE 처리)
   min_string_field_len: 4      # ValueIndex: 색인할 문자열 필드 값의 최소 길이
   named_match_min_len: 4       # ValueIndex: 지목 자료 이름 일치에 쓰는 최소 길이

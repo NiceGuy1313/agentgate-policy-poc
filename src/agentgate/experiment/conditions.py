@@ -1,4 +1,4 @@
-"""실험 조건 등록부: 조건 이름 → (Gate 모드, ESCALATE 처리, 판정기). 런타임 조립은 `agentgate.policy_gate.assembly`가 한다.
+"""실험 조건 등록부: 조건 이름 → (Gate 모드, 판정기 이름). `make_runtime`이 조건 하나의 PolicyGateRuntime을 만든다.
 
 | 조건 | 내용 |
 |---|---|
@@ -17,10 +17,9 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Condition:
     name: str
-    mode: str             # audit | enforce
-    escalate: str         # block | allow | judge
+    mode: str                  # audit | enforce
+    judge: str | None          # judge registry name (`agentgate.policy_gate.judge.JUDGES`); None: no judge, no ToolSpec
     description: str
-    judge: str | None = None   # llm (판정 LLM) | rules (룰북 정적 코드), escalate == "judge"일 때
 
     @property
     def gated(self) -> bool:
@@ -28,11 +27,19 @@ class Condition:
         return self.mode == "enforce"
 
 
-CONDITIONS: dict[str, Condition] = {c.name: c for c in [
-    Condition("no_gate", "audit", "block", "방어 없음 (Gate audit)"),
-    Condition("gate_llm_judge", "enforce", "judge", "정책 Gate + 판정 LLM(룰북)", judge="llm"),
-    Condition("gate_static_rules", "enforce", "judge", "정책 Gate + 룰북 정적 코드", judge="rules"),
-]}
+CONDITIONS: dict[str, Condition] = {}
+
+
+def register_condition(cond: Condition) -> Condition:
+    """Add (or replace) a condition by name."""
+    CONDITIONS[cond.name] = cond
+    return cond
+
+
+for _cond in (Condition("no_gate", "audit", None, "방어 없음 (Gate audit)"),
+              Condition("gate_llm_judge", "enforce", "llm", "정책 Gate + 판정 LLM(룰북)"),
+              Condition("gate_static_rules", "enforce", "rules", "정책 Gate + 룰북 정적 코드")):
+    register_condition(_cond)
 
 
 def get_condition(name: str) -> Condition:
@@ -42,19 +49,23 @@ def get_condition(name: str) -> Condition:
 
 
 def make_runtime(condition: str | Condition, functions, *, suite_name: str, prompt: str, mode: str | None = None,
-                 escalate: str | None = None, stats: dict | None = None, spec=None, **runtime_kwargs):
+                 stats: dict | None = None, spec=None, **runtime_kwargs):
     """PolicyGateRuntime for one task under `condition`.
 
-    mode / escalate override the condition (replay runs audit and enforce from the same condition; audit never calls
-    the judge). `stats` collects per-run LLM usage of the ToolSpec extractor. Extra kwargs go to the runtime.
+    `mode` overrides the condition's (replay runs audit and enforce from the same condition; audit never calls the
+    judge). A condition with a judge labels every response with a ToolSpec; `stats` collects the extractor's LLM usage.
+    Extra kwargs go to the runtime.
     """
-    from agentgate.policy_gate.assembly import build
+    from agentgate.policy_gate import assembly
+    from agentgate.policy_gate.judge import make_judge
+    from agentgate.policy_gate.runtime import PolicyGateRuntime
 
     cond = get_condition(condition) if isinstance(condition, str) else condition
     mode = mode or cond.mode
-    escalate = escalate or cond.escalate
-    if mode == "audit" and escalate == "judge":
-        escalate = "block"
-    runtime_cls, kwargs = build(cond, suite_name=suite_name, prompt=prompt, escalate=escalate, stats=stats)
-    return runtime_cls(functions, mode=mode, escalate_action=escalate, prompt=prompt if spec is not None else None,
-                       spec=spec, **kwargs, **runtime_kwargs)
+    kwargs = {}
+    if cond.judge is not None:   # no_gate: record calls only, no ToolSpec extraction, no judge
+        kwargs["toolspec"] = assembly.toolspec_labeller(suite_name, stats)
+        if mode == "enforce":
+            kwargs["judge"] = make_judge(cond.judge)
+    return PolicyGateRuntime(functions, mode=mode, prompt=prompt if spec is not None else None, spec=spec,
+                             **kwargs, **runtime_kwargs)

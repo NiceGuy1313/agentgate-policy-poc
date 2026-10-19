@@ -22,7 +22,6 @@ import re
 import threading
 
 from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
-from agentgate.core.engine import EngineResult
 from agentgate.core.types import PolicyContext, ToolCall
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, parse_think
 from agentgate.policy_gate import load_rulebook
@@ -174,6 +173,7 @@ class LLMJudge:
         """use_rules: True = gate_llm_judge (rulebook in the system prompt), False = same facts without the rulebook."""
         load_dotenv()
         self.use_rules = use_rules
+        self.kind = "llm" if use_rules else "llm-norules"
         self._client = client
         if client:   # injected client (tests): its own model, no settings resolution
             self.provider, self.model, self.think = getattr(client, "provider", None), client.model, None
@@ -187,8 +187,8 @@ class LLMJudge:
             self._client = LLMClient(provider=self.provider, model=self.model, think=self.think)
         return self._client
 
-    def __call__(self, call: ToolCall, result: EngineResult, context: PolicyContext, prompt: str) -> dict:
-        user_prompt = render_user(build_facts(call, context, prompt))
+    def __call__(self, call: ToolCall, context: PolicyContext) -> dict:
+        user_prompt = render_user(build_facts(call, context, context.prompt))
         think = "" if self.think is None else f"think={self.think}\n"   # think changes the answer: part of the key
         key = hashlib.sha256((self.model + think + self.system_prompt + user_prompt).encode()).hexdigest()[:24]
         path = CACHE_DIR / self.model.replace("/", "_").replace(":", "_") / f"{key}.json"
@@ -212,7 +212,7 @@ class LLMJudge:
                     write_text_atomic(path, json.dumps(record, indent=1))
                 record["cached"], record["unparsed"] = False, unparsed
         cached = record["cached"]
-        return {"judge": "llm" if self.use_rules else "llm-norules", "provider": self.provider, "model": self.model,
+        return {"judge": self.kind, "provider": self.provider, "model": self.model,
                 "answer": record["answer"], "final": record["answer"], "verdict": record["answer"],
                 "text": record["text"][:200], "cached": cached, "unparsed": record.get("unparsed"),
                 "latency_ms": 0.0 if cached else record["latency_ms"],
@@ -220,7 +220,3 @@ class LLMJudge:
                 "output_tokens": 0 if cached else record["output_tokens"],
                 "cache_read_input_tokens": 0 if cached else record.get("cache_read_input_tokens", 0),
                 "cache_creation_input_tokens": 0 if cached else record.get("cache_creation_input_tokens", 0)}
-
-
-def as_runtime_judge(judge: LLMJudge, prompt: str):
-    return lambda call, result, context: judge(call, result, context, prompt)

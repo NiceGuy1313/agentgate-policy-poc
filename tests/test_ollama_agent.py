@@ -89,7 +89,7 @@ def test_blocked_call_result_reaches_model(fake_post):
     suite = load_suite("banking")
     llm = OllamaAgentLLM("glm-4.6", client=OllamaClient(host="http://localhost:11434", api_key=""))
     pipeline = RecordingPipeline(build_pipeline(llm, lambda p: (TaskSpec(), {"source": "test"})))
-    runtime = PolicyGateRuntime(suite.tools, mode="enforce", escalate_action="judge", judge=RuleChecker())
+    runtime = PolicyGateRuntime(suite.tools, mode="enforce", judge=RuleChecker())
     pipeline.query("hi", runtime, suite.load_and_inject_default_environment({}))
     assert runtime.trace[0].blocked and "Authorization" not in sent[0]["headers"]
     tool_msg = next(m for m in sent[1]["json"]["messages"] if m["role"] == "tool")

@@ -7,33 +7,20 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from agentgate.core.engine import AllowAllPolicyEngine, EngineResult
 from agentgate.core.runtime import GatedRuntime, TraceEvent
-from agentgate.core.types import ToolCall, Verdict
 from agentgate.policy_gate import effect_tools
 
 
 class PolicyGateRuntime(GatedRuntime):
-    """`toolspec`: (tool, args, output_text) -> validated ToolSpec dict | None (`agentgate.policy_gate.toolspec`).
-    `judge`: (call, result, context) -> judge record (`agentgate.policy_gate.llm_judge`)."""
+    """`GatedRuntime` whose judge scope is the effect tools. `toolspec`: (tool, args, output_text) -> validated
+    ToolSpec dict | None (`agentgate.policy_gate.toolspec`); `judge`: `agentgate.policy_gate.judge.Judge`."""
 
     def __init__(self, functions=(), *, toolspec: Callable[[str, dict, str], dict | None] | None = None, **kwargs):
-        kwargs.setdefault("engine", AllowAllPolicyEngine())
+        self.effect_tools = effect_tools()
+        kwargs.setdefault("judge_scope", self.effect_tools.__contains__)
         super().__init__(functions, **kwargs)
         self.toolspec = toolspec
-        self.effect_tools = effect_tools()
         self.trace_label_keys = ("toolspec",) if toolspec is not None else ()
-
-    def resolve(self, call: ToolCall, result: EngineResult) -> tuple[Verdict, dict | None]:
-        if call.tool not in self.effect_tools:
-            return Verdict.ALLOW, None
-        if self.judge is None or self.escalate_action != "judge":
-            if self.mode == "enforce":   # an enforcing policy gate without a judge would allow every effect call
-                raise RuntimeError(f"policy gate in enforce mode needs escalate_action 'judge' and a judge "
-                                   f"(got {self.escalate_action!r}, judge {'set' if self.judge else 'None'})")
-            return Verdict.ALLOW, None
-        judgement = self.judge(call, result, self.context)
-        return Verdict(judgement["verdict"]), judgement
 
     def label_response(self, source, event: TraceEvent) -> None:
         if self.toolspec is None:

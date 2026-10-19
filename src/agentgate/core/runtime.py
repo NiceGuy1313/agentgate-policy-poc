@@ -4,8 +4,9 @@
 `GroundTruthPipeline`(replay)은 모두 `runtime.run_function`으로만 툴을 실행하고, `TaskSuite.run_task_with_pipeline`은
 `runtime_class`를 받으므로, `run_function`을 override하면 agentdojo 소스를 건드리지 않고 모든 실행 경로를 덮는다.
 
-판정 방식은 `resolve`·`label_response`·`finalize_judgement`·`index_class`를 override하는 서브클래스
-(`agentgate.policy_gate.runtime.PolicyGateRuntime`)가 정한다. 런타임 설정은 config/gate.yaml이다.
+판정은 `judge`(`agentgate.policy_gate.judge.Judge`: (call, context) -> 판정 기록)가 하고, `judge_scope`가 판정할 툴을
+정한다. ToolSpec 부착 등은 서브클래스(`agentgate.policy_gate.runtime.PolicyGateRuntime`)가 `label_response`·`index_class`로
+더한다. 런타임 설정은 config/gate.yaml이다.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
 from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime, TaskEnvironment
 
 from agentgate.config import load_config_yaml
-from agentgate.core.engine import AllowAllPolicyEngine, EngineResult
 from agentgate.core.provenance import ValueIndex
 from agentgate.core.task_spec import TaskSpec
 from agentgate.core.types import PolicyContext, SessionState, ToolCall, Verdict
@@ -41,14 +41,14 @@ class TraceEvent:
     blocked: bool = False
     executed: bool = False
     phase: str = ""                   # replay bookkeeping: "user" | "injection" | "agent"
-    decision: dict | None = None      # serialized EngineResult
+    decision: dict | None = None      # {"verdict", "decisions", "judge", "effective"}: see run_function
     decide_ms: float = 0.0
     labels: dict = field(default_factory=dict)   # label summaries of this response (ToolSpec)
     env_hash_before: str | None = None
 
 
-EscalationJudgeFn = Callable[[ToolCall, EngineResult, PolicyContext], dict]
-"""Returns {"verdict": "ALLOW"|"BLOCK", ...} (the judge record stored in the trace)."""
+JudgeFn = Callable[[ToolCall, PolicyContext], dict]
+"""Returns {"verdict": "ALLOW"|"BLOCK", ...} (the judge record stored in the trace); `agentgate.policy_gate.judge.Judge`."""
 
 
 def to_plain_data(value: Any) -> Any:
@@ -70,13 +70,6 @@ def compute_environment_hash(environment: TaskEnvironment | None) -> str | None:
     if environment is None:
         return None
     return hashlib.sha1(environment.model_dump_json().encode()).hexdigest()
-
-
-def format_block_message(result: EngineResult) -> str:
-    decision = result.primary_decision
-    policy_id = decision.policy_id if decision else "POLICY"
-    reason = decision.reason if decision else "The call was not allowed."
-    return f"Tool call blocked by security policy {policy_id}: {reason}"
 
 
 BLOCK_REASON_CHARS = 240
@@ -125,10 +118,9 @@ class GatedRuntime(FunctionsRuntime):
         *,
         prompt: str | None = None,
         spec: TaskSpec | None = None,
-        engine=None,
         mode: str = "enforce",
-        escalate_action: str | None = None,
-        judge: EscalationJudgeFn | None = None,
+        judge: JudgeFn | None = None,
+        judge_scope: Callable[[str], bool] | None = None,
         record_env_hash: bool = False,
         config: dict | None = None,
     ):
@@ -138,16 +130,16 @@ class GatedRuntime(FunctionsRuntime):
         self.functions = {name: _guarded(f, self.ungated_executions) for name, f in self.functions.items()}
         if mode not in ("audit", "enforce"):
             raise ValueError("mode must be audit | enforce")
-        self.engine = engine or AllowAllPolicyEngine()
-        # runtime settings (escalate default, self identifiers, index lengths): explicit `config` or config/gate.yaml
+        # runtime settings (self identifiers, index lengths): explicit `config` or config/gate.yaml
         self.config = config if config is not None else load_config_yaml("gate.yaml")
         self.mode = mode
-        self.escalate_action = escalate_action or self.config["runtime"]["escalate_action"]
         self.judge = judge
+        self.judge_scope = judge_scope   # tool name -> judged? (None: every tool)
         self.record_env_hash = record_env_hash
         self.trace: list[TraceEvent] = []
         self.phase = ""
         self.session = SessionState()
+        self.prompt = ""
         self.spec: TaskSpec | None = None
         self.index: ValueIndex | None = None
         self.spec_meta: dict = {}
@@ -168,6 +160,7 @@ class GatedRuntime(FunctionsRuntime):
         return make
 
     def configure(self, prompt: str, spec: TaskSpec, meta: dict | None = None) -> None:
+        self.prompt = prompt
         self.spec = spec
         self.spec_meta = meta or {}
         self.index = self.index_class(prompt, spec, self.config.get("self_identifiers"),
@@ -176,7 +169,7 @@ class GatedRuntime(FunctionsRuntime):
 
     @property
     def context(self) -> PolicyContext:
-        return PolicyContext(self.spec, self.index, self.session, self.config)  # type: ignore[arg-type]
+        return PolicyContext(self.spec, self.index, self.session, self.config, self.prompt)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------ the gate
     def run_function(self, env, function: str, kwargs, raise_on_error: bool = False):
@@ -187,14 +180,13 @@ class GatedRuntime(FunctionsRuntime):
             event.env_hash_before = compute_environment_hash(env)
 
         start = time.perf_counter()
+        # trace schema: "verdict" is BLOCK only when fail-closed, else ALLOW; the judge's answer is "judge"/"effective"
         if self.index is None:
-            result = EngineResult(Verdict.BLOCK, [])
             event.decision = {"verdict": "BLOCK", "decisions": [], "note": "no TaskSpec configured (fail closed)"}
+            effective, judgement = Verdict.BLOCK, None
         else:
-            result = self.engine.decide(ToolCall(function, args), self.context)
-            event.decision = result.as_dict()
-        effective, judgement = (self.resolve(ToolCall(function, args), result) if self.index is not None
-                                else (result.verdict, None))
+            event.decision = {"verdict": "ALLOW", "decisions": []}
+            effective, judgement = self.resolve(ToolCall(function, args))
         if judgement is not None:
             event.decision["judge"] = judgement
         event.decide_ms = (time.perf_counter() - start) * 1000
@@ -202,7 +194,7 @@ class GatedRuntime(FunctionsRuntime):
 
         if self.mode == "enforce" and effective == Verdict.BLOCK:
             event.blocked = True
-            message = self.block_message(result, judgement)
+            message = self.block_message(judgement)
             event.output_text = message
             self.trace.append(event)
             return (message, None) if raise_on_error else (message, message)
@@ -222,37 +214,34 @@ class GatedRuntime(FunctionsRuntime):
         if error is None and self.index is not None:
             source = self.index.add_response(step, function, args, output, event.output_text)
             self.label_response(source, event)
-            self.session.record_call(function, args, output, source.sensitive_categories, source.source_id)
+            self.session.record_call(function, output)
         self.trace.append(event)
         return output, error
 
     # ------------------------------------------------------------------ judgement hooks
-    def resolve(self, call: ToolCall, result: EngineResult) -> tuple[Verdict, dict | None]:
-        """Effective verdict and judge record. Default: only ESCALATE is resolved (block | allow | judge)."""
-        if result.verdict != Verdict.ESCALATE:
-            return result.verdict, None
-        if self.escalate_action == "allow":
+    def resolve(self, call: ToolCall) -> tuple[Verdict, dict | None]:
+        """Effective verdict and judge record of a call (the TaskSpec is configured). A tool outside `judge_scope` is
+        allowed unjudged. Without a judge the call is allowed, except that an enforcing runtime with a judge scope (the
+        policy gate) refuses to run: it would allow every call it is meant to judge."""
+        if self.judge_scope is not None and not self.judge_scope(call.tool):
             return Verdict.ALLOW, None
-        if self.escalate_action == "judge" and self.judge is not None:
-            judgement = self.finalize_judgement(self.judge(call, result, self.context))
-            return Verdict(judgement["verdict"]), judgement
-        return Verdict.BLOCK, None
+        if self.judge is None:
+            if self.mode == "enforce" and self.judge_scope is not None:
+                raise RuntimeError("policy gate in enforce mode needs a judge (judge None)")
+            return Verdict.ALLOW, None
+        judgement = self.judge(call, self.context)
+        return Verdict(judgement["verdict"]), judgement
 
-    def block_message(self, result: EngineResult, judgement: dict | None) -> str:
-        """Text the agent receives for a blocked call: the judge's rule ids and reason when a judge decided, else the
-        engine's primary decision."""
+    def block_message(self, judgement: dict | None) -> str:
+        """Text the agent receives for a blocked call: the judge's rule ids and reason."""
         if self.index is None:
             return NO_TASKSPEC_MESSAGE
         if judgement is not None:
             return format_judge_block_message(judgement)
-        return format_block_message(result)
+        return "Tool call blocked by security policy POLICY: The call was not allowed."
 
     def label_response(self, source, event: TraceEvent) -> None:
         """Attach labels to an executed response (PolicyGateRuntime: ToolSpec). Default: none."""
-
-    def finalize_judgement(self, judgement: dict) -> dict:
-        """Post-process the ESCALATE judge's answer. Default: unchanged."""
-        return judgement
 
     # ------------------------------------------------------------------ serialization
     def trace_records(self) -> list[dict]:

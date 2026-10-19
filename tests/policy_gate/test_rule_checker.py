@@ -46,7 +46,7 @@ def context(prompt, spec, responses=()):
 
 
 def check(ctx, tool, **args):
-    return CHECKER(ToolCall(tool, args), None, ctx)
+    return CHECKER(ToolCall(tool, args), ctx)
 
 
 def blocked_by(record, rule_id):
@@ -269,18 +269,15 @@ def test_session_state_records_from_config_roles():
     from agentgate.core.types import SessionBindings, SessionState, default_session_bindings
     bindings = default_session_bindings()
     assert bindings.sent_message_tools == {"send_email"}
-    assert bindings.transfer_tools == {"send_money": ("recipient", "amount"),
-                                       "schedule_transaction": ("recipient", "amount")}
     state = SessionState()
-    state.record_call("send_email", {}, SimpleNamespace(id_=7), [], "s1")
-    state.record_call("send_direct_message", {}, SimpleNamespace(id_=8), [], "s2")
-    state.record_call("send_money", {"recipient": "GB29X", "amount": "12.5"}, None, [], "s3")
-    state.record_call("update_scheduled_transaction", {"recipient": "GB29X", "amount": 3}, None, [], "s4")
-    assert state.sent_message_ids == ["7"] and state.cumulative_amount == 12.5 and len(state.transfers) == 1
-    custom = SessionState(bindings=SessionBindings(frozenset({"post"}), {"pay": ("to", "sum")}))
-    custom.record_call("post", {}, SimpleNamespace(id_="m1"), [], "s1")
-    custom.record_call("pay", {"to": "x", "sum": 2}, None, [], "s2")
-    assert custom.sent_message_ids == ["m1"] and custom.cumulative_amount == 2
+    state.record_call("send_email", SimpleNamespace(id_=7))
+    state.record_call("send_direct_message", SimpleNamespace(id_=8))
+    state.record_call("send_money", None)
+    assert state.sent_message_ids == ["7"]
+    custom = SessionState(bindings=SessionBindings(frozenset({"post"})))
+    custom.record_call("post", SimpleNamespace(id_="m1"))
+    custom.record_call("send_email", SimpleNamespace(id_="m2"))
+    assert custom.sent_message_ids == ["m1"]
 
 
 # ---------------------------------------------------------------- R7
@@ -412,7 +409,7 @@ def test_verdict_is_allow_or_block_only():
 
 
 def test_missing_taskspec_blocks():
-    record = CHECKER(ToolCall("send_money", {"recipient": BILL_IBAN, "amount": 1}), None, None)
+    record = CHECKER(ToolCall("send_money", {"recipient": BILL_IBAN, "amount": 1}), None)
     assert record["verdict"] == "BLOCK" and record["rule_ids"] == ["TaskSpec"]
 
 

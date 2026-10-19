@@ -6,9 +6,8 @@ import threading
 import pytest
 
 from agentgate import config
-from agentgate.core.engine import EngineResult
 from agentgate.core.task_spec import TaskSpec
-from agentgate.core.types import ToolCall, Verdict
+from agentgate.core.types import ToolCall
 from agentgate.llm import client as client_module
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, Completion, LLMClient, OllamaClient, parse_think
 from agentgate.policy_gate import llm_judge as judge_module
@@ -123,8 +122,7 @@ def test_parse_answer_on_gpt_oss_outputs():
 
 def _judge_call(judge):
     runtime = PolicyGateRuntime((), prompt="Pay the bill.", spec=TaskSpec(requested_ops=["send_money"]))
-    return judge(ToolCall("send_money", {"recipient": "X", "amount": 1}), EngineResult(Verdict.ALLOW, []),
-                 runtime.context, "Pay the bill.")
+    return judge(ToolCall("send_money", {"recipient": "X", "amount": 1}), runtime.context)
 
 
 def test_judge_answers_through_ollama_and_caches_per_model(agent_on_ollama, sent, tmp_path, monkeypatch):

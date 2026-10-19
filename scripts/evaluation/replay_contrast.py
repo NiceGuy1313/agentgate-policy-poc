@@ -59,7 +59,7 @@ class RecordingRuntime(PolicyGateRuntime):
         super().__init__(functions, prompt=prompt, **kwargs)
         self.user_prompt, self.record = prompt, record
 
-    def resolve(self, call, result):
+    def resolve(self, call):
         if call.tool in EFFECT:
             rules = CHECKER.check(call, self.context)
             self.record.append({"phase": self.phase, "tool": call.tool,

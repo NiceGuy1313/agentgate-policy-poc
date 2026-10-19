@@ -27,7 +27,7 @@ from agentgate.policy_gate.runtime import PolicyGateRuntime
 from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
 from agentgate.scenarios.task_specs import load_task_spec
 
-VERDICT_MARKERS = {"ALLOW": "  ", "ESCALATE": "? ", "BLOCK": "X "}
+VERDICT_MARKERS = {"ALLOW": "  ", "BLOCK": "X "}
 
 
 def show(trace: list[dict], header: str):
@@ -99,7 +99,7 @@ def main():
             tool, text = read.split("=", 1)
             runtime.index.add_response(i, tool, {}, text, text)
         call_args = json.loads(args.args)
-        judgement = RuleChecker()(ToolCall(args.tool, call_args), None, runtime.context)
+        judgement = RuleChecker()(ToolCall(args.tool, call_args), runtime.context)
         show([{"step": 0, "tool": args.tool, "args": call_args, "verdict": judgement["verdict"],
                "effective": judgement["verdict"], "judge": judgement}],
              "single call")

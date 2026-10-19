@@ -124,10 +124,8 @@ class Session:
             if self.runtime.index is None:   # `GatedRuntime.run_function`과 같다: TaskSpec 없이는 아무것도 허용하지 않는다
                 return {"verdict": "BLOCK", "decisions": [], "effective": "BLOCK", "judge": None,
                         "note": "no TaskSpec configured (fail closed)"}
-            call = ToolCall(tool, dict(args or {}))
-            result = self.runtime.engine.decide(call, self.runtime.context)
-            effective, judgement = self.runtime.resolve(call, result)
-            return {**result.as_dict(), "verdict": effective.value, "effective": effective.value, "judge": judgement}
+            effective, judgement = self.runtime.resolve(ToolCall(tool, dict(args or {})))
+            return {"verdict": effective.value, "decisions": [], "effective": effective.value, "judge": judgement}
 
     # ------------------------------------------------------------------ end of run
     def finish(self, final_output: str | None) -> dict:
