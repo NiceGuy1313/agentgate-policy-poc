@@ -1,6 +1,6 @@
 # 구조와 집행 지점
 
-AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 정리한다. 판정 규칙은 [`rulebook.md`](rulebook.md), 프레임워크 연결 절차는 [`integration_guide.md`](integration_guide.md)에 있다.
+AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 정리한다. 판정 규칙은 [`rulebook.md`](rulebook.md), Adapter 부착 위치는 [`adapter_guide.md`](adapter_guide.md), contract v1 규약은 [`integration_guide.md`](integration_guide.md)에 있다.
 
 ## 1. 요약
 
@@ -9,6 +9,22 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 - 프레임워크는 `Adapter → GateToolBridge → Session → PolicyGateRuntime` 경로로만 툴을 실행한다. Gate를 거치지 않은 실행이 있으면 그 run은 무효다.
 - 정해지지 않은 상황(TaskSpec 없음, Gate 연결 실패, 규칙 오류)은 모두 차단한다(fail-closed).
 - AgentDojo 소스는 수정하지 않는다. `FunctionsRuntime` 서브클래스를 끼워 넣는다.
+
+## 모듈 구성
+
+```
+src/agentgate/
+  core/          binding(ToolBinding: 툴 역할 설정) · runtime(GatedRuntime) · trace(TraceEvent, 차단 메시지)
+                 · provenance(ValueIndex) · task_spec · types · normalization        — LLM 호출 없음
+  policy_gate/   runtime(PolicyGateRuntime) · judge(Judge, register_judge) · rule_checker · rule_facts
+                 · llm_judge · toolspec · toolspec_schema · assembly
+  environments/  base(Environment, ScenarioRun) · agentdojo(AgentDojoEnvironment) · ENVIRONMENTS 등록부
+  adapters/      base(FrameworkAdapter) · native · smolagents · mini-swe-agent · browser-use · contract
+  harness/       bridge · session · registry · runner · worker · service · agentgate_client · conformance · tool_schema
+  experiment/    conditions(register_condition) · batch(실행기) · cli(시나리오 CLI) · metrics · live_run_analysis
+  scenarios/     AgentDojo suite·pipeline·재생·공격 궤적·쌍(runner·run·metrics·live_run_analysis는 experiment shim)
+  agents/ · llm/ 평가 대상 에이전트, LLM client·TaskSpec 추출기
+```
 
 ## 2. 단일 집행 지점: `GatedRuntime.run_function`
 
@@ -56,7 +72,7 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 | registry | [`harness/registry.py`](../src/agentgate/harness/registry.py) | 내장 어댑터, `config/frameworks.yaml`, `agentgate.frameworks` entry point |
 | runner·worker | [`harness/runner.py`](../src/agentgate/harness/runner.py), [`harness/worker.py`](../src/agentgate/harness/worker.py) | 실행 하나를 돌리고 레코드를 만든다. `python:`이 지정된 프레임워크는 별도 인터프리터 worker에서 돈다 |
 
-native 어댑터는 AgentDojo pipeline에 `BridgeRuntime`을 넘긴다. pipeline의 툴 실행은 `BridgeRuntime.run_function` → `GateToolBridge.invoke_detail` → `Session.invoke` → `PolicyGateRuntime.run_function`을 지나므로 다른 프레임워크와 같은 경로다. 시나리오 CLI와 대시보드도 native를 다른 프레임워크와 같은 `harness.runner`로 돌린다([`scenarios/runner.py`](../src/agentgate/scenarios/runner.py)의 `run_framework_one`). `GatedRuntime`을 pipeline에 직접 넘기는 `run_live_task`([`scenarios/pipeline.py`](../src/agentgate/scenarios/pipeline.py))는 실행 경로가 아니며 conformance의 기준 실행과 단위 테스트에서만 쓴다.
+native 어댑터는 AgentDojo pipeline에 `BridgeRuntime`을 넘긴다. pipeline의 툴 실행은 `BridgeRuntime.run_function` → `GateToolBridge.invoke_detail` → `Session.invoke` → `PolicyGateRuntime.run_function`을 지나므로 다른 프레임워크와 같은 경로다. 시나리오 CLI와 대시보드도 native를 다른 프레임워크와 같은 `harness.runner`로 돌린다([`experiment/batch.py`](../src/agentgate/experiment/batch.py)의 `run_framework_one`). `GatedRuntime`을 pipeline에 직접 넘기는 `run_live_task`([`scenarios/pipeline.py`](../src/agentgate/scenarios/pipeline.py))는 실행 경로가 아니며 conformance의 기준 실행과 단위 테스트에서만 쓴다.
 
 ### contract 서비스
 
@@ -130,7 +146,7 @@ flowchart LR
 | [`config/agentdojo/named_source_rules.yaml`](../config/agentdojo/named_source_rules.yaml) | 지목 자료 판정 규칙, 신뢰 툴 |
 | [`config/agentdojo/sensitive_reads.yaml`](../config/agentdojo/sensitive_reads.yaml) | 민감 읽기 툴 범주(R4) |
 
-AgentDojo 고유 값(툴 이름 등)은 `config/agentdojo/`와 `src/agentgate/scenarios/`에만 둔다. 신뢰 툴은 인젝션 벡터가 없어야 하며 [`tests/test_config_consistency.py`](../tests/test_config_consistency.py)가 확인한다.
+AgentDojo 고유 값(툴 이름 등)은 `config/agentdojo/`, `src/agentgate/environments/agentdojo.py`, `src/agentgate/scenarios/`에만 둔다. Gate core와 정책 코드는 이 설정을 `ToolBinding`([`core/binding.py`](../src/agentgate/core/binding.py))으로만 읽는다. 신뢰 툴은 인젝션 벡터가 없어야 하며 [`tests/test_config_consistency.py`](../tests/test_config_consistency.py)가 확인한다.
 
 ## 8. 주요 설계 결정
 

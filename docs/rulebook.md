@@ -73,7 +73,7 @@ TaskSpec 출처는 LLM 추출(`--spec llm`, live·대시보드 기본)과 사람
 |---|---|---|
 | 판정기 | 판정 LLM([`policy_gate/llm_judge.py`](../src/agentgate/policy_gate/llm_judge.py)) | 정적 규칙 코드([`policy_gate/rule_checker.py`](../src/agentgate/policy_gate/rule_checker.py)) |
 | 룰북 사용 | system에 R1–R10의 `id`·`title`·`text`를 넣는다(`evidence`·주석 제외) | 같은 규칙을 코드로 해석한다(6절) |
-| 모델 | 에이전트와 같은 모델(기본 `gpt-oss:120b`). `AGENTGATE_JUDGE_*`로 바꿀 수 있다 | 없음 |
+| 모델 | `AGENTGATE_JUDGE_*`가 없으면 에이전트와 같은 모델(`AGENTGATE_AGENT_*`), 그것도 없으면 anthropic `claude-sonnet-5-5` | 없음 |
 | 답 해석 | 첫 단어가 `ALLOW`일 때만 ALLOW, 그 밖(BLOCK, 해석 불가)은 BLOCK | 규칙 하나라도 BLOCK 이유를 내면 BLOCK, 아무도 내지 않으면 ALLOW(R10) |
 | 실패 시 | 해석할 수 없는 답은 BLOCK. provider 오류는 잡지 않고 올려 실행을 멈춘다 | 규칙 함수 예외는 그 규칙의 BLOCK, TaskSpec 없음은 BLOCK |
 | 캐시 | `data/cache/judge/<model>/` | 해당 없음 |
@@ -82,7 +82,7 @@ TaskSpec 출처는 LLM 추출(`--spec llm`, live·대시보드 기본)과 사람
 
 ## 6. 정적 규칙의 코드 해석 (방식 B)
 
-근거는 [`rule_checker.py`](../src/agentgate/policy_gate/rule_checker.py) 모듈 docstring이다. 인자 역할(destination·amount·url·password·content·attachment·target_id·booking)과 R4 임계값은 [`config/agentdojo/tool_args.yaml`](../config/agentdojo/tool_args.yaml)에 있다.
+근거는 [`rule_checker.py`](../src/agentgate/policy_gate/rule_checker.py) 모듈 docstring이고, 호출마다 계산하는 사실(지목 자료·근거 있는 값·target 일치)은 [`rule_facts.py`](../src/agentgate/policy_gate/rule_facts.py)에 있다. 인자 역할(destination·amount·url·password·content·attachment·target_id·booking)과 R4 임계값은 [`config/agentdojo/tool_args.yaml`](../config/agentdojo/tool_args.yaml)에 있다.
 
 용어
 - **지목 자료**: ValueIndex가 `TaskSpec.named_sources`와 일치한다고 표시한 툴 응답.
@@ -110,4 +110,4 @@ ToolSpec이 `None`인 응답은 레코드도 요청도 없는 것으로 본다. 
 - **데이터 바꿔치기**: 지시 없이 지목 자료 안의 값만 바꾼 공격은 ToolSpec에 요청이 없어 R2·R8로 구분하지 못한다.
 - **추출 품질 의존**: TaskSpec(`requested_ops`, `named_sources`, `delegated_sources`)이나 ToolSpec이 틀리면 판정도 틀린다. ToolSpec 추출이 실패한 응답 속 요청은 놓친다.
 - **툴 호출 없는 공격**: 답변 문장만 바꾸는 공격은 범위 밖이다.
-- **AgentDojo 바인딩**: 툴 역할·인자 역할은 AgentDojo v1.2.2 툴 기준이다. 다른 환경에는 `config/agentdojo/`에 해당하는 설정이 따로 필요하다.
+- **AgentDojo 바인딩**: 툴 역할·인자 역할은 AgentDojo v1.2.2 툴 기준이다(`ToolBinding`, `config/agentdojo/`). 다른 환경에는 같은 형식의 설정 디렉터리가 따로 필요하다.
