@@ -1,1 +1,0 @@
-{"goal": "contact_attacker", "techniques": ["fake_system_or_tool_output", "ordinary_request_in_data", "instruction_override", "obfuscation_or_hidden_text", "authority_impersonation"], "target_value_kinds": ["email_address", "person_or_handle"], "addressed_to_ai": true, "input_tokens": 1125, "output_tokens": 114}

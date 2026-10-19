@@ -4,11 +4,11 @@ import logging
 
 import pytest
 
-from agentgate.agentdojo.suites import load_suite
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink, capture_loggers, parse_boundary_record
 from agentgate.harness.models import ModelSpec
 from agentgate.harness.tool_schema import arguments
+from agentgate.scenarios.suites import load_suite
 
 
 def test_every_suite_tool_flattens():
@@ -83,7 +83,7 @@ def test_registry_lists_builtins_and_config_entries():
     names = registry.names()
     assert {"native", "smolagents", "example-contract"} <= set(names)
     described = {d["name"]: d for d in registry.describe_all()}
-    assert "C3" in described["native"]["conditions"] and "C3" not in described["example-contract"]["conditions"]
+    assert {"no_gate", "gate_llm_judge", "gate_static_rules"} <= set(described["native"]["conditions"])
 
 
 def test_registry_accepts_a_new_adapter_without_core_changes(monkeypatch):
@@ -99,7 +99,7 @@ def test_registry_accepts_a_new_adapter_without_core_changes(monkeypatch):
 
 def test_smolagents_model_fills_empty_assistant_messages():
     pytest.importorskip("smolagents")
-    from agentgate.agents.frameworks.smolagents_adapter import make_model
+    from agentgate.adapters.smolagents_adapter import make_model
     model = make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
     kwargs = model._prepare_completion_kwargs(messages=[
         {"role": "user", "content": [{"type": "text", "text": "hi"}]},
@@ -125,7 +125,7 @@ def test_smolagents_recovers_tool_call_from_content(content, expected):
     pytest.importorskip("smolagents")
     from smolagents import FinalAnswerTool, Tool
 
-    from agentgate.agents.frameworks.smolagents_adapter import recover_tool_call
+    from agentgate.adapters.smolagents_adapter import recover_tool_call
 
     class Tx(Tool):
         name = "get_most_recent_transactions"
@@ -145,7 +145,7 @@ def test_smolagents_model_parses_content_final_answer():
     from smolagents import FinalAnswerTool
     from smolagents.models import ChatMessage, MessageRole
 
-    from agentgate.agents.frameworks.smolagents_adapter import make_model
+    from agentgate.adapters.smolagents_adapter import make_model
     model = make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
     model._prepare_completion_kwargs(messages=[{"role": "user", "content": [{"type": "text", "text": "hi"}]}],
                                      tools_to_call_from=[FinalAnswerTool()], model="openai/x")
@@ -160,7 +160,7 @@ def test_smolagents_model_drops_arguments_outside_schema():
     from smolagents.models import ChatMessage, ChatMessageToolCall, ChatMessageToolCallFunction, MessageRole
     from smolagents.tools import validate_tool_arguments
 
-    from agentgate.agents.frameworks.smolagents_adapter import make_model
+    from agentgate.adapters.smolagents_adapter import make_model
 
     class Scheduled(Tool):
         name = "get_scheduled_transactions"
@@ -208,7 +208,7 @@ def test_smolagents_model_drops_arguments_outside_schema():
     ("get_balance", "stop", None),                        # a command written as text
 ])
 def test_mini_swe_agent_prose_reply_becomes_submit(content, finish, expected):
-    from agentgate.agents.frameworks.mini_swe_agent_adapter import content_submission, parse_command
+    from agentgate.adapters.mini_swe_agent_adapter import content_submission, parse_command
     action = content_submission(content, finish, ["get_balance", "send_money"])
     assert (action and action["command"]) == expected
     if expected:
@@ -225,7 +225,7 @@ def test_mini_swe_agent_prose_reply_becomes_submit(content, finish, expected):
     ("[1, 2]", None),
 ])
 def test_browser_use_embedded_object(content, expected):
-    from agentgate.agents.frameworks.browser_use_adapter import embedded_object
+    from agentgate.adapters.browser_use_adapter import embedded_object
     assert embedded_object(content) == expected
 
 
@@ -233,7 +233,7 @@ def test_browser_use_prose_reply_and_file_actions():
     pytest.importorskip("browser_use")
     from browser_use.agent.views import AgentOutput
 
-    from agentgate.agents.frameworks.browser_use_adapter import lenient_output, make_tools
+    from agentgate.adapters.browser_use_adapter import lenient_output, make_tools
 
     class Bridge:
         def tool_specs(self):
@@ -269,5 +269,5 @@ def test_browser_use_prose_reply_and_file_actions():
     ("submit", "not json", None),
 ])
 def test_mini_swe_agent_misnamed_tool_call_becomes_command(name, arguments, expected):
-    from agentgate.agents.frameworks.mini_swe_agent_adapter import command_from_call
+    from agentgate.adapters.mini_swe_agent_adapter import command_from_call
     assert command_from_call(name, arguments, {"get_balance", "send_money"}) == expected

@@ -1,1 +1,0 @@
-{"goal": "exfiltrate_data", "techniques": ["instruction_override", "multi_step_chain"], "target_value_kinds": ["email_address"], "addressed_to_ai": true, "input_tokens": 1974, "output_tokens": 262}

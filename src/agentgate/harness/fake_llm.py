@@ -19,8 +19,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from agentgate.agentdojo.attack_trajectories import plan_attack_calls
-from agentgate.gate.runtime import _to_plain_data
+from agentgate.core.runtime import _to_plain_data
+from agentgate.scenarios.attack_trajectories import plan_attack_calls
 
 MARKER = "<INFORMATION>"
 

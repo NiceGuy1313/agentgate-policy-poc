@@ -1,8 +1,7 @@
 """LLM TaskSpec 추출기이다.
 
 signature를 의도적으로 (prompt, tools)로 둔다. 툴 응답, ground truth, injection goal은 넘길 수 없다.
-추출 프롬프트와 캐시 위치는 버전이 정한다: `TaskSpecExtractor(version="v3")`는 prompts/v3/extract_taskspec.md를
-쓰고 data/v3/cache/taskspec/<model>/에 저장한다(기본 v1).
+추출 프롬프트는 prompts/extract_taskspec.md, 캐시는 data/cache/taskspec/<model>/이다.
 """
 
 from __future__ import annotations
@@ -16,19 +15,11 @@ from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
-from agentgate.gate.task_spec import TaskSpec
-from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, extract_first_json_object
+from agentgate.core.task_spec import TaskSpec
+from agentgate.llm.client import LLMClient, extract_first_json_object
 
-VERSION_PROMPTS = {"v1": PROJECT_ROOT / "prompts" / "v1" / "extract_taskspec.md",
-                   "v3": PROJECT_ROOT / "prompts" / "v3" / "extract_taskspec.md"}
-PROMPT_TEMPLATE_PATH = VERSION_PROMPTS["v1"]
-
-
-def cache_dir_for(version: str) -> Path:
-    return PROJECT_ROOT / "data" / version / "cache" / "taskspec"
-
-
-CACHE_DIR = cache_dir_for("v1")
+PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts" / "extract_taskspec.md"
+CACHE_DIR = PROJECT_ROOT / "data" / "cache" / "taskspec"
 SYSTEM_PROMPT = "You are a careful requirements analyst. You output only JSON."
 
 
@@ -64,24 +55,21 @@ def compute_cache_key(prompt: str, tools: list[ToolInfo], model: str, template_p
     return digest.hexdigest()[:24]
 
 
-SPEC_MODEL_V3 = "claude-haiku-5-5"   # v3 TaskSpec (ToolSpec uses the same model) when AGENTGATE_LLM_MODEL is unset
+DEFAULT_SPEC_MODEL = "claude-haiku-5-5"   # TaskSpec model (ToolSpec uses the same) when AGENTGATE_LLM_MODEL is unset
 
 
 class TaskSpecExtractor:
     """`model` defaults to AGENTGATE_LLM_MODEL; the API client is only created on a cache miss, so cached
     extractions can be reused without a key."""
 
-    def __init__(self, client: LLMClient | None = None, cache_dir: Path | None = None, model: str | None = None,
-                 version: str = "v1"):
+    def __init__(self, client: LLMClient | None = None, cache_dir: Path | None = None, model: str | None = None):
         load_dotenv()
-        self.version = version
-        self.template_path = VERSION_PROMPTS[version]
+        self.template_path = PROMPT_TEMPLATE_PATH
         self._client = client
-        self.model = client.model if client else (model or os.environ.get("AGENTGATE_LLM_MODEL")
-                                                  or (SPEC_MODEL_V3 if version == "v3" else DEFAULT_ANTHROPIC_MODEL))
+        self.model = client.model if client else (model or os.environ.get("AGENTGATE_LLM_MODEL") or DEFAULT_SPEC_MODEL)
         # AGENTGATE_TASKSPEC_CACHE_DIR: a fresh directory forces live extraction (e.g. a live run that must not reuse
         # earlier specs); the default reuses the committed cache.
-        cache_dir = cache_dir or Path(os.environ.get("AGENTGATE_TASKSPEC_CACHE_DIR") or cache_dir_for(version))
+        cache_dir = cache_dir or Path(os.environ.get("AGENTGATE_TASKSPEC_CACHE_DIR") or CACHE_DIR)
         self.cache_dir = cache_dir / self.model.replace("/", "_").replace(":", "_")
 
     @property

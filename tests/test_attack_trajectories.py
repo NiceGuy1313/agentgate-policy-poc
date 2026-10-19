@@ -5,8 +5,8 @@ from agentdojo.functions_runtime import FunctionsRuntime
 from agentdojo.types import text_content_block_from_string
 
 from agentgate import SUITES
-from agentgate.agentdojo.attack_trajectories import plan_attack_calls
-from agentgate.agentdojo.suites import load_default_environment, load_suite
+from agentgate.scenarios.attack_trajectories import plan_attack_calls
+from agentgate.scenarios.suites import load_default_environment, load_suite
 
 CASES = [(s, t) for s in SUITES for t in load_suite(s).injection_tasks]
 

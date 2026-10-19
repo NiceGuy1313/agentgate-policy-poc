@@ -1,10 +1,10 @@
-"""live run에서 게이트 조건의 utility 손실 원인을 C0(방어 없음)와 짝지어 분해한다.
+"""live run에서 게이트 조건의 utility 손실 원인을 no_gate(방어 없음)와 짝지어 분해한다.
 
-같은 (suite, user task, injection task)에서 C0는 성공하고 대상 조건은 실패한 run을 "차단 있음 / 없음"으로 나누고,
-차단된 호출마다 원인(게이트 BLOCK 정책, 판정 LLM BLOCK·HUMAN)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
+같은 (suite, user task, injection task)에서 no_gate는 성공하고 대상 조건은 실패한 run을 "차단 있음 / 없음"으로 나누고,
+차단된 호출마다 원인(게이트 BLOCK 정책, 판정기 BLOCK)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
 
-사용법: python scripts/analysis/analyze_live_utility.py --run results/v3/live/<run> \
-          --baseline results/v3/live/<run> --condition C10a
+사용법: python scripts/analysis/analyze_live_utility.py --run results/live/<run> \
+          --baseline results/live/<run> --condition gate_llm_judge
 run 폴더에 <condition>/가 없으면 runs.tar.gz를 임시 폴더에 풀어 읽는다. 출력: <run>/utility_analysis_<condition>.json
 """
 
@@ -18,8 +18,8 @@ from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
-from agentgate.agentdojo.suites import load_suite
 from agentgate.config import PROJECT_ROOT
+from agentgate.scenarios.suites import load_suite
 
 
 def load_condition(run_dir: Path, condition: str, tmp: Path) -> dict:
@@ -49,8 +49,7 @@ def block_cause(event: dict) -> str:
     judge = event.get("judge") or {}
     if not judge:
         return "gate_block:" + "+".join(sorted({d["policy_id"] for d in event["decisions"] if d["verdict"] == "BLOCK"}))
-    escalated = "+".join(sorted({d["policy_id"] for d in event["decisions"] if d["verdict"] == "ESCALATE"}))
-    return f"judge_{judge['final'].lower()}[{escalated}]"
+    return f"{judge.get('judge')}_{judge['final'].lower()}[{'+'.join(judge.get('rule_ids') or [])}]"
 
 
 def analyze(runs: dict, baseline: dict) -> dict:
@@ -61,7 +60,7 @@ def analyze(runs: dict, baseline: dict) -> dict:
         for key in keys:
             run, base = runs[key], baseline[key]
             blocks = [e for e in run["trace"] if e["blocked"]]
-            pairing[f"C0={'ok' if base['utility'] else 'fail'} cond={'ok' if run['utility'] else 'fail'} "
+            pairing[f"no_gate={'ok' if base['utility'] else 'fail'} cond={'ok' if run['utility'] else 'fail'} "
                     f"{'blocked' if blocks else 'no_block'}"] += 1
             if not (base["utility"] and not run["utility"] and blocks):
                 continue
@@ -82,13 +81,13 @@ def analyze(runs: dict, baseline: dict) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
-    parser.add_argument("--baseline", required=True, help="run directory holding C0 (same pairs)")
-    parser.add_argument("--condition", required=True, help="condition to analyse, e.g. C10a")
+    parser.add_argument("--baseline", required=True, help="run directory holding no_gate (same pairs)")
+    parser.add_argument("--condition", required=True, help="condition to analyse, e.g. gate_llm_judge")
     args = parser.parse_args()
     run_dir, baseline_dir = PROJECT_ROOT / args.run, PROJECT_ROOT / args.baseline
     with tempfile.TemporaryDirectory() as tmp:
         runs = load_condition(run_dir, args.condition, Path(tmp))
-        baseline = load_condition(baseline_dir, "C0", Path(tmp) / "baseline")
+        baseline = load_condition(baseline_dir, "no_gate", Path(tmp) / "baseline")
     result = {"run": args.run, "baseline": args.baseline, "condition": args.condition, **analyze(runs, baseline)}
     (run_dir / f"utility_analysis_{args.condition}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     for kind in ("benign", "attack"):

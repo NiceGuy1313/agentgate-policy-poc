@@ -1,7 +1,7 @@
 """공통 경로, YAML 설정 loader, `.env` loader를 제공한다.
 
-버전별 정책 설정은 각 버전 패키지(`agentgate.v1`·`v3`)가 읽는다. 여기에는 버전과
-무관한 AgentDojo 툴 환경 설정(config/agentdojo/)만 둔다.
+Gate 설정(config/gate.yaml), 룰북(config/rulebook.yaml, config/tool_args.yaml)은 각 모듈이 읽는다. 여기에는
+AgentDojo 툴 환경 바인딩(config/agentdojo/) loader만 둔다.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 
 @lru_cache(maxsize=None)
 def load_config_yaml(name: str) -> dict:
-    """`name` is relative to config/, e.g. "v1/policies.yaml"."""
+    """`name` is relative to config/, e.g. "gate.yaml"."""
     return yaml.safe_load((CONFIG_DIR / name).read_text())
 
 

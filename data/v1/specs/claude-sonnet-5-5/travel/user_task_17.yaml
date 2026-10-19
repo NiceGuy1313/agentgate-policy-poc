@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- Paris
-allowed_dest: []
-egress_requested: false
-notes: Read-only recommendation and cost calculation request for Paris (hotel, car
-  rental, restaurant by ratings and budget). No reservations, emails, or other state-changing
-  actions were requested; the answer is returned to the user only.
-status: llm

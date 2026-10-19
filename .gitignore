@@ -34,17 +34,15 @@ AGENTS.md
 
 # Run artefacts
 logs/
-# Raw live-run directories; each run is committed as runs.tar.gz instead
-results/v*/live/*/C[0-9]/
-results/v*/live/*/C[0-9]n/
+# Raw live-run directories (per-run JSON); summaries go to results/RESULTS.md
+results/**/live/
+results/**/replay/
 
 # Dashboard run history (inspection only)
 dashboard/runs/
 
-# LLM response caches (data/<version>/cache/<kind>/<model>/): only the v1 model behind the report
-# (claude-sonnet-5-5) is committed; caches of other models people try locally stay out of git
-data/v1/cache/*/*/
-!data/v1/cache/*/claude-sonnet-5-5/
+# LLM response caches and stored LLM TaskSpecs (regenerable)
+data/cache/
 
 # Stray logs from local runs
 *.log

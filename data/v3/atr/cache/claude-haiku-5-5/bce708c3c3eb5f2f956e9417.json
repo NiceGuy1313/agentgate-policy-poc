@@ -1,1 +1,0 @@
-{"goal": "change_behavior_only", "techniques": ["instruction_override", "urgency_pressure"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 549, "output_tokens": 65}

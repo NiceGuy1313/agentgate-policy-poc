@@ -1,12 +1,12 @@
-"""live run의 조건별 지표에 대해 C0 대비 신뢰구간과 대응 검정을 계산한다.
+"""live run의 조건별 지표에 대해 no_gate 대비 신뢰구간과 대응 검정을 계산한다.
 
 조건·지표(ASR, Utility, Utility under attack)별로:
   - Wilson 95% 구간을 포함한 비율
-  - 같은 (suite, user task, injection task)에서 C0와의 대응 차이와 exact McNemar p-value
+  - 같은 (suite, user task, injection task)에서 no_gate와의 대응 차이와 exact McNemar p-value
   - 차이의 95% 구간: 한 user task의 run들은 독립이 아니므로 user task 단위 cluster bootstrap(suite별 층화)으로 계산
-게이트 기인 실패(차단 호출이 있고 user task를 실패한 run, 그중 C0에서는 성공한 run)와 차단 정책도 집계한다.
+게이트 기인 실패(차단 호출이 있고 user task를 실패한 run, 그중 no_gate에서는 성공한 run)와 차단 정책도 집계한다.
 
-사용법: python scripts/analysis/live_significance.py --run results/v1/live/<name>
+사용법: python scripts/analysis/live_significance.py --run results/live/<name>
 출력: <run>/significance.json. 오류가 난 run은 제외한다(대응 검정에서는 쌍 단위로 제외).
 """
 
@@ -18,9 +18,11 @@ import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from agentgate.agentdojo.live_run_analysis import live_run_files
-from agentgate.agentdojo.metrics import mcnemar_exact, wilson
 from agentgate.config import PROJECT_ROOT
+from agentgate.scenarios.live_run_analysis import live_run_files
+from agentgate.scenarios.metrics import mcnemar_exact, wilson
+
+BASELINE = "no_gate"
 
 # Metric name -> (run kind, record field).
 METRICS = {"asr": ("attack", "security"), "utility": ("benign", "utility"),
@@ -49,7 +51,7 @@ def blocked_policies(run: dict) -> list[str]:
 
 
 def cluster_bootstrap_diff(pairs: list[tuple[tuple, int, int]], n_boot: int, seed: int) -> tuple[float, float] | None:
-    """pairs: (key, x_C0, x_C). Resample user tasks with replacement within each suite."""
+    """pairs: (key, x_baseline, x_C). Resample user tasks with replacement within each suite."""
     if not pairs:
         return None
     diffs_by_task = defaultdict(list)
@@ -85,12 +87,12 @@ def analyse(run_dir: Path, n_boot: int = 2000, seed: int = 0) -> dict:
             successes = sum(bool(runs[key][field]) for key in keys)
             metric = {"n": len(keys), "k": successes, "rate": round(successes / len(keys), 4) if keys else None,
                       "ci95": wilson(successes, len(keys))}
-            if condition != "C0":
-                pairs = [(key[1:], int(bool(runs[("C0",) + key[1:]][field])), int(bool(runs[key][field])))
-                         for key in keys if ("C0",) + key[1:] in runs]
+            if condition != BASELINE:
+                pairs = [(key[1:], int(bool(runs[(BASELINE,) + key[1:]][field])), int(bool(runs[key][field])))
+                         for key in keys if (BASELINE,) + key[1:] in runs]
                 c0_only = sum(1 for _, x_c0, x_condition in pairs if x_c0 and not x_condition)
                 condition_only = sum(1 for _, x_c0, x_condition in pairs if x_condition and not x_c0)
-                metric["paired_vs_C0"] = {
+                metric["paired_vs_baseline"] = {
                     "n_pairs": len(pairs), "c0_only": c0_only, "cond_only": condition_only,
                     "diff": round((condition_only - c0_only) / len(pairs), 4) if pairs else None,
                     "p_mcnemar": float(f"{mcnemar_exact(c0_only, condition_only):.3g}"),
@@ -101,7 +103,7 @@ def analyse(run_dir: Path, n_boot: int = 2000, seed: int = 0) -> dict:
         for key, run in runs.items():
             if key[0] != condition or run["utility"] or not any(e["blocked"] for e in run["trace"]):
                 continue
-            c0_run = runs.get(("C0",) + key[1:])
+            c0_run = runs.get((BASELINE,) + key[1:])
             gate_failures["benign" if key[3] is None else "attack"].append({
                 "suite": key[1], "user_task": key[2], "injection_task": key[3],
                 "blocked_by": blocked_policies(run), "blocks": blocked_decisions(run),
@@ -141,8 +143,8 @@ def main():
         for name in METRICS:
             metric = condition_metrics[name]
             cell = f"{name} {metric['k']}/{metric['n']}"
-            if "paired_vs_C0" in metric:
-                paired = metric["paired_vs_C0"]
+            if "paired_vs_baseline" in metric:
+                paired = metric["paired_vs_baseline"]
                 cell += f" (Δ {paired['diff']:+.3f}, p={paired['p_mcnemar']:.2g})"
             cells.append(cell)
         gate_failures = condition_metrics["gate_failures"]

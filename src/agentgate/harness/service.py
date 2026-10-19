@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from agentgate.harness import CONTRACT_VERSION
 from agentgate.harness.bridge import GateToolBridge
 from agentgate.harness.events import EventSink
-from agentgate.harness.scenario import ScenarioConfig, Session
+from agentgate.harness.session import ScenarioConfig, Session
 
 
 @dataclass

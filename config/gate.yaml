@@ -1,0 +1,8 @@
+# GatedRuntime 공통 설정(agentgate.core.runtime). 벤치마크 사용자 정보는 넣지 않는다.
+# 사용자 자신의 식별자(이메일 등)를 SELF 출처로 인정하려면 배포 환경에서 self_identifiers에 적는다. 기본값은 비어 있다.
+self_identifiers: []
+
+runtime:
+  escalate_action: block       # block | allow | judge (판정기가 없는 ESCALATE 처리)
+  min_string_field_len: 4      # ValueIndex: 색인할 문자열 필드 값의 최소 길이
+  named_match_min_len: 4       # ValueIndex: 지목 자료 이름 일치에 쓰는 최소 길이

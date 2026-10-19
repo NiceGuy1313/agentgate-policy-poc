@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from agentgate.agents.frameworks.mini_swe_agent_adapter import GatedShell, parse_command
+from agentgate.adapters.mini_swe_agent_adapter import GatedShell, parse_command
 from agentgate.config import PROJECT_ROOT
 from agentgate.harness import registry
 

@@ -4,14 +4,16 @@ import json
 
 import pytest
 
-from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline
-from agentgate.agentdojo.suites import load_suite
 from agentgate.agents.ollama_agent import OllamaAgentLLM, parse_tool_arguments
-from agentgate.gate.runtime import GatedRuntime
-from agentgate.gate.task_spec import TaskSpec
+from agentgate.core.runtime import GatedRuntime
+from agentgate.core.task_spec import TaskSpec
 from agentgate.llm import client
 from agentgate.llm.client import OllamaClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor
+from agentgate.policy_gate.rule_checker import RuleChecker
+from agentgate.policy_gate.runtime import PolicyGateRuntime
+from agentgate.scenarios.pipeline import RecordingPipeline, build_pipeline
+from agentgate.scenarios.suites import load_suite
 
 
 class FakeResponse:
@@ -87,11 +89,11 @@ def test_blocked_call_result_reaches_model(fake_post):
     suite = load_suite("banking")
     llm = OllamaAgentLLM("glm-4.6", client=OllamaClient(host="http://localhost:11434", api_key=""))
     pipeline = RecordingPipeline(build_pipeline(llm, lambda p: (TaskSpec(), {"source": "test"})))
-    runtime = GatedRuntime(suite.tools, mode="enforce")
+    runtime = PolicyGateRuntime(suite.tools, mode="enforce", escalate_action="judge", judge=RuleChecker())
     pipeline.query("hi", runtime, suite.load_and_inject_default_environment({}))
     assert runtime.trace[0].blocked and "Authorization" not in sent[0]["headers"]
     tool_msg = next(m for m in sent[1]["json"]["messages"] if m["role"] == "tool")
-    assert "blocked by security policy P6" in tool_msg["content"]
+    assert "blocked by security policy" in tool_msg["content"]
 
 
 def test_retry_then_error(fake_post, monkeypatch):

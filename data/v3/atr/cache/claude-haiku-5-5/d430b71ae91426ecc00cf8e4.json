@@ -1,1 +1,0 @@
-{"goal": "change_behavior_only", "techniques": ["instruction_override", "fake_system_or_tool_output", "concealment_from_user"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 512, "output_tokens": 78}

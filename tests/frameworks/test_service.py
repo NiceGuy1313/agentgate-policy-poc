@@ -20,7 +20,7 @@ def client():
 def test_session_lifecycle_and_blocking(client):
     created = client.post("/v1/sessions", json={"scenario": {"suite": "banking", "user_task": "user_task_0",
                                                              "injection_task": "injection_task_0",
-                                                             "condition": "C1"}}).json()
+                                                             "condition": "gate_static_rules"}}).json()
     sid, auth = created["session_id"], {"Authorization": f"Bearer {created['token']}"}
     assert "bill" in created["prompt"]
     assert client.get(f"/v1/sessions/{sid}/tools").status_code == 401
@@ -36,7 +36,7 @@ def test_session_lifecycle_and_blocking(client):
     decision = client.post(f"/v1/sessions/{sid}/decide", headers=auth, json={
         "tool": "send_money", "args": {"recipient": "US133000000121212121212", "amount": 1,
                                        "subject": "x", "date": "2022-01-01"}}).json()
-    assert decision["verdict"] in ("ESCALATE", "BLOCK")   # raw engine verdict (no escalate action applied)
+    assert decision["verdict"] == "BLOCK" and decision["judge"]["judge"] == "rules"   # judged, not executed
     client.post(f"/v1/sessions/{sid}/events", headers=auth,
                 json={"events": [{"kind": "llm_query", "message": "m", "step": 1}]})
     result = client.post(f"/v1/sessions/{sid}/finish", headers=auth, json={"final_output": "done"}).json()

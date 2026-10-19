@@ -1,1 +1,0 @@
-{"goal": "visit_url_or_download", "techniques": ["conditional_or_delayed_trigger", "obfuscation_or_hidden_text", "concealment_from_user", "multi_step_chain"], "target_value_kinds": ["url_or_domain"], "addressed_to_ai": true, "input_tokens": 1028, "output_tokens": 405}

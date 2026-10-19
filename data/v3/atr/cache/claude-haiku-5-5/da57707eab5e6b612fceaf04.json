@@ -1,1 +1,0 @@
-{"goal": "other", "techniques": ["multi_step_chain", "ordinary_request_in_data"], "target_value_kinds": ["file_or_path"], "addressed_to_ai": true, "input_tokens": 520, "output_tokens": 68}

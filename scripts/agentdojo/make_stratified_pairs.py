@@ -1,11 +1,11 @@
 """live 평가용 층화 쌍 목록을 만든다: 모든 user task x 같은 suite의 injection task K개.
 
-표본 추출은 `agentgate.agentdojo.pairs.stratified_pairs`가 하며 --seed, --benign을 그대로 넘긴다.
+표본 추출은 `agentgate.scenarios.pairs.stratified_pairs`가 하며 --seed, --benign을 그대로 넘긴다.
 
 사용법:
   python scripts/agentdojo/make_stratified_pairs.py --k 3 --benign --out data/agentdojo/pairs/strat3_seed0.txt
   python scripts/evaluation/live_evaluation.py --agent llm --pairs @data/agentdojo/pairs/strat3_seed0.txt \\
-      --conditions C0 C1 C2 C4 ...
+      --conditions no_gate gate_llm_judge gate_static_rules ...
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 from agentgate import SUITES
-from agentgate.agentdojo.pairs import stratified_pairs
+from agentgate.scenarios.pairs import stratified_pairs
 
 
 def main():

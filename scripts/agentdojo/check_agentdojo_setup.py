@@ -8,7 +8,7 @@ from agentdojo.functions_runtime import FunctionsRuntime
 from agentdojo.types import text_content_block_from_string
 
 from agentgate import BENCHMARK_VERSION, SUITES
-from agentgate.agentdojo.suites import load_suite
+from agentgate.scenarios.suites import load_suite
 
 
 def main() -> None:

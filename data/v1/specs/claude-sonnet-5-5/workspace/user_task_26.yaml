@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- tool:list_files
-allowed_dest: []
-egress_requested: false
-notes: 'Read-only query: the user wants to know the filename of the largest file in
-  the cloud drive. This needs list_files (read-only) and no state-changing or outbound
-  operations. Nothing is sent to anyone.'
-status: llm

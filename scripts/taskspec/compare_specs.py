@@ -1,6 +1,6 @@
 """oracle TaskSpec과 LLM TaskSpec을 필드별로 비교한다.
 
-출력: data/<version>/specs/<model>/comparison.json, comparison.md
+출력: data/cache/specs/<model>/comparison.json, comparison.md
 
 사용법: python scripts/taskspec/compare_specs.py --model <model>
 """
@@ -12,17 +12,17 @@ import json
 
 from agentgate import SUITES
 from agentgate.config import PROJECT_ROOT
-from agentgate.gate.normalization import normalize_value
-from agentgate.gate.task_spec import TaskSpec, llm_spec_dir
+from agentgate.core.normalization import normalize_value
+from agentgate.core.task_spec import TaskSpec, llm_spec_dir
 
 
 def _normalized_set(values):
     return {normalize_value(v) for v in values}
 
 
-def compare(model: str, version: str = "v1") -> dict:
+def compare(model: str) -> dict:
     oracle_root = PROJECT_ROOT / "data" / "agentdojo" / "oracle_specs"
-    llm_root = llm_spec_dir(model, version)
+    llm_root = llm_spec_dir(model)
     true_positives = false_positives = false_negatives = 0
     rows, agree = [], {"allowed_dest": 0, "named_sources": 0, "amount_cap": 0, "egress_requested": 0}
     compared = missing = 0
@@ -85,12 +85,11 @@ def _format_percentage(value):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
-    parser.add_argument("--version", choices=["v1", "v3"], default="v1")
     args = parser.parse_args()
-    model_dir = llm_spec_dir(args.model, args.version)
+    model_dir = llm_spec_dir(args.model)
     if not model_dir.exists():
         raise SystemExit(f"no LLM specs for {args.model}; run scripts/taskspec/extract_llm_specs.py first")
-    result = compare(args.model, args.version)
+    result = compare(args.model)
     (model_dir / "comparison.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     ops = result["requested_ops"]
     lines = [

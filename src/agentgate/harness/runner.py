@@ -20,7 +20,7 @@ from agentgate.harness import CONTRACT_VERSION, registry
 from agentgate.harness.bridge import GateToolBridge
 from agentgate.harness.events import EventSink, capture_loggers
 from agentgate.harness.models import ModelSpec, model_from_dict
-from agentgate.harness.scenario import ScenarioConfig, Session
+from agentgate.harness.session import ScenarioConfig, Session
 
 
 @dataclass
@@ -89,7 +89,7 @@ def run_scenario(request: RunRequest, sink: EventSink | None = None, session: Se
             result = adapter.run(session.prompt, bridge, request.model, request.options, max_steps, sink)
         error = result.error
     except Exception as exc:  # keep the record; the run counts as failed
-        from agentgate.agents.frameworks.base import FrameworkResult
+        from agentgate.adapters.base import FrameworkResult
         result = FrameworkResult(final_output=None, error=f"{type(exc).__name__}: {exc}")
         error = f"{result.error}\n{traceback.format_exc()[-1500:]}"
     scored = session.finish(result.final_output)

@@ -19,7 +19,7 @@ def _available():
 
 @pytest.mark.parametrize("framework", _available())
 @pytest.mark.parametrize("pair", PAIRS, ids=lambda p: ":".join(x or "none" for x in p))
-@pytest.mark.parametrize("condition", ["C0", "C1"])
+@pytest.mark.parametrize("condition", ["no_gate", "gate_static_rules"])
 def test_framework_conformance(framework, pair, condition):
     result = run_case(framework, pair, condition)
     assert result["ok"], result["problems"]
@@ -30,7 +30,7 @@ def test_third_party_adapter_conforms(monkeypatch):
     monkeypatch.setattr(registry, "BUILTIN", {**registry.BUILTIN,
                                               "dummy": "tests.frameworks.dummy_adapter:DummyAdapter"})
     try:
-        result = run_case("dummy", PAIRS[0], "C1")
+        result = run_case("dummy", PAIRS[0], "gate_static_rules")
         assert result["ok"], result["problems"]
     finally:
         registry.reset()

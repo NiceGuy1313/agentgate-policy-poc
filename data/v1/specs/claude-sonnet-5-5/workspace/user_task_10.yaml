@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- tool:get_day_calendar_events
-allowed_dest: []
-egress_requested: false
-notes: 'Read-only query: count today''s calendar appointments. May need get_current_day
-  to determine today''s date, then get_day_calendar_events. No state-changing or outbound
-  operations requested.'
-status: llm

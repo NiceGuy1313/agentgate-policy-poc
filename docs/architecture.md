@@ -7,7 +7,7 @@
 - 에이전트의 모든 툴 호출을 **실행 직전에** 결정론 규칙 P1–P9로 검사한다.
 - 핵심 질문: 이 호출의 대상·내용이 **사용자 요청**에서 왔는가, **툴 응답**(공격자가 글을 심을 수 있는 곳)에서 왔는가.
 - 판정: `ALLOW`(실행) · `ESCALATE`(애매함, 설정에 따라 처리) · `BLOCK`(실행 안 함).
-- 정책 코드([`src/agentgate/gate/`](../src/agentgate/gate/), `v*/policies.py`)에는 LLM·네트워크 호출이 없다. LLM은 TaskSpec 추출과 C4의 ESCALATE 판정에만 쓴다.
+- 정책 코드([`src/agentgate/core/`](../src/agentgate/core/), `v*/policies.py`)에는 LLM·네트워크 호출이 없다. LLM은 TaskSpec 추출과 C4의 ESCALATE 판정에만 쓴다.
 - AgentDojo 소스는 수정하지 않는다. `FunctionsRuntime` 서브클래스를 끼워 넣는다.
 - 공통 Gate(`gate/`) 위에 버전 패키지 `v1/`·`v3/`가 정책·판정 LLM·런타임 확장을 따로 둔다(9절). v2는 `archive/v2.bak/`에 보관한다.
 
@@ -26,7 +26,7 @@ flowchart LR
     B --> L
 ```
 
-호출 한 건의 처리 순서 ([`runtime.py`](../src/agentgate/gate/runtime.py) `GatedRuntime.run_function`):
+호출 한 건의 처리 순서 ([`runtime.py`](../src/agentgate/core/runtime.py) `GatedRuntime.run_function`):
 
 1. `PolicyEngine.decide`가 해당 툴에 걸리는 정책만 평가한다.
 2. `combine_verdicts`가 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 판정을 고른다.
@@ -39,7 +39,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 
 ## 3. 판정 입력
 
-### TaskSpec — 사용자가 요청한 것 ([`task_spec.py`](../src/agentgate/gate/task_spec.py))
+### TaskSpec — 사용자가 요청한 것 ([`task_spec.py`](../src/agentgate/core/task_spec.py))
 
 | 필드 | 뜻 |
 |---|---|
@@ -52,7 +52,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 - oracle spec: 사람이 프롬프트만 보고 작성 ([`data/agentdojo/oracle_specs/`](../data/agentdojo/oracle_specs/)).
 - LLM spec: [`llm/taskspec_extractor.py`](../src/agentgate/llm/taskspec_extractor.py). 입력은 프롬프트와 툴 목록뿐이다.
 
-### 출처(origin) 판정 ([`provenance.py`](../src/agentgate/gate/provenance.py) `ValueIndex.origin_of`)
+### 출처(origin) 판정 ([`provenance.py`](../src/agentgate/core/provenance.py) `ValueIndex.origin_of`)
 
 값이 나타난 곳 중 **가장 신뢰도 높은 범주**로 판정한다.
 
@@ -64,7 +64,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 | `OTHER_TOOL` | 지목하지 않은 툴 응답에만 있음 | 불신 → BLOCK |
 | `UNSEEN` | 어디에도 없음 | 불신 → BLOCK |
 
-- 비교는 정규화(이메일·URL·IBAN 규칙, [`normalization.py`](../src/agentgate/gate/normalization.py)) 후 포함 여부로 한다.
+- 비교는 정규화(이메일·URL·IBAN 규칙, [`normalization.py`](../src/agentgate/core/normalization.py)) 후 포함 여부로 한다.
 - 지목 자료 판정 규칙과 신뢰 툴 목록은 [`config/agentdojo/named_source_rules.yaml`](../config/agentdojo/named_source_rules.yaml)에 있다. 신뢰 툴은 인젝션 벡터가 없어야 하며 [`tests/test_config_consistency.py`](../tests/test_config_consistency.py)가 확인한다.
 - P2·P3의 반출 판정은 외부로 나가는 내용과 민감 읽기 응답이 16자 이상 겹치는지 k-gram으로 본다. 프롬프트 문장과의 겹침은 제외한다.
 
@@ -85,7 +85,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 | P1 대상 | 외부 목적지만 | slack 내부 DM·채널 메시지의 위험은 내용 전파(P7)로 다룬다 |
 | P4 금액 | 상한·지목 자료 모두 없으면 프롬프트에 없는 금액은 ESCALATE | 사양에 없던 경우의 보수적 처리 |
 | executed-only security | 실행된 호출만으로 공격 성공을 다시 판정 | AgentDojo의 일부 판정은 차단된 시도도 성공으로 센다 |
-| 참조 공격 궤적 | 정답이 없는 workspace injection 6–13은 직접 작성 ([`evaluation/attack_trajectories.py`](../src/agentgate/agentdojo/attack_trajectories.py)) | 재생 평가에 공격 호출이 필요하다 |
+| 참조 공격 궤적 | 정답이 없는 workspace injection 6–13은 직접 작성 ([`evaluation/attack_trajectories.py`](../src/agentgate/scenarios/attack_trajectories.py)) | 재생 평가에 공격 호출이 필요하다 |
 | LLM 호출 설정 | `temperature` 대신 `output_config.effort`, 재현성은 디스크 캐시로 확보 | 현행 Claude 모델은 sampling 파라미터를 거부한다 |
 | 평가 대상 에이전트 | 서버 측 fallback 미사용, 거부 횟수 기록 | 다른 모델이 대신 답하면 ASR이 섞인다 |
 
@@ -98,7 +98,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 | 실제 에이전트 실행 (RQ2) | [`scripts/evaluation/live_evaluation.py`](../scripts/evaluation/live_evaluation.py) | 조건 C0–C4별 ASR·Utility |
 | 집행 무결성 | [`scripts/analysis/check_enforcement.py`](../scripts/analysis/check_enforcement.py) | 차단된 호출이 실행·환경 변경을 일으키지 않았는지 |
 | 판정 LLM 단독 | [`scripts/evaluation/judge_evaluation.py`](../scripts/evaluation/judge_evaluation.py) | ESCALATE 호출에 대한 A/B/C 정확도 |
-| ToolSpec 추출 품질 (v3) | [`scripts/v3/toolspec_evaluation.py`](../scripts/v3/toolspec_evaluation.py) | 정상·주입 툴 응답에서 '독자에게 하는 요청'을 뽑는 정확도 |
+| ToolSpec 추출 품질 (v3) | [`scripts/analysis/toolspec_evaluation.py`](../scripts/analysis/toolspec_evaluation.py) | 정상·주입 툴 응답에서 '독자에게 하는 요청'을 뽑는 정확도 |
 | 정상 작업 손실 분해 (v3) | [`scripts/analysis/analyze_live_utility.py`](../scripts/analysis/analyze_live_utility.py) | 같은 짝의 C0와 비교해 실패가 차단 때문인지, 차단 원인은 무엇인지 |
 
 ## 7. 한계
@@ -110,7 +110,7 @@ TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail c
 
 ## 8. 외부 에이전트 프레임워크 연결
 
-AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents, mini-swe-agent, browser-use 등)가 같은 시나리오를 수행할 때에도 모든 툴 호출이 같은 `GatedRuntime`을 지나게 한다. 구현은 [`src/agentgate/harness/`](../src/agentgate/harness/)와 [`src/agentgate/agents/frameworks/`](../src/agentgate/agents/frameworks/)에 있다.
+AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents, mini-swe-agent, browser-use 등)가 같은 시나리오를 수행할 때에도 모든 툴 호출이 같은 `GatedRuntime`을 지나게 한다. 구현은 [`src/agentgate/harness/`](../src/agentgate/harness/)와 [`src/agentgate/adapters/`](../src/agentgate/adapters/)에 있다.
 
 ```
 대시보드 / live_evaluation.py --framework
@@ -162,13 +162,13 @@ src/agentgate/
   harness/     외부 프레임워크 연결(Wrapper 규약 v1, 대시보드 서비스)
   llm/         API client, TaskSpec 추출기(버전별 프롬프트), 판정 LLM 공용 입출력
   v1/          P1–P9, 판정 LLM v1(C4)
-  v3/          정책 엔진 없음: ToolSpec 추출기, 판정 LLM v3, ToolSpecGatedRuntime(effect 호출 → 판정 LLM)
+  v3/          정책 엔진 없음: ToolSpec 추출기, 판정 LLM v3, PolicyGateRuntime(effect 호출 → 판정 LLM)
   conditions.py  실험 조건 C0–C10b → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
 ```
 
 설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v3}/`, `prompts/{v1,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
 
 - 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
-- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없다. `config/v3/rulebook.yaml`(룰북)을 방식 A는 판정 LLM이 읽고, 방식 B는 `src/agentgate/v3/rules.py`가 정적 코드로 검사한다(인자 역할: `config/v3/tool_args.yaml`).
-- TaskSpec 추출 프롬프트는 v1이 `prompts/v1/extract_taskspec.md`, v3가 `prompts/v3/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
+- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없다. `config/rulebook.yaml`(룰북)을 방식 A는 판정 LLM이 읽고, 방식 B는 `src/agentgate/policy_gate/rule_checker.py`가 정적 코드로 검사한다(인자 역할: `config/tool_args.yaml`).
+- TaskSpec 추출 프롬프트는 v1이 `prompts/v1/extract_taskspec.md`, v3가 `prompts/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
 - 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.

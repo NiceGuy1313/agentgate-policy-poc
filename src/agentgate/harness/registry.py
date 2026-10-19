@@ -22,10 +22,10 @@ import yaml
 from agentgate.config import CONFIG_DIR
 
 BUILTIN = {
-    "native": "agentgate.agents.frameworks.native:NativeAdapter",
-    "smolagents": "agentgate.agents.frameworks.smolagents_adapter:SmolagentsAdapter",
-    "mini-swe-agent": "agentgate.agents.frameworks.mini_swe_agent_adapter:MiniSweAgentAdapter",
-    "browser-use": "agentgate.agents.frameworks.browser_use_adapter:BrowserUseAdapter",
+    "native": "agentgate.adapters.native:NativeAdapter",
+    "smolagents": "agentgate.adapters.smolagents_adapter:SmolagentsAdapter",
+    "mini-swe-agent": "agentgate.adapters.mini_swe_agent_adapter:MiniSweAgentAdapter",
+    "browser-use": "agentgate.adapters.browser_use_adapter:BrowserUseAdapter",
 }
 ENTRY_POINT_GROUP = "agentgate.frameworks"
 
@@ -64,7 +64,7 @@ def get(name: str):
     """Adapter instance for `name`."""
     item = entry(name)
     if "contract" in item:
-        from agentgate.agents.frameworks.contract import ContractAdapter
+        from agentgate.adapters.contract import ContractAdapter
         adapter = ContractAdapter(name, item["contract"])
     else:
         adapter = _load(item["adapter"])()

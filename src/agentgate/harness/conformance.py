@@ -1,6 +1,6 @@
 """Conformance kit: does a framework adapter / Wrapper put every tool call through the gate correctly?
 
-LLM-free. Each framework is driven by the scripted fake LLM (`fake_llm.FakeLLMServer`) through its real model
+LLM-free (the ToolSpec extractor is replaced by an empty one, `offline_toolspec`). Each framework is driven by the scripted fake LLM (`fake_llm.FakeLLMServer`) through its real model
 path; the reference is the native AgentDojo pipeline with `ScriptedAgent` (`run_live_task`). For each pair and
 condition the check requires:
   - same gate trace as the reference (tool, effective verdict, blocked) and same utility / security;
@@ -18,17 +18,33 @@ import argparse
 import json
 import shlex
 import sys
+from contextlib import contextmanager
+from unittest import mock
 
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink
 from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
 from agentgate.harness.models import ModelSpec
 from agentgate.harness.runner import RunRequest, run_scenario
-from agentgate.harness.scenario import CONDITIONS, ScenarioConfig, Session
+from agentgate.harness.session import CONDITIONS, ScenarioConfig, Session
+from agentgate.policy_gate.toolspec import ToolSpecResult
 
 DEFAULT_PAIRS = [("banking", "user_task_0", "injection_task_0"), ("banking", "user_task_3", "injection_task_4"),
                  ("slack", "user_task_1", "injection_task_1"), ("banking", "user_task_2", None)]
-DEFAULT_CONDITIONS = ("C0", "C1")
+DEFAULT_CONDITIONS = ("no_gate", "gate_static_rules")
+
+
+class OfflineToolSpec:
+    """ToolSpec extractor stand-in: every tool output gets an empty ToolSpec (no LLM call)."""
+
+    def extract(self, tool: str, args: dict, output_text: str) -> ToolSpecResult:
+        return ToolSpecResult({"records": [], "requests": []}, "offline", True)
+
+
+@contextmanager
+def offline_toolspec():
+    with mock.patch("agentgate.policy_gate.assembly.toolspec_extractor", lambda suite_name: OfflineToolSpec()):
+        yield
 
 
 def _signature(trace: list[dict]) -> list[tuple]:
@@ -36,8 +52,8 @@ def _signature(trace: list[dict]) -> list[tuple]:
 
 
 def reference(pair, condition: str) -> dict:
-    from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline, run_live_task
     from agentgate.agents.scripted_agent import ScriptedAgent
+    from agentgate.scenarios.pipeline import RecordingPipeline, build_pipeline, run_live_task
 
     session = Session(ScenarioConfig(*pair, condition=condition, attack_model_name="GPT-4"))
     llm = ScriptedAgent(pair[0], session.user_task, session.injection_task)
@@ -62,6 +78,11 @@ def _event_order_issues(events, internal_tools: frozenset[str] = frozenset()) ->
 
 
 def run_case(framework: str, pair, condition: str, options: dict | None = None) -> dict:
+    with offline_toolspec():
+        return _run_case(framework, pair, condition, options)
+
+
+def _run_case(framework: str, pair, condition: str, options: dict | None = None) -> dict:
     sys.path.insert(0, str(registry.CONFIG_DIR.parent / "scripts" / "analysis"))
     from check_enforcement import check_run
 

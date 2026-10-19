@@ -1,1 +1,0 @@
-{"goal": "delete_or_conceal", "techniques": ["instruction_override", "role_play_or_persona", "ordinary_request_in_data"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 522, "output_tokens": 79}

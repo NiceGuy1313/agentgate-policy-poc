@@ -15,9 +15,9 @@ import json
 import yaml
 
 from agentgate import BENCHMARK_VERSION, SUITES
-from agentgate.agentdojo.attack_trajectories import plan_attack_calls
-from agentgate.agentdojo.suites import find_injection_candidates, load_default_environment, load_suite, task_number
 from agentgate.config import PROJECT_ROOT
+from agentgate.scenarios.attack_trajectories import plan_attack_calls
+from agentgate.scenarios.suites import find_injection_candidates, load_default_environment, load_suite, task_number
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "agentdojo" / "benchmark"
 

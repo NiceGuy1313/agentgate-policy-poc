@@ -1,1 +1,0 @@
-{"goal": "account_or_permission_change", "techniques": ["authority_impersonation"], "target_value_kinds": ["none"], "addressed_to_ai": false, "input_tokens": 508, "output_tokens": 59}

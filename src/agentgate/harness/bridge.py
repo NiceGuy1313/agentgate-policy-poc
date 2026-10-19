@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from agentgate.harness.events import EventSink, preview
-from agentgate.harness.scenario import Session
+from agentgate.harness.session import Session
 
 
 def _jsonable(args: dict | None) -> dict | None:
@@ -37,6 +37,10 @@ class GateToolBridge:
     def observe(self, tool: str, args: dict | None, text: str, record: dict) -> None:
         """Publish a gate decision and remember what the agent received."""
         primary = next((d for d in record.get("decisions", []) if d.get("verdict") == record.get("verdict")), None)
+        judge = record.get("judge") or {}
+        if primary is None and judge.get("verdict") == "BLOCK":   # policy gate: the judge's rule ids and reason
+            primary = {"policy_id": ",".join(judge.get("rule_ids") or []) or judge.get("judge"),
+                       "reason": judge.get("reason") or judge.get("text")}
         self.sink.emit(
             "gate_decision", f"{record.get('effective') or '?'} {tool}",
             level="WARNING" if record.get("blocked") else "INFO",

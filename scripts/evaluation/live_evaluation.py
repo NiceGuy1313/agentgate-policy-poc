@@ -1,7 +1,7 @@
 """live 평가(RQ2): 한 실행 안에서 여러 조건으로 에이전트를 AgentDojo에 돌리고 전 과정을 기록한다.
 
-조건(`agentgate.conditions`): C0·C3 기준선, C1·C2·C4 v1, C10a·C10b v3. 버전을 비교하려면 같은 실행에
-기준선 C0을 함께 넣는다(같은 짝·공격·모델·시점). 다른 실행의 C0과 섞어 비교하지 않는다.
+조건(`agentgate.experiment.conditions`): no_gate 기준선, gate_llm_judge, gate_static_rules. 조건을 비교하려면 같은
+실행에 기준선 no_gate를 함께 넣는다(같은 짝·공격·모델·시점). 다른 실행의 no_gate와 섞어 비교하지 않는다.
 
 규모
   기본(--pairs, --pilot, --sample 없음): AgentDojo v1.2.2 전체 = 사용자 작업 97개(공격 없음) + 공격 쌍 949개
@@ -13,13 +13,12 @@
   --agent scripted  결정론적 ScriptedAgent (키 불필요) - 모델 행동이 아니라 통합을 확인한다
 
 프레임워크 (--framework, 기본값 native = AgentDojo pipeline)
-  agentgate.harness.registry에 등록된 이름. 프레임워크 경로는 C0·C1·C2·C4만 지원한다. C3는 native만이다.
+  agentgate.harness.registry에 등록된 이름.
 
 사용법
-  python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/v1/live/scripted
-  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C1 C4 --out results/v1/live/<run>
-  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C10a C10b --attack important_instructions \
-      --out results/v3/live/<run>
+  python scripts/evaluation/live_evaluation.py --agent scripted --conditions no_gate gate_static_rules --out results/live/scripted
+  python scripts/evaluation/live_evaluation.py --agent llm --conditions no_gate gate_llm_judge gate_static_rules \
+      --attack important_instructions --out results/live/<run>
 완료된 (condition, suite, user, injection) run은 건너뛰므로 중단된 실행을 이어서 할 수 있다.
 """
 
@@ -39,31 +38,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from agentgate import SUITES
-from agentgate.agentdojo.pipeline import RecordingPipeline, build_pipeline, run_live_task
-from agentgate.agentdojo.replay import REPLAY_PIPELINE_NAME, get_cached_attack
-from agentgate.agentdojo.suites import load_suite, task_number
 from agentgate.agents.factory import UsageMeter, make_llm, spec_provider
 from agentgate.agents.scripted_agent import ScriptedAgent
-from agentgate.conditions import CONDITIONS, get_condition, make_runtime
 from agentgate.config import load_dotenv
-from agentgate.gate.task_spec import taskspec_version
+from agentgate.experiment.conditions import CONDITIONS, get_condition, make_runtime
+from agentgate.scenarios.pipeline import RecordingPipeline, build_pipeline, run_live_task
+from agentgate.scenarios.replay import REPLAY_PIPELINE_NAME, get_cached_attack
+from agentgate.scenarios.suites import load_suite, task_number
 
 PILOT = {"suites": ["banking"], "user_tasks": ["user_task_0", "user_task_2", "user_task_3", "user_task_13"],
          "injection_tasks": ["injection_task_0", "injection_task_4", "injection_task_7"]}
-
-
-def _judge_stats(runtime) -> dict:
-    """Judge totals from the v3 judge records in the trace (same keys as the v1 EscalationJudge.stats)."""
-    judgements = [e.decision["judge"] for e in runtime.trace if (e.decision or {}).get("judge")]
-    return {"judge": judgements[0].get("judge") if judgements else None, "calls": len(judgements),
-            "human": sum(j["final"] == "HUMAN" for j in judgements),
-            "rule4": sum(bool(j.get("rule4")) for j in judgements), "p0_human": sum(bool(j.get("by")) for j in judgements),
-            "api_calls": sum(1 for j in judgements if j.get("answer") and not j.get("cached")),
-            "input_tokens": sum(j.get("input_tokens", 0) for j in judgements),
-            "output_tokens": sum(j.get("output_tokens", 0) for j in judgements),
-            "cache_read_input_tokens": sum(j.get("cache_read_input_tokens", 0) for j in judgements),
-            "cache_creation_input_tokens": sum(j.get("cache_creation_input_tokens", 0) for j in judgements),
-            "latency_ms": round(sum(j.get("latency_ms", 0.0) for j in judgements), 1)}
 
 
 def run_framework_one(job: dict, output_path: Path) -> str:
@@ -71,7 +55,7 @@ def run_framework_one(job: dict, output_path: Path) -> str:
     from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
     from agentgate.harness.models import ModelSpec
     from agentgate.harness.runner import RunRequest, execute, run_scenario
-    from agentgate.harness.scenario import ScenarioConfig, Session
+    from agentgate.harness.session import ScenarioConfig, Session
 
     config = ScenarioConfig(job["suite"], job["user_task"], job["injection_task"], condition=job["cond"],
                             spec=job["spec"], attack=job["attack"], attack_model_name=job["attack_model_name"])
@@ -129,13 +113,12 @@ def run_one(job: dict) -> str:
         llm = make_llm(meter)
         attack_model = job["attack_model_name"]
     cond = get_condition(condition)
-    # gated conditions use their version's TaskSpec; audit baselines (C0, C3) use the run's TaskSpec version, so
-    # every condition of a run sees the same live-extracted spec
-    provider = spec_provider(job["spec"], suite_name, user_task_id, cond.gate if cond.gated else job["spec_version"])
+    # every condition of a run (the no_gate baseline included) sees the same live-extracted spec
+    provider = spec_provider(job["spec"], suite_name, user_task_id)
     stats: dict = {}
     runtime = make_runtime(cond, suite.tools, suite_name=suite_name, prompt=user_task.PROMPT, stats=stats,
                            record_env_hash=True)
-    pipeline = build_pipeline(llm, provider, defense=job["c3_defense"] if cond.defense else None)
+    pipeline = build_pipeline(llm, provider)
     recording_pipeline = RecordingPipeline(pipeline)
     injections = {}
     if injection_task is not None:
@@ -152,16 +135,14 @@ def run_one(job: dict) -> str:
         "condition": condition, "suite": suite_name, "user_task": user_task_id, "injection_task": injection_task_id,
         "agent": job["agent"], "agent_model": getattr(llm, "name", None),
         "attack": job["attack"] if injection_task else None,
-        "version": cond.version, "gate": cond.gate,
         "spec_source": job["spec"], "spec_meta": runtime.spec_meta,
         "spec": runtime.spec.model_dump() if runtime.spec is not None else None,
         "error": error, **result,
         "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
-        "judge": (stats["judge_object"].stats if "judge_object" in stats
-                  else _judge_stats(runtime) if cond.judge in ("v3", "rules") else None),
-        "toolspec": stats.get("toolspec") if cond.gate == "v3" else None,
+        "judge": runtime.judge_stats() if cond.judge else None,
+        "toolspec": stats.get("toolspec") if cond.judge else None,
         "trace": runtime.trace_records(),
     }
     if _is_quota_error(error):
@@ -175,22 +156,17 @@ def run_one(job: dict) -> str:
 
 
 def _extract_specs_once(jobs: list[dict]) -> None:
-    """One extraction per (suite, user task, TaskSpec version) before any run, so concurrent runs of the same task
-    never extract it separately (they all read the same cached spec)."""
-    from agentgate.agentdojo.suites import describe_tools
+    """One extraction per (suite, user task) before any run, so concurrent runs of the same task never extract it
+    separately (they all read the same cached spec)."""
     from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
-    keys = sorted({(j["suite"], j["user_task"], taskspec_version(get_condition(j["cond"]).gate
-                                                                 if get_condition(j["cond"]).gated else j["spec_version"]))
-                   for j in jobs if j.get("framework", "native") == "native"})
-    results = []
-    for version in sorted({k[2] for k in keys}):
-        items = []
-        for suite_name, user_task_id, _ in [k for k in keys if k[2] == version]:
-            suite = load_suite(suite_name)
-            items.append((suite.get_user_task_by_id(user_task_id).PROMPT,
-                          [ToolInfo(**tool) for tool in describe_tools(suite)]))
-        # one Message Batches request for every cache miss (anthropic): 50% price, prompt-cached tool list
-        results += TaskSpecExtractor(version=version).extract_many(items)
+    from agentgate.scenarios.suites import describe_tools
+    keys = sorted({(j["suite"], j["user_task"]) for j in jobs if j.get("framework", "native") == "native"})
+    items = []
+    for suite_name, user_task_id in keys:
+        suite = load_suite(suite_name)
+        items.append((suite.get_user_task_by_id(user_task_id).PROMPT, [ToolInfo(**tool) for tool in describe_tools(suite)]))
+    # one Message Batches request for every cache miss (anthropic): 50% price, prompt-cached tool list
+    results = TaskSpecExtractor().extract_many(items)
     print(f"TaskSpec: {len(keys)} extracted ({sum(not r.cached for r in results)} live, "
           f"{sum(r.spec is None for r in results)} failed) -> {os.environ['AGENTGATE_TASKSPEC_CACHE_DIR']}")
 
@@ -199,14 +175,13 @@ def main():
     load_dotenv()
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent", choices=["llm", "scripted"], default="llm")
-    parser.add_argument("--conditions", nargs="+", default=["C0", "C1"], choices=list(CONDITIONS))
+    parser.add_argument("--conditions", nargs="+", default=["no_gate", "gate_static_rules"], choices=list(CONDITIONS))
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--user-tasks", nargs="*", default=None)
     parser.add_argument("--injection-tasks", nargs="*", default=None)
     parser.add_argument("--attack", default="important_instructions")
     parser.add_argument("--attack-model-name", default=None, help="name used for {model} in the attack text")
     parser.add_argument("--spec", choices=["llm", "oracle"], default="llm")
-    parser.add_argument("--c3-defense", default="spotlighting_with_delimiting")
     parser.add_argument("--on-block", choices=["continue", "stop"], default="continue", help="scripted agent only")
     parser.add_argument("--no-benign", action="store_true", help="skip the no-attack (utility) runs")
     parser.add_argument("--pilot", action="store_true", help="banking, 4 user x 3 injection tasks")
@@ -241,8 +216,6 @@ def main():
     conditions = list(args.conditions)
     for condition in conditions:
         get_condition(condition)
-    if args.framework != "native" and not set(args.conditions) <= {"C0", "C1", "C2", "C4"}:
-        parser.error("--framework supports C0 C1 C2 C4 only (C3 is an AgentDojo pipeline defense, C10a·C10b native only)")
     attack_model = args.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
         provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
     framework_fields = {"framework": args.framework, "framework_options": args.framework_options,
@@ -258,7 +231,7 @@ def main():
                 jobs.append({"cond": condition, "suite": suite_name, "user_task": user_task_id,
                              "injection_task": injection_task_id, "agent": args.agent,
                              "spec": args.spec, "attack": args.attack, "attack_model_name": attack_model,
-                             "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out,
+                             "on_block": args.on_block, "out": args.out,
                              **framework_fields})
         args.conditions = []   # skip the suite loop below
     for condition in args.conditions:
@@ -272,16 +245,12 @@ def main():
             for user_task_id in user_task_ids:
                 base = {"cond": condition, "suite": suite_name, "user_task": user_task_id, "agent": args.agent,
                         "spec": args.spec, "attack": args.attack, "attack_model_name": attack_model,
-                        "c3_defense": args.c3_defense, "on_block": args.on_block, "out": args.out,
+                        "on_block": args.on_block, "out": args.out,
                         **framework_fields}
                 if not args.no_benign:
                     jobs.append({**base, "injection_task": None})
                 for injection_task_id in injection_task_ids:
                     jobs.append({**base, "injection_task": injection_task_id})
-    gated_versions = {taskspec_version(get_condition(c).gate) for c in conditions if get_condition(c).gated}
-    spec_version = gated_versions.pop() if len(gated_versions) == 1 else "v1"
-    for job in jobs:
-        job["spec_version"] = spec_version
     if args.spec == "llm":
         _extract_specs_once(jobs)
     # all runs of one user task (every condition, benign and attack) back to back: the judge's prompt-cache prefix

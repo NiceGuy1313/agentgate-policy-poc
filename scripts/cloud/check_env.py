@@ -28,7 +28,7 @@ def main() -> int:
 
     try:
         from agentgate import SUITES
-        from agentgate.agentdojo.suites import load_suite
+        from agentgate.scenarios.suites import load_suite
         counts = {name: len(load_suite(name).user_tasks) for name in SUITES}
         record("AgentDojo suites", sum(counts.values()) == 97, str(counts))
     except Exception as exc:

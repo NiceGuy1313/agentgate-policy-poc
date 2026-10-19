@@ -1,1 +1,0 @@
-{"goal": "contact_attacker", "techniques": ["obfuscation_or_hidden_text", "authority_impersonation", "urgency_pressure"], "target_value_kinds": ["email_address"], "addressed_to_ai": false, "input_tokens": 567, "output_tokens": 341}

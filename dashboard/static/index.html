@@ -240,8 +240,8 @@ header{position:relative}
           <div><label for="attack">공격 문구 방식</label><select id="attack"></select></div>
           <div><label for="spec">TaskSpec 출처</label><select id="spec"><option value="oracle">oracle (정답)</option><option value="llm">LLM 추출</option></select></div>
         </div>
-        <label for="escalate">Gate 판정이 애매할 때 (ESCALATE)</label>
-        <select id="escalate"><option value="C1">차단 (C1)</option><option value="C2">허용 (C2)</option><option value="C4">판정 LLM에 맡김 (C4)</option></select>
+        <label for="escalate">Gate 판정기</label>
+        <select id="escalate"><option value="gate_static_rules">룰북 정적 코드 (gate_static_rules)</option><option value="gate_llm_judge">판정 LLM + 룰북 (gate_llm_judge)</option></select>
         <div id="fw-options"></div>
       </details>
       <button id="run" class="primary" type="submit">실행</button>
@@ -311,7 +311,7 @@ function renderFrameworkOptions() {
     box.append(lab, input);
   }
   [...$('#escalate').options].forEach(o => { o.disabled = !info.conditions.includes(o.value); });
-  if ($('#escalate').selectedOptions[0]?.disabled) $('#escalate').value = 'C1';
+  if ($('#escalate').selectedOptions[0]?.disabled) $('#escalate').value = 'gate_static_rules';
   $('#max_steps').value = info.default_max_steps || 15;
 }
 
@@ -350,7 +350,7 @@ function readRun(gate, label) {
   return {framework: $('#framework').value, options, max_steps: Number($('#max_steps').value),
           model: {provider: $('#provider').value, model: $('#model').value.trim(), ...(baseUrl ? {base_url: baseUrl} : {})},
           scenario: {suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value,
-                     condition: gate ? $('#escalate').value : 'C0', spec: $('#spec').value, attack: $('#attack').value},
+                     condition: gate ? $('#escalate').value : 'no_gate', spec: $('#spec').value, attack: $('#attack').value},
           label};
 }
 
@@ -423,10 +423,10 @@ class Panel {
   setGate(condition) {
     if (!condition || this.gate === condition) return;
     this.gate = condition;
-    const on = ['C1', 'C2', 'C4'].includes(condition);
+    const on = ['gate_llm_judge', 'gate_static_rules'].includes(condition);
     this.root.classList.remove('gate-on', 'gate-off'); this.root.classList.add(on ? 'gate-on' : 'gate-off');
-    const desc = on ? {C1: '정책 위반 호출을 실행 전에 차단 (ESCALATE도 차단)', C2: '정책 위반 호출 차단 (ESCALATE는 허용)', C4: '정책 위반 호출 차단 (ESCALATE는 판정 LLM)'}[condition]
-                    : condition === 'C3' ? 'Gate는 판정만 기록, AgentDojo spotlighting 방어' : 'Gate는 판정만 기록하고 모든 호출을 실행';
+    const desc = on ? {gate_static_rules: 'effect 호출을 룰북 정적 코드로 판정해 실행 전에 차단', gate_llm_judge: 'effect 호출을 판정 LLM(룰북)으로 판정해 실행 전에 차단'}[condition]
+                    : 'Gate는 호출을 기록만 하고 모든 호출을 실행';
     this.banner.replaceChildren(el('b', null, `${on ? 'GATE ON' : 'GATE OFF'} · ${on ? 'Gate 적용' : 'Gate 없음'} (${condition})`), el('span', null, desc));
   }
   show(view) {

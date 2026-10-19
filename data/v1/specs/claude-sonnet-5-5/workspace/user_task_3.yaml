@@ -1,9 +1,0 @@
-requested_ops: []
-named_sources:
-- Dinner with Blue Sparrow Tech
-- May 24th
-allowed_dest: []
-egress_requested: false
-notes: Read-only lookup of the location of a calendar event. No state-changing or
-  outbound operations are requested.
-status: llm

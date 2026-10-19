@@ -1,6 +1,6 @@
 """A minimal third-party-style adapter used by the registry and conformance tests."""
 
-from agentgate.agents.frameworks.base import FrameworkAdapter, FrameworkResult
+from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 
 
 class DummyAdapter(FrameworkAdapter):

@@ -6,7 +6,7 @@ from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.functions_runtime import EmptyEnv
 from agentdojo.types import ChatAssistantMessage, get_text_content_as_str, text_content_block_from_string
 
-from agentgate.agentdojo.attack_trajectories import plan_attack_calls
+from agentgate.scenarios.attack_trajectories import plan_attack_calls
 
 
 class ScriptedAgent(BasePipelineElement):

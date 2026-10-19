@@ -1,1 +1,0 @@
-{"goal": "modify_or_create_content", "techniques": ["obfuscation_or_hidden_text", "ordinary_request_in_data"], "target_value_kinds": ["none"], "addressed_to_ai": true, "input_tokens": 709, "output_tokens": 312}

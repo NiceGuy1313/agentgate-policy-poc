@@ -1,13 +1,13 @@
 """재생 평가(RQ1): AgentDojo 정답(ground truth) 궤적을 한 조건의 Gate로 재생한다. 에이전트 LLM은 없다.
 
 사용법:
-  python scripts/evaluation/replay_evaluation.py --condition C1 --spec oracle --out results/v1/replay/oracle
-  python scripts/evaluation/replay_evaluation.py --condition C10b --spec llm:claude-haiku-5-5 --attack tool_knowledge \\
-      --mode enforce --out results/v3/replay/c7_llmspec_tool_knowledge
+  python scripts/evaluation/replay_evaluation.py --condition gate_static_rules --spec oracle --out results/replay/oracle
+  python scripts/evaluation/replay_evaluation.py --condition gate_static_rules --spec llm:claude-haiku-5-5 \\
+      --attack tool_knowledge --mode enforce --out results/replay/llmspec_tool_knowledge
 
-조건은 `agentgate.conditions`(C1·C2·C4 v1, C10a·C10b v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
-않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C4 --escalate block).
-`--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1은 v1 프롬프트, v3는 v3 프롬프트).
+조건은 `agentgate.experiment.conditions`의 enforce 조건(gate_llm_judge, gate_static_rules)이다. audit 모드는 호출을
+기록만 하고 판정기를 부르지 않는다. `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다.
+`--spec llm:<model>`은 data/cache/specs/<model>/의 저장된 TaskSpec을 읽는다(scripts/taskspec/extract_llm_specs.py).
 
 출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
 """
@@ -24,28 +24,27 @@ import time
 from pathlib import Path
 
 from agentgate import BENCHMARK_VERSION, SUITES
-from agentgate.agentdojo.replay import replay_attack_pair, replay_benign_task
-from agentgate.agentdojo.suites import load_suite
-from agentgate.conditions import CONDITIONS, get_condition, make_runtime
 from agentgate.config import PROJECT_ROOT, load_dotenv
-from agentgate.gate.task_spec import load_task_spec
+from agentgate.core.task_spec import load_task_spec
+from agentgate.experiment.conditions import CONDITIONS, get_condition, make_runtime
+from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
+from agentgate.scenarios.suites import load_suite
 
 
 def _run_job(job):
-    kind, suite, user_task_id, injection_task_id, spec_kind, mode, disabled, attack, condition, escalate = job
-    cond = get_condition(condition)
-    spec = load_task_spec(spec_kind, suite, user_task_id, version=cond.gate)
+    kind, suite, user_task_id, injection_task_id, spec_kind, mode, attack, condition, escalate = job
+    spec = load_task_spec(spec_kind, suite, user_task_id)
     prompt = load_suite(suite).get_user_task_by_id(user_task_id).PROMPT
     factory = functools.partial(make_runtime, condition, suite_name=suite, escalate=escalate)
     started = time.perf_counter()
 
-    def runtime_factory(functions, *, prompt=prompt, spec, mode, disabled):
-        return factory(functions, prompt=prompt, spec=spec, mode=mode, disabled=disabled)
+    def runtime_factory(functions, *, prompt=prompt, spec, mode):
+        return factory(functions, prompt=prompt, spec=spec, mode=mode)
 
     if kind == "benign":
-        run = replay_benign_task(suite, user_task_id, spec, mode, set(disabled), runtime_factory=runtime_factory)
+        run = replay_benign_task(suite, user_task_id, spec, mode, runtime_factory=runtime_factory)
     else:
-        run = replay_attack_pair(suite, user_task_id, injection_task_id, spec, mode, set(disabled), attack,
+        run = replay_attack_pair(suite, user_task_id, injection_task_id, spec, mode, attack,
                                  runtime_factory=runtime_factory)
     run["wall_ms"] = round((time.perf_counter() - started) * 1000, 1)
     run["spec"] = spec_kind
@@ -62,13 +61,13 @@ def _init_worker():
 def main():
     load_dotenv()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--condition", default="C1", choices=[c for c in CONDITIONS if CONDITIONS[c].mode == "enforce"])
+    parser.add_argument("--condition", default="gate_static_rules",
+                        choices=[c for c in CONDITIONS if CONDITIONS[c].mode == "enforce"])
     parser.add_argument("--spec", default="oracle")
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--mode", nargs="*", default=["audit", "enforce"], choices=["audit", "enforce"])
     parser.add_argument("--escalate", default=None, choices=["block", "allow", "judge"],
                         help="override the condition's ESCALATE handling")
-    parser.add_argument("--disable", default="", help="comma separated policy ids, e.g. P1,P2")
     parser.add_argument("--attack", default="important_instructions")
     parser.add_argument("--out", required=True)
     parser.add_argument("--workers", type=int, default=max(1, mp.cpu_count()))
@@ -80,7 +79,6 @@ def main():
     if args.pairs:
         pair_filter = {tuple(line.replace(":", " ").split()[:3]) for line in Path(args.pairs).read_text().splitlines()
                        if line.strip() and not line.startswith("#")}
-    disabled = tuple(p for p in args.disable.split(",") if p)
     output_dir = Path(args.out)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -94,13 +92,13 @@ def main():
         for mode in args.mode:
             for user_task_id in user_task_ids:
                 if pair_filter is None or any(p[:2] == (suite_name, user_task_id) for p in pair_filter):
-                    jobs[mode]["benign"].append(("benign", suite_name, user_task_id, None, args.spec, mode, disabled,
+                    jobs[mode]["benign"].append(("benign", suite_name, user_task_id, None, args.spec, mode,
                                                  args.attack, args.condition, args.escalate))
                 for injection_task_id in injection_task_ids:
                     if pair_filter is not None and (suite_name, user_task_id, injection_task_id) not in pair_filter:
                         continue
                     jobs[mode]["attack"].append(("attack", suite_name, user_task_id, injection_task_id, args.spec,
-                                                 mode, disabled, args.attack, args.condition, args.escalate))
+                                                 mode, args.attack, args.condition, args.escalate))
 
     started = time.time()
     with mp.Pool(args.workers, initializer=_init_worker) as pool:
@@ -115,15 +113,11 @@ def main():
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True).strip()
     except Exception:
         commit = None
-    from agentgate import v1, v3
-    # v1 has a rule engine config; v3 has no engine config, only the rulebook (C10a judge LLM, C10b static checker).
-    policy_config = ({"policy_config_version": v1.load_config()["version"]} if cond.gate == "v1"
-                     else {"policy_config_version": v3.VERSION, "rulebook": f"config/{v3.RULEBOOK_FILE}",
-                        "tool_args": f"config/{v3.TOOL_ARGS_FILE}"})
-    meta = {"benchmark_version": BENCHMARK_VERSION, "condition": args.condition, "version": cond.version,
-            "gate": cond.gate, "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
-            "modes": args.mode, "disabled": list(disabled), "attack": args.attack,
-            **policy_config, "pairs": args.pairs,
+    from agentgate.policy_gate import RULEBOOK_FILE, TOOL_ARGS_FILE
+    meta = {"benchmark_version": BENCHMARK_VERSION, "condition": args.condition, "judge": cond.judge,
+            "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
+            "modes": args.mode, "attack": args.attack, "rulebook": f"config/{RULEBOOK_FILE}",
+            "tool_args": f"config/{TOOL_ARGS_FILE}", "pairs": args.pairs,
             "git_commit": commit, "python": platform.python_version(), "elapsed_s": round(time.time() - started, 1)}
     (output_dir / "meta.json").write_text(json.dumps(meta, indent=1))
 

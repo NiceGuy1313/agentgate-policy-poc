@@ -9,11 +9,11 @@ from __future__ import annotations
 import os
 import time
 
-from agentgate.agentdojo.suites import describe_tools, load_suite
 from agentgate.agents.ollama_agent import OllamaAgentLLM
-from agentgate.gate.task_spec import TaskSpec, load_task_spec, taskspec_version
+from agentgate.core.task_spec import TaskSpec, load_task_spec
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
+from agentgate.scenarios.suites import describe_tools, load_suite
 
 
 class UsageMeter:
@@ -73,8 +73,8 @@ def make_llm(meter: UsageMeter):
     return llm
 
 
-def spec_provider(kind: str, suite_name: str, user_task_id: str, version: str = "v1"):
-    """kind oracle | llm. `version` is the gate version; it picks the TaskSpec extraction prompt (v1: v1, v3: v3)."""
+def spec_provider(kind: str, suite_name: str, user_task_id: str):
+    """kind oracle (data/agentdojo/oracle_specs) | llm (TaskSpecExtractor, prompts/extract_taskspec.md)."""
     def oracle(prompt):
         return (load_task_spec("oracle", suite_name, user_task_id),
                 {"source": "oracle", "cached": True, "latency_ms": 0.0})
@@ -84,7 +84,7 @@ def spec_provider(kind: str, suite_name: str, user_task_id: str, version: str = 
 
     def llm(prompt):
         tools = [ToolInfo(**tool) for tool in describe_tools(load_suite(suite_name))]
-        result = TaskSpecExtractor(version=taskspec_version(version)).extract(prompt, tools)
+        result = TaskSpecExtractor().extract(prompt, tools)
         meta = {"source": f"llm:{result.model}", "cached": result.cached,
                 "latency_ms": 0.0 if result.cached else result.latency_ms,
                 "input_tokens": 0 if result.cached else result.input_tokens,

@@ -29,15 +29,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agentgate import SUITES
-from agentgate.agentdojo.suites import load_suite, task_number
 from agentgate.config import load_dotenv
+from agentgate.experiment.conditions import CONDITIONS
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink
 from agentgate.harness.models import PROVIDERS, ModelSpec, model_from_dict
 from agentgate.harness.runner import RunRequest, execute, run_scenario
-from agentgate.harness.scenario import ScenarioConfig, Session, default_attack_model_name
 from agentgate.harness.service import router as contract_router
 from agentgate.harness.service import set_service_url, store
+from agentgate.harness.session import ScenarioConfig, Session, default_attack_model_name
+from agentgate.scenarios.suites import load_suite, task_number
 
 APP_DIR = Path(__file__).resolve().parent
 RUNS_DIR = APP_DIR / "runs"
@@ -129,9 +130,7 @@ def catalog() -> dict:
             "injection_tasks": [{"id": t, "goal": suite.injection_tasks[t].GOAL}
                                 for t in sorted(suite.injection_tasks, key=task_number)]}
     return {"frameworks": registry.describe_all(), "suites": suites, "attacks": ATTACKS,
-            "conditions": {"C0": "방어 없음 (audit, 판정만 기록)", "C1": "Gate enforce · ESCALATE→차단",
-                           "C2": "Gate enforce · ESCALATE→허용", "C3": "AgentDojo spotlighting (native만)",
-                           "C4": "Gate enforce · ESCALATE→판정 LLM"},
+            "conditions": {name: cond.description for name, cond in CONDITIONS.items()},
             "providers": list(PROVIDERS), "model_presets": MODEL_PRESETS, "max_active": MAX_ACTIVE}
 
 
@@ -161,8 +160,8 @@ def status() -> dict:
 def scenario(suite: str, user_task: str, injection_task: str | None = None,
              attack: str = "important_instructions", attack_model_name: str = "AI assistant") -> dict:
     """Preview: user prompt, injection GOAL and the injected texts, oracle TaskSpec."""
-    from agentgate.agentdojo.replay import REPLAY_PIPELINE_NAME, get_cached_attack
-    from agentgate.gate.task_spec import load_task_spec
+    from agentgate.core.task_spec import load_task_spec
+    from agentgate.scenarios.replay import REPLAY_PIPELINE_NAME, get_cached_attack
     suite_obj = load_suite(suite)
     task = suite_obj.get_user_task_by_id(user_task)
     out: dict[str, Any] = {"prompt": task.PROMPT}
