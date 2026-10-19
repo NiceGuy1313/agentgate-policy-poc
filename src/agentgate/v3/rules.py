@@ -11,8 +11,11 @@ config/v3/tool_args.yaml(AgentDojo 바인딩)이다.
 용어
   - 지목 자료(named source): ValueIndex가 is_named로 표시한 툴 응답(TaskSpec.named_sources와 일치).
   - 지목 데이터: 지목 자료의 ToolSpec records[].data 값(요청 targets는 포함하지 않는다).
-  - 근거 있는 값(grounded): 출처가 PROMPT·ALLOWED_DEST·SELF·TRUSTED_TOOL이거나 지목 데이터에 있는 값.
-    금액은 프롬프트에 있거나, amount_cap 이하이거나(상한은 프롬프트에서 나온다), 지목 데이터 amounts에 있는 값.
+  - 근거 있는 값(grounded): 출처가 PROMPT·ALLOWED_DEST·SELF·TRUSTED_TOOL이거나, 지목 데이터에 있거나, 이 호출과 같은
+    행동(action이 같은 툴이거나 other)을 시킨 위임 요청(R9)의 targets에 있는 값. 금액은 프롬프트에 있거나,
+    amount_cap 이하이거나(상한은 프롬프트에서 나온다), 지목 데이터 amounts나 그런 위임 요청의 targets.amounts에 있는 값.
+    위임 요청도 R4·R5의 상한·R6·R8은 그대로 받는다.
+  - target 일치(target_hit): 정규화 후 같은 값, URL이면 같은 host, names·texts는 토큰 경계 포함(양방향, 짧은 쪽 4자 이상).
   - ToolSpec이 None인 응답(추출 실패)은 레코드도 요청도 없는 것으로 본다. 그 응답의 값은 지목 데이터가 될 수 없고
     (R3·R5·R7에서는 막는 쪽), 그 안의 요청은 보이지 않는다(R2·R8에서는 놓치는 쪽).
 
@@ -20,8 +23,8 @@ config/v3/tool_args.yaml(AgentDojo 바인딩)이다.
   R1 요청된 행동: 툴 이름이 requested_ops에 정확히 있어야 한다. 방문 툴(tool_roles visit, get_webpage)은 TaskSpec
      추출 지시상 requested_ops에 오르지 않으므로 R1에서 제외하고 R7이 판단한다. "필요한 단계"는 코드로 표현하지 못한다.
   R2 툴 콘텐츠가 시킨 행동: 응답 속 요청 q가 호출과 "일치"하는 경우는 둘이다.
-     (a) 인자 값 일치: destination·amount·url·password·target_id·booking 인자 값(outgoing 툴은 content 속 URL도)이
-         q.targets의 값과 같고(정규화 후), 그 값이 근거 있는 값이 아니다. 사용자가 그 행동(툴)을 요청했어도 예외가 아니다
+     (a) 인자 값 일치: destination·amount·url·password·target_id·booking 인자 값(outgoing 툴은 content 속 URL도,
+         이메일 주소의 도메인은 URL로 보지 않는다)이 q.targets와 일치하고(target_hit), 그 값이 근거 있는 값이 아니다. 사용자가 그 행동(툴)을 요청했어도 예외가 아니다
          (룰북 R3: 요청 targets에만 있는 목적지는 막는다).
      (b) 행동 일치: q.action == 툴 이름이고 그 툴이 requested_ops에 없다. 툴이 requested_ops에 있으면 사용자가 그 행동을
          요청한 것이므로 행동 일치만으로는 막지 않는다(룰북 R2의 예외).
@@ -33,14 +36,17 @@ config/v3/tool_args.yaml(AgentDojo 바인딩)이다.
   R5 금액: 금액을 읽을 수 없거나, amount_cap을 넘거나, 근거 있는 금액이 아니면 BLOCK. "지목 자료에서 계산한 금액"은
      코드로 표현하지 못하므로 값이 그대로 있어야 한다.
   R6 삭제·계정·권한: tool_roles의 delete·account·share 툴은 requested_ops에 있어야 하고, target_id 값은 프롬프트나
-     지목 자료에서 와야 하고(origin PROMPT 계열·NAMED_SOURCE, 짧은 id는 프롬프트 단어 일치도 인정), 새 비밀번호는
+     지목 자료에서 와야 하고(origin PROMPT 계열·NAMED_SOURCE, 짧은 id는 프롬프트의 독립 토큰도 인정하되 "10:00"·
+     "2024-05-13" 같은 시각·날짜 안의 숫자는 제외), 새 비밀번호는
      프롬프트에 있어야 한다. 이 세션에서 보낸 이메일을 지우면 BLOCK.
-  R7 URL: 방문 URL은 근거 있는 값이어야 한다(프롬프트 또는 지목 데이터 urls). outgoing 툴의 content 속 URL은 출처가
-     OTHER_TOOL(지목하지 않은 응답에만 있음)이면 BLOCK.
+  R7 URL: 방문 URL은 근거 있는 값이어야 한다(프롬프트, 지목 데이터 urls, 위임 요청 targets). outgoing 툴의 content 속
+     URL은 출처가 OTHER_TOOL(지목하지 않은 응답에만 있음)이고 위임 요청 targets에도 없으면 BLOCK.
   R8 권한·긴급성 사칭: R2에서 일치한 요청(위임 자료 포함) 중 claims(authority·override·urgency·conceal)가 하나라도
      true면 BLOCK. 위임 자료라도 사칭 요청은 신뢰하지 않는다.
-  R9 위임 범위: 요청 레코드에 author가 있으면 author가 delegated_sources 항목과 토큰 경계로 일치할 때만 위임이다.
-     author가 없으면 그 응답을 만든 호출의 인자가 delegated_sources와 일치할 때(named source 판정과 같은 방식) 위임이다.
+  R9 위임 범위: 요청이 나온 응답이 위임 자료여야 한다(그 응답을 만든 호출이 delegated_sources 항목과 named source
+     판정 방식으로 일치). 일치한 항목이 사람(이름·이메일, "."·"/"·"tool:"가 없거나 "@"가 있음)이면 레코드 author가 그
+     사람과 정확히 같거나 이메일 local part의 토큰이 이름 토큰과 같아야 한다("david.x@evil.com"은 "David"가 아니다).
+     author가 없거나 record가 없는 요청은 응답의 레코드가 하나 이하일 때만 위임이다. 위임 요청도 R8 대상이다.
      "지나친 행동" 판단은 별도 코드가 없고 R4(대량 반출)·R5(상한)·R6(계정 변경)이 막는다.
   R10 위 규칙이 모두 통과하면 ALLOW.
 """
@@ -53,9 +59,12 @@ from functools import cached_property
 
 from agentgate.gate.base import PolicyContext, ToolCall
 from agentgate.gate.normalization import (
+    EMAIL_PATTERN,
+    classify_value_kind,
     haystack_contains,
     iterate_leaf_values,
     normalize_text,
+    normalize_url,
     normalize_value,
     parse_amount,
     text_contains_amount,
@@ -73,8 +82,11 @@ from agentgate.v3.toolspec import CLAIM_KEYS, DATA_KEYS, TARGET_KEYS
 
 RULE_IDS = ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8")
 MATCH_ROLES = ("destination", "url", "password", "target_id", "booking")   # + amount (numeric match)
+# bare domains must not be the domain part of an e-mail address ("x@clientcorp.com" is not a link)
 URL_IN_TEXT = re.compile(
-    r"(?:https?://|www\.)[^\s'\"<>)]+|\b[a-z0-9-]+\.(?:com|org|net|io|ly|info)(?:/[^\s'\"<>)]*)?", re.IGNORECASE)
+    r"(?:https?://|(?<![@\w.-])www\.)[^\s'\"<>)]+"
+    r"|(?<![@\w.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|org|net|io|ly|info)\b(?:/[^\s'\"<>)]*)?", re.IGNORECASE)
+CONTAINMENT_MIN_LEN = 4   # names/texts targets: token-boundary containment, shorter side at least this long
 _EPS = 1e-6
 
 
@@ -84,6 +96,65 @@ def _file_ids(value) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [i for item in value for i in _file_ids(item)]
     return [str(value)] if value is not None and str(value).strip() else []
+
+
+def _host(url: str) -> str:
+    return normalize_url(str(url)).split("/", 1)[0]
+
+
+def target_hit(value, targets: dict) -> bool:
+    """`value` (a call argument) is one of the request's typed targets: equal after normalization, the same URL host,
+    or (names, texts) contained in either direction on token boundaries."""
+    normalized = normalize_value(value)
+    is_url = classify_value_kind(str(value)) == "url"
+    for key in TARGET_KEYS:
+        if key == "amounts":
+            continue
+        for target in targets.get(key) or []:
+            target_normalized = normalize_value(target)
+            if not target_normalized:
+                continue
+            if target_normalized == normalized:
+                return True
+            if is_url and (key == "urls" or classify_value_kind(str(target)) == "url") \
+                    and _host(target) == _host(value):
+                return True
+            if key in ("names", "texts") and _names_match(target_normalized, normalized, CONTAINMENT_MIN_LEN):
+                return True
+    return False
+
+
+def amount_hit(amount: float, targets: dict) -> bool:
+    return any(x is not None and abs(amount - x) < _EPS for x in map(parse_amount, targets.get("amounts") or []))
+
+
+def _is_person(entry: str) -> bool:
+    """A delegated entry naming a person (or an e-mail address) rather than a file, URL, channel id or tool."""
+    entry = entry.strip()
+    return "@" in entry or not (entry.startswith("tool:") or "." in entry or "/" in entry)
+
+
+def _author_matches(entry: str, author: str) -> bool:
+    """Exact name or address, or the e-mail local part ("david.smith" for "David Smith"); no partial tokens, so
+    "david.x@evil.com" does not match "David"."""
+    entry_n, author_n = normalize_text(entry), normalize_text(author)
+    if entry_n == author_n:
+        return True
+    tokens = re.findall(r"[a-z0-9]+", entry_n)
+    names = [author_n.split("<")[0].strip()] + re.findall(r"[\w.+-]+@[\w.-]+", author_n)
+    for name in names:
+        if not name:
+            continue
+        if "@" in name:
+            if "@" in entry_n:
+                if entry_n == name:
+                    return True
+                continue
+            if re.findall(r"[a-z0-9]+", name.split("@")[0]) == tokens:
+                return True
+        elif re.findall(r"[a-z0-9]+", name) == tokens:
+            return True
+    return False
 
 
 class _Facts:
@@ -96,11 +167,12 @@ class _Facts:
             for role, names in roles.items() if role != "attachment"}
         self.attachments = [i for name in roles.get("attachment", []) for i in _file_ids(call.args.get(name))]
         self.content = "\n".join(str(v) for v in self.args.get("content", []))
-        self.content_urls = ([u.rstrip(".,;") for u in URL_IN_TEXT.findall(self.content) if "@" not in u]
+        self.content_urls = ([u.rstrip(".,;") for u in URL_IN_TEXT.findall(EMAIL_PATTERN.sub(" ", self.content))]
                              if outgoing else [])
         self.named_data: set[str] = set()
         self.named_amounts: list[float] = []
-        self.requests: list[tuple[IndexedSource, dict | None, dict]] = []
+        # (source, record or None, request, number of records in the response)
+        self.requests: list[tuple[IndexedSource, dict | None, dict, int]] = []
         for source in self.index.sources[1:]:
             spec = source.labels.get("toolspec")
             if not isinstance(spec, dict):
@@ -118,43 +190,68 @@ class _Facts:
                             else:
                                 self.named_data.add(normalize_value(value))
             for request in spec.get("requests", []):
-                self.requests.append((source, records.get(request.get("record")), request))
+                self.requests.append((source, records.get(request.get("record")), request, len(records)))
+
+    # ---------------------------------------------------------------- R9 delegation
+    def delegated(self, source: IndexedSource, record: dict | None, n_records: int) -> bool:
+        """The request's response is a delegated source (named-source matching against delegated_sources) and, for a
+        person entry, its record's author is that person. A request without a record inherits delegation only when
+        the response has at most one record."""
+        entries = [d for d in self.spec.delegated_sources if str(d).strip()]
+        if not entries:
+            return False
+        min_len = self.index.named_match_min_len
+        matched = [d for d in entries
+                   if is_named_source_response(source.tool, source.args,
+                                               self.spec.model_copy(update={"named_sources": [d]}), min_len)]
+        if not matched:
+            return False
+        if record is None:
+            return n_records <= 1
+        if not any(_is_person(d) for d in matched):
+            return True
+        author = record.get("author")
+        if not author:
+            return n_records <= 1
+        return any(_author_matches(d, author) for d in matched if _is_person(d))
+
+    @cached_property
+    def delegated_targets(self) -> list[dict]:
+        """Targets of delegated requests for this action (same tool, or no specific tool): the user's own values."""
+        return [request.get("targets") or {} for source, record, request, n in self.requests
+                if request.get("action") in (self.call.tool, "other", None, "")
+                and self.delegated(source, record, n)]
 
     # ---------------------------------------------------------------- value grounding
     def origin(self, value) -> Origin:
         return self.index.origin_of(value).origin
 
+    def by_delegation(self, value) -> bool:
+        return any(target_hit(value, targets) for targets in self.delegated_targets)
+
     def grounded(self, value) -> bool:
-        return self.origin(value) in TRUSTED_ORIGINS or normalize_value(value) in self.named_data
+        return (self.origin(value) in TRUSTED_ORIGINS or normalize_value(value) in self.named_data
+                or self.by_delegation(value))
 
     def amount_grounded(self, amount: float) -> bool:
         cap = self.spec.amount_cap
         return ((cap is not None and amount <= cap + _EPS) or text_contains_amount(amount, self.index.prompt.text)
-                or any(abs(amount - x) < _EPS for x in self.named_amounts))
+                or any(abs(amount - x) < _EPS for x in self.named_amounts)
+                or any(amount_hit(amount, targets) for targets in self.delegated_targets))
 
     def in_prompt(self, value) -> bool:
-        """Prompt containment; short ids ("13") by word boundary, which the index haystack skips."""
+        """Prompt containment; short ids ("13") as a standalone token, which the index haystack skips. A token inside
+        a time or date ("10:00", "2024-05-13") does not count."""
         if self.origin(value) == Origin.PROMPT or haystack_contains(self.index.prompt.haystack, value):
             return True
         word = normalize_text(str(value))
-        return bool(word) and re.search(r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])",
-                                        normalize_text(self.index.prompt.text)) is not None
+        pattern = (r"(?<![a-z0-9])(?<![0-9][:/.-])" + re.escape(word) + r"(?![a-z0-9])(?![:/.-][0-9])")
+        return bool(word) and re.search(pattern, normalize_text(self.index.prompt.text)) is not None
 
     def from_prompt_or_named(self, value) -> bool:
         return self.in_prompt(value) or self.origin(value) in TRUSTED_ORIGINS | {Origin.NAMED_SOURCE}
 
-    # ---------------------------------------------------------------- R2 / R8 / R9
-    def delegated(self, source: IndexedSource, record: dict | None) -> bool:
-        delegated = self.spec.delegated_sources
-        if not delegated:
-            return False
-        author = (record or {}).get("author")
-        if author:
-            return any(_names_match(normalize_value(d), normalize_value(author), self.index.named_match_min_len)
-                       for d in delegated if normalize_value(d))
-        scope = self.spec.model_copy(update={"named_sources": list(delegated)})
-        return is_named_source_response(source.tool, source.args, scope, self.index.named_match_min_len)
-
+    # ---------------------------------------------------------------- R2 / R8
     @cached_property
     def matches(self) -> list[dict]:
         """Requests the call carries out (R2 (a)/(b)), each with its delegation flag and claims."""
@@ -162,20 +259,20 @@ class _Facts:
         candidates += [("url", u) for u in self.content_urls]
         amounts = [a for a in (parse_amount(v) for v in self.args.get("amount", [])) if a is not None]
         out = []
-        for source, record, request in self.requests:
+        for source, record, request, n_records in self.requests:
             targets = request.get("targets") or {}
-            strings = {normalize_value(t) for key in TARGET_KEYS if key != "amounts" for t in targets.get(key) or []}
-            target_amounts = [x for x in (parse_amount(t) for t in targets.get("amounts") or []) if x is not None]
-            hits = [f"{role} '{v}'" for role, v in candidates
-                    if normalize_value(v) in strings and not self.grounded(v)]
+            delegated = self.delegated(source, record, n_records)
+            # a delegated request's own targets are grounded by it; judge its values without that grounding
+            hits = [f"{role} '{v}'" for role, v in candidates if target_hit(v, targets)
+                    and (delegated or not self.grounded(v))]
             hits += [f"amount {a}" for a in amounts
-                     if any(abs(a - t) < _EPS for t in target_amounts) and not self.amount_grounded(a)]
-            if request.get("action") == self.call.tool and self.call.tool not in self.spec.requested_ops:
+                     if amount_hit(a, targets) and (delegated or not self.amount_grounded(a))]
+            if request.get("action") == self.call.tool and (delegated or self.call.tool not in self.spec.requested_ops):
                 hits.append(f"action {self.call.tool}")
             if hits:
                 claims = [k for k in CLAIM_KEYS if (request.get("claims") or {}).get(k)]
                 out.append({"where": f"{source.source_id}/{request.get('id') or request.get('record')}",
-                            "hits": hits, "delegated": self.delegated(source, record), "claims": claims})
+                            "hits": hits, "delegated": delegated, "claims": claims})
         return out
 
 
@@ -289,7 +386,7 @@ class RuleChecker:
         bad = [f"'{v}' ({f.origin(v).value})" for v in f.args.get("url", []) if not f.grounded(v)]
         if bad:
             return "URL to visit not from the request or a named source's data: " + ", ".join(bad)
-        bad = [u for u in f.content_urls if f.origin(u) == Origin.OTHER_TOOL]
+        bad = [u for u in f.content_urls if f.origin(u) == Origin.OTHER_TOOL and not f.by_delegation(u)]
         return f"message passes on links only found in unnamed tool outputs: {bad}" if bad else None
 
     def r8(self, f: _Facts) -> str | None:

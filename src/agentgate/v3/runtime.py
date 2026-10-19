@@ -25,7 +25,12 @@ class ToolSpecGatedRuntime(GatedRuntime):
         self.trace_label_keys = ("toolspec",) if toolspec is not None else ()
 
     def resolve(self, call: ToolCall, result: EngineResult) -> tuple[Verdict, dict | None]:
-        if call.tool not in self.effect_tools or self.judge is None or self.escalate_action != "judge":
+        if call.tool not in self.effect_tools:
+            return Verdict.ALLOW, None
+        if self.judge is None or self.escalate_action != "judge":
+            if self.mode == "enforce":   # an enforcing v3 Gate without a judge would allow every effect call
+                raise RuntimeError(f"v3 Gate in enforce mode needs escalate_action 'judge' and a judge "
+                                   f"(got {self.escalate_action!r}, judge {'set' if self.judge else 'None'})")
             return Verdict.ALLOW, None
         judgement = self.judge(call, result, self.context)
         return Verdict(judgement["verdict"]), judgement

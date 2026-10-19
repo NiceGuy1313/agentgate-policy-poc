@@ -138,10 +138,29 @@ def resolve_judge_settings(model: str | None = None) -> tuple[str, str, bool | s
     return provider, model, think if provider == "ollama" else None
 
 
+TRUNCATED_STOP_REASONS = {"length", "max_tokens"}   # ollama done_reason / anthropic stop_reason
+
+
+def parse_answer_strict(text: str) -> str | None:
+    """ALLOW or BLOCK when the answer starts with one of them, else None (unparsable)."""
+    match = re.match(r"\s*[*#`_ ]*(ALLOW|BLOCK)\b", (text or "").upper())
+    return match.group(1) if match else None
+
+
 def parse_answer(text: str) -> str:
     """ALLOW only on an explicit ALLOW; anything else (BLOCK, unparsable) blocks."""
-    match = re.match(r"\s*[*#`_ ]*(ALLOW|BLOCK)\b", text.upper())
-    return match.group(1) if match else "BLOCK"
+    return parse_answer_strict(text) or "BLOCK"
+
+
+def unparsed_reason(text: str, stop_reason: str | None) -> str | None:
+    """Why an answer is not a real verdict (it is enforced as BLOCK but never cached), or None."""
+    if not (text or "").strip():
+        return "empty answer"
+    if stop_reason in TRUNCATED_STOP_REASONS:
+        return f"truncated ({stop_reason})"
+    if parse_answer_strict(text) is None:
+        return "unparsable answer"
+    return None
 
 
 class TrustedJudgeV3:
@@ -176,17 +195,20 @@ class TrustedJudgeV3:
                 completion = self.client.complete(self.system_prompt, user_prompt, max_tokens=4000,
                                                   cache_system=True,
                                                   cache_user_prefix=user_prompt[:user_prompt.index(INPUT_2)])
-                record = {"answer": parse_answer(completion.text), "text": completion.text.strip()[:400],
+                unparsed = unparsed_reason(completion.text, completion.stop_reason)
+                record = {"answer": parse_answer(completion.text) if unparsed is None else "BLOCK",
+                          "text": completion.text.strip()[:400],
                           "latency_ms": completion.latency_ms, "input_tokens": completion.input_tokens,
                           "output_tokens": completion.output_tokens,
                           "cache_read_input_tokens": completion.cache_read_input_tokens,
                           "cache_creation_input_tokens": completion.cache_creation_input_tokens}
-                write_text_atomic(path, json.dumps(record, indent=1))
-                record["cached"] = False
+                if unparsed is None:   # an empty, truncated or unparsable answer is enforced as BLOCK, not cached
+                    write_text_atomic(path, json.dumps(record, indent=1))
+                record["cached"], record["unparsed"] = False, unparsed
         cached = record["cached"]
         return {"judge": "v3" if self.use_rules else "v3-norules", "provider": self.provider, "model": self.model,
                 "answer": record["answer"], "final": record["answer"], "verdict": record["answer"],
-                "text": record["text"][:200], "cached": cached,
+                "text": record["text"][:200], "cached": cached, "unparsed": record.get("unparsed"),
                 "latency_ms": 0.0 if cached else record["latency_ms"],
                 "input_tokens": 0 if cached else record["input_tokens"],
                 "output_tokens": 0 if cached else record["output_tokens"],

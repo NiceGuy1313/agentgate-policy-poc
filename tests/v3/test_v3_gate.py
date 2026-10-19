@@ -1,5 +1,7 @@
 """v3(C10a·C10b): 정책 엔진 없이 effect 호출만 ALLOW / BLOCK으로 판정한다. 방식 A 판정 LLM은 stub, LLM 호출 없음."""
 
+import pytest
+
 from agentgate.agentdojo.suites import load_suite, load_task_environment
 from agentgate.conditions import get_condition
 from agentgate.gate.base import ToolCall, Verdict
@@ -111,3 +113,29 @@ def test_prompt_without_rulebook(tmp_path, monkeypatch):
     assert record["judge"] == "v3-norules"
     assert "Rulebook" not in request["system"] and not any(f"{r['id']} " in request["system"]
                                                                    for r in load_rules())
+
+
+def test_unparsable_or_truncated_answers_block_and_are_not_cached(tmp_path, monkeypatch):
+    monkeypatch.setattr(judge_module, "CACHE_DIR", tmp_path)
+    runtime = ToolSpecGatedRuntime((), prompt="Pay the bill.", spec=TaskSpec(requested_ops=["send_money"]))
+    call = ToolCall("send_money", {"recipient": "X", "amount": 1})
+    for text, stop, reason in (("", "stop", "empty answer"), ("I think", "stop", "unparsable answer"),
+                               ("ALLOW", "length", "truncated (length)")):
+        client = StubClient(text)
+        client.complete = (lambda c: lambda *a, **k: Completion(c.answer, c.model, 1.0, 10, 2, stop))(client)
+        judge = judge_module.TrustedJudgeV3(client=client)
+        record = judge(call, EngineResult(Verdict.ALLOW, []), runtime.context, "Pay the bill.")
+        assert record["verdict"] == "BLOCK" and record["unparsed"] == reason and not record["cached"]
+        assert not list(tmp_path.rglob("*.json"))
+    judge = judge_module.TrustedJudgeV3(client=StubClient("ALLOW"))
+    assert judge(call, EngineResult(Verdict.ALLOW, []), runtime.context, "Pay the bill.")["unparsed"] is None
+    assert len(list(tmp_path.rglob("*.json"))) == 1
+
+
+def test_enforcing_v3_gate_without_judge_refuses_effect_calls():
+    runtime = ToolSpecGatedRuntime((), prompt="Pay.", spec=TaskSpec(), escalate_action="block")
+    with pytest.raises(RuntimeError, match="judge"):
+        runtime.resolve(ToolCall("send_money", {}), EngineResult(Verdict.ALLOW, []))
+    assert runtime.resolve(ToolCall("read_file", {}), EngineResult(Verdict.ALLOW, [])) == (Verdict.ALLOW, None)
+    audit = ToolSpecGatedRuntime((), prompt="Pay.", spec=TaskSpec(), mode="audit", escalate_action="block")
+    assert audit.resolve(ToolCall("send_money", {}), EngineResult(Verdict.ALLOW, [])) == (Verdict.ALLOW, None)

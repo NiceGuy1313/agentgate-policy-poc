@@ -186,8 +186,8 @@ def test_replay_contrast_judges_ollama_with_synchronous_calls(replay_contrast):
     answers = replay_contrast.batch_judge(stub, "system", prompts + prompts[:2], workers=3)
     assert len(answers) == 8 and len(stub.calls) == 8   # duplicates are judged once
     for prompt in prompts:
-        answer, text, usage = answers[prompt]
-        assert answer == ("BLOCK" if "bad" in prompt else "ALLOW") and text.startswith(answer)
+        answer, text, usage, unparsed = answers[prompt]
+        assert answer == ("BLOCK" if "bad" in prompt else "ALLOW") and text.startswith(answer) and unparsed is None
         assert usage == {"input": 7, "output": 2, "cache_read": 0}
 
 

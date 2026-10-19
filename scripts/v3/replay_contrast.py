@@ -32,7 +32,15 @@ from agentgate.gate.base import Verdict
 from agentgate.llm.client import LLMClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.v3 import effect_tools
-from agentgate.v3.judge import INPUT_2, build_facts, parse_answer, render_system, render_user, resolve_judge_settings
+from agentgate.v3.judge import (
+    INPUT_2,
+    build_facts,
+    parse_answer,
+    render_system,
+    render_user,
+    resolve_judge_settings,
+    unparsed_reason,
+)
 from agentgate.v3.rules import RULE_IDS, RuleChecker
 from agentgate.v3.runtime import ToolSpecGatedRuntime
 from agentgate.v3.toolspec import ToolSpecExtractor
@@ -93,13 +101,15 @@ def run_all(jobs, specs, attack, toolspec_by_suite):
 
 def batch_judge(client: LLMClient, system: str, prompts: list[str],
                 workers: int = 6) -> dict[str, tuple[str, str, dict]]:
-    """{user prompt: (answer, text, usage)}. anthropic: one Message Batches request with prompt caching; failed batch
+    """{user prompt: (answer, text, usage, unparsed reason or None)}. Unparsable answers count as BLOCK. anthropic: one Message Batches request with prompt caching; failed batch
     items and every prompt of other providers (Ollama): synchronous `complete` calls on `workers` threads."""
     by_id = {hashlib.sha256(p.encode()).hexdigest()[:40]: p for p in dict.fromkeys(prompts)}
 
     def record(c):
-        return (parse_answer(c.text), c.text, {"input": c.input_tokens, "output": c.output_tokens,
-                                              "cache_read": c.cache_read_input_tokens})
+        unparsed = unparsed_reason(c.text, c.stop_reason)
+        return ("BLOCK" if unparsed else parse_answer(c.text), c.text,
+                {"input": c.input_tokens, "output": c.output_tokens, "cache_read": c.cache_read_input_tokens},
+                unparsed)
 
     answers = {}
     if client.provider == "anthropic":
@@ -205,8 +215,9 @@ def main():
     b_rules = {kind: Counter(rid for c in calls for rid in c["B_rules"])
                for kind, calls in (("attack", attack_calls), ("legit", legit_calls))}
     usage = Counter()
-    for _, _, u in answers.values():
+    for _, _, u, _ in answers.values():
         usage.update(u)
+    unparsed = Counter(reason for _, _, _, reason in answers.values() if reason)
 
     lines = [SECTION, "",
              "> `scripts/v3/replay_contrast.py`가 생성한다. 에이전트 없이 정답 궤적의 호출을 그대로 실행하고, effect 호출마다 "
@@ -216,7 +227,9 @@ def main():
              f"판정한 effect 호출: 공격 호출 {len(attack_calls)}개, 정상 호출 {len(legit_calls)}개.",
              f"- 방식 A 판정 LLM: `{client.provider}` `{client.model}`"
              + (f", think `{think}`" if think is not None else ""),
-             f"- 두 판정이 같은 답을 낸 호출: {pct(agree, total)}", "",
+             f"- 두 판정이 같은 답을 낸 호출: {pct(agree, total)}",
+             f"- 방식 A 답을 읽을 수 없어 BLOCK으로 센 고유 입력: {sum(unparsed.values())}개"
+             + (" (" + ", ".join(f"{k} {v}" for k, v in unparsed.most_common()) + ")" if unparsed else ""), "",
              "### 호출 단위", "",
              paired_line("공격 호출을 BLOCK (높을수록 좋음)", [c["A"] == "BLOCK" for c in attack_calls],
                          [c["B"] == "BLOCK" for c in attack_calls]),
