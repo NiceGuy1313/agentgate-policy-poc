@@ -5,8 +5,11 @@
   - Input 2: 지금까지 받은 툴 응답의 ToolSpec(레코드·응답 속 요청)
   - Input 3: 대기 중 호출(툴, 인자)
   - C9만: system에 정책 문서(config/v3/policy.yaml) 전체. C9n은 정책 문서 없음.
-비용: system과 Input 1(한 태스크 안에서 고정)에 prompt-cache 지점을 둔다. 같은 입력의 동시 요청은 API를 한 번만 부르고
-나머지는 디스크 캐시(data/v3/cache/judge/<model>/)를 읽는다. 실시간 판정이라 Message Batches는 쓸 수 없다.
+모델: 평가 대상 에이전트와 같은 모델(provider·model·think)을 쓴다. AGENTGATE_JUDGE_PROVIDER·MODEL·THINK가 있으면 그것을,
+없으면 AGENTGATE_AGENT_PROVIDER·MODEL·THINK를 따른다(`resolve_judge_settings`). 둘 다 없으면 anthropic 기본 모델이다.
+비용: anthropic이면 system과 Input 1(한 태스크 안에서 고정)에 prompt-cache 지점을 둔다(ollama는 해당 없음). 같은 입력의
+동시 요청은 API를 한 번만 부르고 나머지는 디스크 캐시(data/v3/cache/judge/<model>/)를 읽는다. 실시간 판정이라
+Message Batches는 쓸 수 없다. provider 오류(예: Ollama 429 사용량 한도)는 잡지 않고 그대로 올려 live 평가가 멈추게 한다.
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ import threading
 from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.gate.base import PolicyContext, ToolCall
 from agentgate.gate.engine import EngineResult
-from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient
+from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, parse_think
 from agentgate.llm.judge_io import data_block
 from agentgate.v3 import load_rules
 
@@ -104,6 +107,24 @@ def render_user(facts: dict) -> str:
     return "\n".join(lines)
 
 
+def resolve_judge_settings(model: str | None = None) -> tuple[str, str, bool | str | None]:
+    """(provider, model, think) of the judge LLM. AGENTGATE_JUDGE_* first, then the agent's AGENTGATE_AGENT_*
+    (the Trusted LLM runs on the agent's model), then anthropic with DEFAULT_ANTHROPIC_MODEL. `think` is ollama only.
+    The agent's model is borrowed only when the judge uses the agent's provider (a model name is provider-specific)."""
+    agent_provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
+    provider = os.environ.get("AGENTGATE_JUDGE_PROVIDER") or agent_provider
+    model = (model or os.environ.get("AGENTGATE_JUDGE_MODEL")
+             or (os.environ.get("AGENTGATE_AGENT_MODEL") if provider == agent_provider else None)
+             or (DEFAULT_ANTHROPIC_MODEL if provider == "anthropic" else None))
+    if not model:
+        raise RuntimeError(f"no judge model for provider {provider}: set AGENTGATE_JUDGE_MODEL (see .env.example)")
+    if provider == "ollama" and model.startswith("claude-"):
+        raise ValueError(f"judge provider ollama with model {model}: clear AGENTGATE_JUDGE_MODEL to follow "
+                         "AGENTGATE_AGENT_MODEL (see .env.example)")
+    think = parse_think(os.environ.get("AGENTGATE_JUDGE_THINK") or os.environ.get("AGENTGATE_AGENT_THINK"))
+    return provider, model, think if provider == "ollama" else None
+
+
 def parse_answer(text: str) -> str:
     """ALLOW only on an explicit ALLOW; anything else (BLOCK, unparsable) blocks."""
     match = re.match(r"\s*[*#`_ ]*(ALLOW|BLOCK)\b", text.upper())
@@ -116,19 +137,22 @@ class TrustedJudgeV3:
         load_dotenv()
         self.use_rules = use_rules
         self._client = client
-        self.model = client.model if client else (model or os.environ.get("AGENTGATE_JUDGE_MODEL")
-                                                  or DEFAULT_ANTHROPIC_MODEL)
+        if client:   # injected client (tests): its own model, no settings resolution
+            self.provider, self.model, self.think = getattr(client, "provider", None), client.model, None
+        else:
+            self.provider, self.model, self.think = resolve_judge_settings(model)
         self.system_prompt = render_system(use_rules)
 
     @property
     def client(self) -> LLMClient:
         if self._client is None:
-            self._client = LLMClient(provider="anthropic", model=self.model)
+            self._client = LLMClient(provider=self.provider, model=self.model, think=self.think)
         return self._client
 
     def __call__(self, call: ToolCall, result: EngineResult, context: PolicyContext, prompt: str) -> dict:
         user_prompt = render_user(build_facts(call, context, prompt))
-        key = hashlib.sha256((self.model + self.system_prompt + user_prompt).encode()).hexdigest()[:24]
+        think = "" if self.think is None else f"think={self.think}\n"   # think changes the answer: part of the key
+        key = hashlib.sha256((self.model + think + self.system_prompt + user_prompt).encode()).hexdigest()[:24]
         path = CACHE_DIR / self.model.replace("/", "_").replace(":", "_") / f"{key}.json"
         with _INFLIGHT_GUARD:
             lock = _INFLIGHT.setdefault(key, threading.Lock())
@@ -147,7 +171,7 @@ class TrustedJudgeV3:
                 write_text_atomic(path, json.dumps(record, indent=1))
                 record["cached"] = False
         cached = record["cached"]
-        return {"judge": "v3" if self.use_rules else "v3-norules", "model": self.model,
+        return {"judge": "v3" if self.use_rules else "v3-norules", "provider": self.provider, "model": self.model,
                 "answer": record["answer"], "final": record["answer"], "verdict": record["answer"],
                 "text": record["text"][:200], "cached": cached,
                 "latency_ms": 0.0 if cached else record["latency_ms"],

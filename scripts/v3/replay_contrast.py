@@ -2,12 +2,14 @@
 
 정답 궤적(정상 97, 공격 949쌍)의 호출을 그대로 실행한다. effect 호출마다 두 판정 LLM의 입력(TaskSpec + 지금까지의
 ToolSpec + 대기 중 호출)을 만들고 판정 결과로 막지는 않으므로, 두 조건의 입력은 모든 호출에서 같다. 에이전트는 없다.
-모든 입력을 미리 알 수 있으므로 TaskSpec·ToolSpec·판정을 모두 Message Batches(50%)로 처리하고 프롬프트 캐시를 쓴다.
+모든 입력을 미리 알 수 있으므로 TaskSpec·ToolSpec은 Message Batches(50%)로 처리한다. 판정 LLM은 에이전트와 같은 모델을 쓰고
+(`agentgate.v3.judge.resolve_judge_settings`), anthropic이면 Message Batches와 프롬프트 캐시, 그 밖의 provider(Ollama 등)면
+스레드 풀 동기 호출이다.
 
 라벨: 공격 쌍의 injection 단계 effect 호출 = 공격 호출(막아야 함), user 단계 effect 호출 = 정상 호출(허용해야 함).
 출력: results/v3/RESULTS.md의 "## 재생 대조" 절(있으면 교체). 중간 기록은 남기지 않는다.
 
-사용법: python scripts/v3/replay_contrast.py [--attack tool_knowledge] [--limit N]
+사용법: python scripts/v3/replay_contrast.py [--attack tool_knowledge] [--limit N] [--workers 6]
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from agentgate.gate.base import Verdict
 from agentgate.llm.client import LLMClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.v3 import effect_tools
-from agentgate.v3.judge import INPUT_2, build_facts, parse_answer, render_system, render_user
+from agentgate.v3.judge import INPUT_2, build_facts, parse_answer, render_system, render_user, resolve_judge_settings
 from agentgate.v3.runtime import ToolSpecGatedRuntime
 from agentgate.v3.toolspec import ToolSpecExtractor
 
@@ -81,22 +83,34 @@ def run_all(jobs, specs, attack, toolspec_by_suite):
     return out
 
 
-def batch_judge(client: LLMClient, system: str, prompts: list[str]) -> dict[str, tuple[str, str, dict]]:
-    """{user prompt: (answer, text, usage)} through one Message Batches request with prompt caching."""
+def batch_judge(client: LLMClient, system: str, prompts: list[str],
+                workers: int = 6) -> dict[str, tuple[str, str, dict]]:
+    """{user prompt: (answer, text, usage)}. anthropic: one Message Batches request with prompt caching; failed batch
+    items and every prompt of other providers (Ollama): synchronous `complete` calls on `workers` threads."""
     by_id = {hashlib.sha256(p.encode()).hexdigest()[:40]: p for p in dict.fromkeys(prompts)}
-    params = {cid: client.anthropic_params(system, p, 4000, cache_system=True,
-                                           cache_user_prefix=p[:p.index(INPUT_2)]) for cid, p in by_id.items()}
+
+    def record(c):
+        return (parse_answer(c.text), c.text, {"input": c.input_tokens, "output": c.output_tokens,
+                                              "cache_read": c.cache_read_input_tokens})
+
     answers = {}
-    for cid, completion in client.run_batch(params).items():
-        if isinstance(completion, str):
-            continue
-        answers[by_id[cid]] = (parse_answer(completion.text), completion.text,
-                               {"input": completion.input_tokens, "output": completion.output_tokens,
-                                "cache_read": completion.cache_read_input_tokens})
-    for p in set(by_id.values()) - answers.keys():   # batch failures: synchronous retry
-        c = client.complete(system, p, 4000, cache_system=True, cache_user_prefix=p[:p.index(INPUT_2)])
-        answers[p] = (parse_answer(c.text), c.text, {"input": c.input_tokens, "output": c.output_tokens,
-                                                     "cache_read": c.cache_read_input_tokens})
+    if client.provider == "anthropic":
+        params = {cid: client.anthropic_params(system, p, 4000, cache_system=True,
+                                               cache_user_prefix=p[:p.index(INPUT_2)]) for cid, p in by_id.items()}
+        for cid, completion in client.run_batch(params).items():
+            if not isinstance(completion, str):
+                answers[by_id[cid]] = record(completion)
+    todo = [p for p in by_id.values() if p not in answers]
+
+    def one(p):
+        return p, client.complete(system, p, 4000, cache_system=True, cache_user_prefix=p[:p.index(INPUT_2)])
+    with ThreadPoolExecutor(workers) as pool:
+        try:
+            for p, c in pool.map(one, todo):
+                answers[p] = record(c)
+        except BaseException:   # e.g. Ollama 429 usage limit: stop instead of draining the queue
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
     return answers
 
 
@@ -123,6 +137,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--attack", default="tool_knowledge")
     parser.add_argument("--limit", type=int, default=0, help="debug: first N trajectories")
+    parser.add_argument("--workers", type=int, default=6,
+                        help="judge calls in flight per condition when the judge is not anthropic (default 6)")
     args = parser.parse_args()
     jobs = trajectories(args.attack, args.limit)
 
@@ -154,12 +170,12 @@ def main():
                    lambda s: (lambda tool, a, text: toolspec_extractors[s].extract(tool, a, text).spec))
     prompts = [c["user"] for r in runs for c in r["calls"]]
 
-    # 4. Judge (Sonnet, batch) for both conditions
-    client = LLMClient(provider="anthropic", model=__import__("os").environ.get("AGENTGATE_JUDGE_MODEL")
-                       or "claude-sonnet-5-5")
-    with ThreadPoolExecutor(2) as pool:   # both conditions' batches submitted together
-        c9, c9n = pool.submit(batch_judge, client, render_system(True), prompts), \
-            pool.submit(batch_judge, client, render_system(False), prompts)
+    # 4. Judge for both conditions: the agent's model (anthropic: batch, else synchronous calls)
+    provider, model, think = resolve_judge_settings()
+    client = LLMClient(provider=provider, model=model, think=think)
+    with ThreadPoolExecutor(2) as pool:   # both conditions submitted together
+        c9, c9n = pool.submit(batch_judge, client, render_system(True), prompts, args.workers), \
+            pool.submit(batch_judge, client, render_system(False), prompts, args.workers)
         answers = {"C9": c9.result(), "C9n": c9n.result()}
 
     # 5. Analysis
@@ -192,6 +208,7 @@ def main():
              "두 조건의 입력이 같다. 차이는 정책 문서 유무뿐이다.", "",
              f"- 궤적: 정상 {len(benign_ok['C9'])}개, 공격 쌍 {len(pair_stopped['C9'])}개(`{args.attack}`). "
              f"판정한 effect 호출: 공격 호출 {len(attack_calls)}개, 정상 호출 {len(legit_calls)}개.",
+             f"- 판정 LLM: `{client.provider}` `{client.model}`" + (f", think `{think}`" if think is not None else ""),
              f"- 두 판정이 같은 답을 낸 호출: {pct(agree, total)}", "",
              "### 호출 단위", "",
              paired_line("공격 호출을 BLOCK (높을수록 좋음)", [c["C9"] == "BLOCK" for c in attack_calls],
@@ -204,7 +221,7 @@ def main():
              paired_line("정상 작업에서 정상 호출을 모두 허용", benign_ok["C9"], benign_ok["C9n"]), "",
              "### C9 판정이 인용한 조항", "",
              "- " + ", ".join(f"{rid} {n}" for rid, n in sorted(cited.items(), key=lambda x: int(x[0][1:]))), "",
-             "### 비용 (Message Batches, 고유 입력 기준)", ""]
+             f"### 비용 ({'Message Batches' if client.provider == 'anthropic' else '동기 호출'}, 고유 입력 기준)", ""]
     for cond in answers:
         u = usage[cond]
         lines.append(f"- {cond}: 판정 {len(answers[cond])}회, 입력 {u['input']:,}, 캐시 읽기 {u['cache_read']:,}, "

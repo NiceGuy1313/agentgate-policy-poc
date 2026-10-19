@@ -23,7 +23,7 @@ from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
 from agentdojo.types import ChatAssistantMessage, ChatMessage, get_text_content_as_str, text_content_block_from_string
 
-from agentgate.llm.client import OllamaClient
+from agentgate.llm.client import OllamaClient, parse_think
 
 RAW_MESSAGE_KEY = "_ollama_message"
 _VALID_TOOL_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
@@ -78,9 +78,7 @@ class OllamaAgentLLM(BasePipelineElement):
         self.model = model
         self.name = model
         self.client = client or OllamaClient()
-        env_think = os.environ.get("AGENTGATE_AGENT_THINK")
-        self.think = think if think is not None else (None if not env_think else
-                                                     {"true": True, "false": False}.get(env_think.lower(), env_think))
+        self.think = think if think is not None else parse_think(os.environ.get("AGENTGATE_AGENT_THINK"))
         self.options = {"temperature": temperature, "seed": seed}
         self.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0, "ms": 0.0, "refusals": 0,
                       "invalid_tool_calls": 0}

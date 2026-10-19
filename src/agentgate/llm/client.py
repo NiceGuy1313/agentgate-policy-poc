@@ -38,6 +38,12 @@ def supports_temperature(model: str) -> bool:
     return model.startswith(_MODELS_ACCEPTING_TEMPERATURE)
 
 
+def parse_think(value: str | None) -> bool | str | None:
+    """`AGENTGATE_*_THINK` -> Ollama `think`: "true"/"false" become bool, other text (low|medium|high) passes through,
+    empty means unset (None)."""
+    return {"true": True, "false": False}.get(value.lower(), value) if value else None
+
+
 @dataclass
 class Completion:
     text: str
@@ -52,10 +58,13 @@ class Completion:
 
 
 class LLMClient:
-    """`AGENTGATE_LLM_PROVIDER` / `AGENTGATE_LLM_MODEL` / `AGENTGATE_LLM_EFFORT` / `AGENTGATE_LLM_FALLBACKS`."""
+    """`AGENTGATE_LLM_PROVIDER` / `AGENTGATE_LLM_MODEL` / `AGENTGATE_LLM_EFFORT` / `AGENTGATE_LLM_FALLBACKS`.
+
+    `think` (ollama only): sent as the payload's `think` when not None. Anthropic-only settings (effort, fallbacks,
+    prompt-cache flags) are ignored by the ollama path."""
 
     def __init__(self, provider: str | None = None, model: str | None = None, temperature: float = 0.0,
-                 effort: str | None = None):
+                 effort: str | None = None, think: bool | str | None = None):
         load_dotenv()
         self.provider = provider or os.environ.get("AGENTGATE_LLM_PROVIDER") or "anthropic"
         default_model = DEFAULT_ANTHROPIC_MODEL if self.provider == "anthropic" else ""
@@ -67,6 +76,7 @@ class LLMClient:
         if API_KEY_ENV_BY_PROVIDER[self.provider]:
             require_env_vars(API_KEY_ENV_BY_PROVIDER[self.provider])
         self.temperature = temperature
+        self.think = think
         self.effort = effort or os.environ.get("AGENTGATE_LLM_EFFORT") or "medium"
         # server-side refusal fallback ("default" routing by refusal category); "off" disables it
         self.fallbacks = (os.environ.get("AGENTGATE_LLM_FALLBACKS") or "default").lower() != "off"
@@ -151,9 +161,11 @@ class LLMClient:
             cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
             stop_reason, served_model = response.stop_reason, getattr(response, "model", self.model)
         elif self.provider == "ollama":
-            data = self._client.chat({"model": self.model, "options": {"temperature": self.temperature, "seed": 0},
-                                      "messages": [{"role": "system", "content": system},
-                                                   {"role": "user", "content": user}]})
+            payload = {"model": self.model, "options": {"temperature": self.temperature, "seed": 0},
+                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+            if self.think is not None:
+                payload["think"] = self.think
+            data = self._client.chat(payload)
             text = (data.get("message") or {}).get("content") or ""
             input_tokens, output_tokens = data.get("prompt_eval_count") or 0, data.get("eval_count") or 0
             stop_reason, served_model = data.get("done_reason"), data.get("model", self.model)
