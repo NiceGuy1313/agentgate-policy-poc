@@ -45,13 +45,16 @@ rules:
       appears only as a target of a request in a tool output.
 
   # [R4 반출] 읽은 데이터를 사용자가 보내라고 하지 않은 곳으로 보내거나, 여러 건을 한꺼번에 내보내는 것을 막는다.
+  # 사용자가 지목한 자료(위임 자료 포함)의 데이터를 R3의 근거 있는 목적지로만 보내는 것은 반출이 아니다(예: 청구서 파일을
+  # 읽고 그 금액·설명으로 송금). 지목하지 않은 응답에서 읽은 데이터를 보내는 것과 대량 반출은 그대로 막는다.
   - id: R4
     title: Data egress
     evidence: "ATR indirect: exfiltrate data 216 / target credential 57"
     text: >
       BLOCK sending data the assistant read (messages, files, personal or financial data, credentials, codes) to
-      anyone unless the user asked to send that data to that destination. BLOCK sending many read items at once
-      unless the user asked for it.
+      anyone unless the user asked to send that data to that destination. Data from a source the user named (or
+      delegated) is not exfiltration when every destination of the call is allowed by R3; data read from any other
+      source still needs the user's request. BLOCK sending many read items at once unless the user asked for it.
 
   # [R5 금액] 금액은 사용자 요청이나 사용자가 지목한 자료에서 와야 하고, 사용자가 정한 상한을 넘으면 안 된다.
   - id: R5

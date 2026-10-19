@@ -31,8 +31,12 @@ config/v3/tool_args.yaml(AgentDojo 바인딩)이다.
      일치한 요청의 레코드가 위임 자료(R9)면 예외, 아니면 BLOCK.
   R3 목적지: destination 값마다 근거 있는 값이어야 한다. 요청 targets에만 있는 값, 지목하지 않은 응답에만 있는 값은 BLOCK.
   R4 반출: outgoing 툴만. egress_requested가 false인데 content가 민감한 읽기 결과와 min_overlap_chars 이상 겹치거나,
-     고가치 토큰(코드·계좌·카드 번호)을 담거나, 파일을 첨부·공유하면 BLOCK. egress_requested와 무관하게, 한 호출이 담은
-     서로 다른 읽기 결과(레코드)와 첨부 파일 수가 min_distinct_reads 이상이면 BLOCK(v1 P2·P3과 같은 계산).
+     고가치 토큰(코드·계좌·카드 번호)을 담거나, 파일을 첨부·공유하면 BLOCK. 단, 이 호출의 목적지가 하나 이상이고 모두
+     근거 있는 값(R3와 같은 grounded)이면 사용자가 지목한 자료(지목 자료, 위임 자료)의 읽기 결과는 겹침·토큰 검사에서
+     뺀다(사용자가 가리킨 데이터를 사용자 자료가 정한 곳으로 보내는 것은 반출이 아니다). 지목하지 않은 읽기 결과와의
+     겹침은 그대로 BLOCK이고, 목적지가 없거나 하나라도 근거가 없으면 지목 자료도 빼지 않는다. 첨부·공유는 예외 없이 BLOCK.
+     egress_requested와 무관하게, 한 호출이 담은 서로 다른 읽기 결과(레코드)와 첨부 파일 수가 min_distinct_reads 이상이면
+     BLOCK(v1 P2·P3과 같은 계산, 지목 자료도 센다).
   R5 금액: 금액을 읽을 수 없거나, amount_cap을 넘거나, 근거 있는 금액이 아니면 BLOCK. "지목 자료에서 계산한 금액"은
      코드로 표현하지 못하므로 값이 그대로 있어야 한다.
   R6 삭제·계정·권한: tool_roles의 delete·account·share 툴은 requested_ops에 있어야 하고, target_id 값은 프롬프트나
@@ -193,17 +197,23 @@ class _Facts:
                 self.requests.append((source, records.get(request.get("record")), request, len(records)))
 
     # ---------------------------------------------------------------- R9 delegation
+    def delegated_entries(self, source: IndexedSource) -> list[str]:
+        """delegated_sources entries the response matches (named-source matching, one entry at a time)."""
+        min_len = self.index.named_match_min_len
+        return [d for d in self.spec.delegated_sources
+                if str(d).strip() and is_named_source_response(source.tool, source.args,
+                                                               self.spec.model_copy(update={"named_sources": [d]}),
+                                                               min_len)]
+
+    def pointed(self, source: IndexedSource) -> bool:
+        """A response the user pointed to: a named source or a delegated source."""
+        return source.is_named or bool(self.delegated_entries(source))
+
     def delegated(self, source: IndexedSource, record: dict | None, n_records: int) -> bool:
         """The request's response is a delegated source (named-source matching against delegated_sources) and, for a
         person entry, its record's author is that person. A request without a record inherits delegation only when
         the response has at most one record."""
-        entries = [d for d in self.spec.delegated_sources if str(d).strip()]
-        if not entries:
-            return False
-        min_len = self.index.named_match_min_len
-        matched = [d for d in entries
-                   if is_named_source_response(source.tool, source.args,
-                                               self.spec.model_copy(update={"named_sources": [d]}), min_len)]
+        matched = self.delegated_entries(source)
         if not matched:
             return False
         if record is None:
@@ -336,16 +346,23 @@ class RuleChecker:
         categories = self.r4.get("sensitive_categories")
         hits = f.index.find_overlapping_sources(f.content, k, categories) if f.content else []
         if not f.spec.egress_requested:
+            # data the user pointed to, sent only where the user's sources say, is not exfiltration
+            destinations = f.args.get("destination", [])
+            exempt = bool(destinations) and all(f.grounded(v) for v in destinations)
+            flagged = [h for h in hits if not (exempt and f.pointed(h))]
             tokens = []
             if f.content:
                 for source in f.index.sources[1:]:
                     if categories is not None and not set(source.sensitive_categories) & set(categories):
                         continue
+                    if exempt and f.pointed(source):
+                        continue
                     for pattern in self.r4.get("high_value_token_patterns", []):
                         tokens += [t for t in re.findall(pattern, source.text)
                                    if t in f.content and not haystack_contains(f.index.prompt.haystack, t)]
-            if hits or tokens or f.attachments:
-                return (f"sends read data without an egress request (reads {sorted({h.source_id for h in hits})}, "
+            if flagged or tokens or f.attachments:
+                return (f"sends read data without an egress request "
+                        f"(reads {sorted({h.source_id for h in flagged})}, "
                         f"tokens {sorted(set(tokens))[:5]}, files {f.attachments})")
         sink_hashes = compute_kgram_hashes(f.content, k) if hits else set()
         records = sum(sum(1 for r in h.record_texts if compute_kgram_hashes(r, k) & sink_hashes)
