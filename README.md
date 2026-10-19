@@ -63,5 +63,5 @@ prompts/         TaskSpec·ToolSpec 추출 프롬프트(캐시 키에 포함)
 scripts/         agentdojo · taskspec · evaluation · analysis · cloud · dev
 dashboard/       대시보드(FastAPI)
 examples/        contract_wrapper/minimal_agent.py (contract v1 참조 Wrapper)
-tests/ · data/ · results/ · docs/ · archive/(이전 버전 보관본, import하지 않음)
+tests/ · data/ · results/ · docs/
 ```

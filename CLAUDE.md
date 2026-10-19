@@ -21,7 +21,6 @@ LLM 에이전트의 effect 툴 호출을 실행 직전에 룰북(R1–R10) 기�
 - `results/RESULTS.md`는 손으로 고치지 않고 `scripts/analysis/summarize_results.py`·`scripts/evaluation/replay_contrast.py`를 고쳐 재생성한다.
 - `config/agentdojo/named_source_rules.yaml`의 `trusted_tools`에 툴을 추가하면 `tests/test_config_consistency.py`로 인젝션 벡터가 없음을 확인한다.
 - AgentDojo 고유 값(툴 이름 등)은 `config/agentdojo/`, `src/agentgate/environments/agentdojo.py`, `src/agentgate/scenarios/`에만 둔다. Gate core·정책 코드는 `ToolBinding`(`core/binding.py`)으로만 읽는다.
-- `archive/`는 보관본이다. 현재 코드·테스트에서 import하거나 되살리지 않는다.
 - LLM 캐시는 `data/cache/{taskspec,toolspec,judge}/`(git 제외)다. 조건 비교는 같은 실행 안의 `no_gate`와 한다.
 - 오래 걸리는 평가(재생 전체, live)는 백그라운드로 돌리고 로그를 `logs/`(git 제외)에 남긴다.
 - 클라우드 세션은 SessionStart hook(`scripts/cloud/setup.sh`)이 `.venv`를 준비한다. 시작하면 `python scripts/cloud/check_env.py`부터 돌리고 실패 항목을 먼저 보고한다.
