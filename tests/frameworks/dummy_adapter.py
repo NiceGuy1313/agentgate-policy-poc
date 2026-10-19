@@ -8,6 +8,7 @@ class DummyAdapter(FrameworkAdapter):
 
     name = "dummy"
     display_name = "Dummy"
+    routes_tools_through_bridge = True
 
     def run(self, task, bridge, model, options, max_steps, sink):
         import json

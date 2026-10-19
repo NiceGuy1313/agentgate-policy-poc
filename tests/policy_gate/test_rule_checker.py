@@ -247,8 +247,40 @@ def test_r6_deletion_target_and_password():
 
 def test_r6_deleting_sent_email_blocks():
     ctx = context("Delete e-mail 31.", TaskSpec(requested_ops=["delete_email"]))
-    ctx.session.sent_email_ids.append("31")
+    ctx.session.sent_message_ids.append("31")
     assert blocked_by(check(ctx, "delete_email", email_id="31"), "R6")
+
+
+def test_r6_sent_message_check_comes_from_config_roles():
+    """The sent-message rule names no tool: it applies to delete tools listed in message_tools of the binding."""
+    from agentgate.config import load_tool_args
+    from agentgate.policy_gate.rule_checker import RuleChecker
+    config = load_tool_args()
+    assert RuleChecker(config).message_delete_tools == {"delete_email"}
+    rebound = RuleChecker({**config, "message_tools": ["send_email", "delete_file"]})
+    assert rebound.message_delete_tools == {"delete_file"}
+    ctx = context("Delete file 31.", TaskSpec(requested_ops=["delete_file", "delete_email"]))
+    ctx.session.sent_message_ids.append("31")
+    assert "sent in this session" in rebound.check(ToolCall("delete_file", {"file_id": "31"}), ctx)["reason"]
+    assert "sent in this session" not in rebound.check(ToolCall("delete_email", {"email_id": "31"}), ctx)["reason"]
+
+
+def test_session_state_records_from_config_roles():
+    from agentgate.core.types import SessionBindings, SessionState, default_session_bindings
+    bindings = default_session_bindings()
+    assert bindings.sent_message_tools == {"send_email"}
+    assert bindings.transfer_tools == {"send_money": ("recipient", "amount"),
+                                       "schedule_transaction": ("recipient", "amount")}
+    state = SessionState()
+    state.record_call("send_email", {}, SimpleNamespace(id_=7), [], "s1")
+    state.record_call("send_direct_message", {}, SimpleNamespace(id_=8), [], "s2")
+    state.record_call("send_money", {"recipient": "GB29X", "amount": "12.5"}, None, [], "s3")
+    state.record_call("update_scheduled_transaction", {"recipient": "GB29X", "amount": 3}, None, [], "s4")
+    assert state.sent_message_ids == ["7"] and state.cumulative_amount == 12.5 and len(state.transfers) == 1
+    custom = SessionState(bindings=SessionBindings(frozenset({"post"}), {"pay": ("to", "sum")}))
+    custom.record_call("post", {}, SimpleNamespace(id_="m1"), [], "s1")
+    custom.record_call("pay", {"to": "x", "sum": 2}, None, [], "s2")
+    assert custom.sent_message_ids == ["m1"] and custom.cumulative_amount == 2
 
 
 # ---------------------------------------------------------------- R7

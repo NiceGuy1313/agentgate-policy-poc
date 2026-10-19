@@ -62,17 +62,21 @@ uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
 - 컬럼 경계를 드래그하면 너비가 바뀐다. 상단 버튼으로 설정 패널을 접거나 너비를 초기화한다.
 - 실행 기록은 `dashboard/runs/`(git 제외)에 저장된다. 보고서 수치에는 쓰지 않는다.
 
-배치 평가는 같은 시나리오를 여러 쌍으로 돌린다.
+배치 평가는 같은 시나리오를 여러 쌍으로 돌린다. 진입점은 `python -m agentgate.scenarios.run`이고 모든 프레임워크가 세 조건(`no_gate`·`gate_llm_judge`·`gate_static_rules`)으로 돈다. `scripts/evaluation/live_evaluation.py`는 같은 코드의 얇은 wrapper다.
 
 ```bash
-python scripts/evaluation/live_evaluation.py --framework smolagents --model ollama:gpt-oss:120b \
+python -m agentgate.scenarios.run --framework smolagents --condition gate_static_rules --model ollama:gpt-oss:120b \
+  --suite banking --user-task user_task_0 --injection-task injection_task_0 --attack tool_knowledge --out results/runs/<run>
+python -m agentgate.scenarios.run --framework smolagents --model ollama:gpt-oss:120b \
   --pilot --conditions no_gate gate_static_rules --out results/live/<run>
 python scripts/analysis/summarize_live.py --run results/live/<run>
 ```
 
+run마다 `<out>/<condition>/<suite>/<user_task>/<injection_task>.json`, 실행 전체 요약은 `<out>/scenario_summary.json`이다. 정책 Gate를 거치지 않은 툴 실행이 하나라도 있으면 그 run은 무효(`valid: false`)이고 점수는 집계에서 빠진다.
+
 ## 4. 정책
 
-룰북은 [`config/rulebook.yaml`](config/rulebook.yaml)(R1–R10), 툴 인자 역할은 [`config/tool_args.yaml`](config/tool_args.yaml)이다. 정적 검사 코드는 [`src/agentgate/policy_gate/rule_checker.py`](src/agentgate/policy_gate/rule_checker.py), 판정 LLM은 [`src/agentgate/policy_gate/llm_judge.py`](src/agentgate/policy_gate/llm_judge.py)다. 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/core/runtime.py) 한 곳을 지나고, 판정은 [`PolicyGateRuntime`](src/agentgate/policy_gate/runtime.py)이 한다. Gate 공통 설정은 [`config/gate.yaml`](config/gate.yaml)이다.
+룰북은 [`config/rulebook.yaml`](config/rulebook.yaml)(R1–R10), 툴 인자 역할은 [`config/agentdojo/tool_args.yaml`](config/agentdojo/tool_args.yaml)이다. 정적 검사 코드는 [`src/agentgate/policy_gate/rule_checker.py`](src/agentgate/policy_gate/rule_checker.py), 판정 LLM은 [`src/agentgate/policy_gate/llm_judge.py`](src/agentgate/policy_gate/llm_judge.py)다. 모든 툴 호출은 [`GatedRuntime.run_function`](src/agentgate/core/runtime.py) 한 곳을 지나고, 판정은 [`PolicyGateRuntime`](src/agentgate/policy_gate/runtime.py)이 한다. Gate 공통 설정은 [`config/gate.yaml`](config/gate.yaml)이다.
 
 정책을 수정하면 다음을 지킨다.
 - `tests/policy_gate/`의 해당 테스트를 고치고 `python -m pytest -q`를 통과시킨다.
@@ -114,7 +118,7 @@ src/agentgate/
   adapters/      에이전트 프레임워크 어댑터(native, smolagents, mini-swe-agent, browser-use, contract)
   harness/       외부 프레임워크 연결, Wrapper 규약 v1
   llm/           LLM client, TaskSpec 추출기, 판정 LLM 공용 입출력
-config/          gate.yaml, rulebook.yaml, tool_args.yaml, agentdojo/(툴 역할·민감 읽기·지목 자료 규칙), frameworks.yaml
+config/          gate.yaml, rulebook.yaml, agentdojo/(툴 역할·툴 인자 역할·민감 읽기·지목 자료 규칙), frameworks.yaml
 prompts/         extract_taskspec.md, extract_toolspec.md
 scripts/         agentdojo · taskspec · evaluation · analysis · cloud
 tests/           core/, policy_gate/, frameworks/, 공통 테스트

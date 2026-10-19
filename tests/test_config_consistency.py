@@ -1,4 +1,4 @@
-"""Gate 설정(config/agentdojo/, config/tool_args.yaml)이 전제하는 사실을 AgentDojo 자체와 대조해 검사한다."""
+"""Gate 설정(config/agentdojo/)이 전제하는 사실을 AgentDojo 자체와 대조해 검사한다."""
 
 import yaml
 from agentdojo.functions_runtime import FunctionsRuntime

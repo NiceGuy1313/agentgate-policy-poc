@@ -38,7 +38,7 @@ class ScriptedAgent(BasePipelineElement):
         last_message = messages[-1] if messages else None
         if last_message is not None and last_message["role"] == "tool":
             text = get_text_content_as_str(last_message["content"]) + (last_message.get("error") or "")
-            if "blocked by security policy" in text and self.on_block == "stop":
+            if "Tool call blocked by" in text and self.on_block == "stop":
                 self.stopped = True
             if (self.injection_task is not None and not self.hijacked and self.marker in text):
                 self.hijacked = True

@@ -18,6 +18,7 @@ from agentgate.config import PROJECT_ROOT
 
 class ContractAdapter(FrameworkAdapter):
     description = "Wrapper following agentgate contract v1"
+    routes_tools_through_bridge = True   # the Wrapper's only tool path is the service's /invoke -> bridge.invoke
 
     def __init__(self, name: str, contract: dict):
         self.name = self.display_name = name
@@ -33,6 +34,8 @@ class ContractAdapter(FrameworkAdapter):
         self.schema = contract.get("options_schema") or {"type": "object", "properties": {}}
 
     def unavailable_reason(self) -> str | None:
+        if problems := self.contract_problems():
+            return "adapter contract: " + "; ".join(problems)
         return None if self.cwd.exists() else f"cwd not found: {self.cwd}"
 
     def options_schema(self) -> dict:

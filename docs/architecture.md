@@ -140,6 +140,14 @@ AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents,
 
 browser-use fork는 `anthropic`·`openai`를 agentgate가 요구하는 버전보다 낮게 고정한다. 그래서 별도 venv(`.venv-browser-use`)에 설치하고 `frameworks.yaml`의 `python:`으로 worker에서 실행한다. 대시보드는 그 인터프리터에서 import가 되는지 확인해 사용 가능 여부를 표시한다.
 
+### 정책 Gate 의무 경로
+
+모든 어댑터는 AgentDojo 툴을 `GateToolBridge.invoke` → `Session.invoke` → `PolicyGateRuntime.run_function`으로만 실행한다.
+- 어댑터는 `routes_tools_through_bridge = True`로 이를 선언한다. 선언이 없으면 registry가 사용 불가로 표시하고 runner가 실행을 거부한다(`FrameworkAdapter.contract_problems`). native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을 넘긴다.
+- `GatedRuntime`은 툴 함수를 감싸 `run_function` 밖에서의 호출을 실행하지 않고 거부하며 기록한다(`ungated_executions`). 프레임워크 경계 로그에서 Gate 판정 없이 실행된 툴(`bridge.ungated_calls`)도 함께 센다. 하나라도 있으면 run은 무효(`valid: false`, `invalid_reason`)이고 점수는 `excluded_scores`로 옮겨 집계에서 뺀다. 이벤트 `gate_bypass`(ERROR)를 낸다.
+- 적합성 검사: `python -m agentgate.harness.conformance --framework X --condition gate_static_rules`(LLM 없음, ToolSpec은 빈 stub). 기준 trace와 같고, 차단 호출이 실행되지 않고, 무효 run이 없어야 통과한다.
+- 차단되면 에이전트는 판정 기록의 규칙 id와 이유를 한 줄로 받는다(`Tool call blocked by policy gate (R2, R3): <이유>`, 240자 이내). 판정 기록 전체는 trace에만 남는다.
+
 ### Wrapper 연결 규약 v1
 
 Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wrapper는 `config/frameworks.yaml`에 `contract:` 항목 한 줄로 연결되며 Python 어댑터가 필요 없다. 참조 구현은 [`examples/contract_wrapper/minimal_agent.py`](../examples/contract_wrapper/minimal_agent.py), 클라이언트는 표준 라이브러리만 쓰는 [`agentgate_client.py`](../src/agentgate/harness/agentgate_client.py)(복사해 사용)이다.
@@ -149,6 +157,8 @@ Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wra
 3. **모델 지정**: `AGENTGATE_MODEL`(OpenAI 호환 `base_url`·키, LiteLLM 인자)을 따른다. 특정 제공자를 고정하지 않는다.
 4. **실행 진입점**: `AGENTGATE_URL`·`AGENTGATE_SESSION`·`AGENTGATE_TOKEN`·`AGENTGATE_MAX_STEPS`·`AGENTGATE_OPTIONS` 환경 변수로 시작하고 끝에 `POST .../finish`로 최종 답을 보낸다. 스스로 시작하는 Wrapper는 `POST /v1/sessions`로 세션을 연다.
 5. **이벤트**: 경계 로그를 `POST .../events`로도 보내면 대시보드에 표시된다(선택).
+
+서비스는 fail closed다. AgentDojo 툴 실행은 `invoke`로만 하고, TaskSpec이 없는 세션은 모든 호출을 막는다. `decide`에 AgentDojo 툴을 넣으면 400을 돌려준다. Wrapper는 `gate_decision`·`gate_bypass`·`result` 이벤트를 보낼 수 없고, Wrapper가 보낸 `tool_start` 중 Gate 판정이 없는 실행이 있으면 run은 무효다.
 
 서비스는 `127.0.0.1`에만 바인딩하고 세션마다 bearer 토큰을 요구한다. Wrapper는 `python -m agentgate.harness.conformance --entry "<command>"`로 규약 적합성을 스스로 확인할 수 있다. MCP 노출은 아직 구현하지 않았다.
 
@@ -169,6 +179,6 @@ src/agentgate/
 설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v3}/`, `prompts/{v1,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
 
 - 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
-- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없다. `config/rulebook.yaml`(룰북)을 방식 A는 판정 LLM이 읽고, 방식 B는 `src/agentgate/policy_gate/rule_checker.py`가 정적 코드로 검사한다(인자 역할: `config/tool_args.yaml`).
+- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없다. `config/rulebook.yaml`(룰북)을 방식 A는 판정 LLM이 읽고, 방식 B는 `src/agentgate/policy_gate/rule_checker.py`가 정적 코드로 검사한다(인자 역할: `config/agentdojo/tool_args.yaml`).
 - TaskSpec 추출 프롬프트는 v1이 `prompts/v1/extract_taskspec.md`, v3가 `prompts/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
 - 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.

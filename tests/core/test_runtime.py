@@ -7,9 +7,10 @@ from agentdojo.functions_runtime import Function
 from agentgate.core.engine import AllowAllPolicyEngine, EngineResult
 from agentgate.core.provenance import Origin
 from agentgate.core.runtime import INSIDE_GATE, GatedRuntime, compute_environment_hash
-from agentgate.core.task_spec import TaskSpec, load_task_spec
+from agentgate.core.task_spec import TaskSpec
 from agentgate.core.types import PolicyDecision, Verdict
 from agentgate.scenarios.suites import load_suite, load_task_environment
+from agentgate.scenarios.task_specs import load_task_spec
 
 
 class BlockTool:

@@ -1,7 +1,7 @@
 """One AgentDojo scenario behind the gate: environment + injections + PolicyGateRuntime + TaskSpec + scoring.
 
 `Session` is what every agent framework talks to (through `GateToolBridge`). It follows the same steps as
-`agentgate.scenarios.pipeline.run_live_task` / `scripts/evaluation/live_evaluation.run_one`, but leaves the agent loop to
+`agentgate.scenarios.pipeline.run_live_task` / `agentgate.scenarios.runner.run_one`, but leaves the agent loop to
 the caller: the framework calls tools through `invoke` and hands in its final answer with `finish`.
 """
 
@@ -21,7 +21,22 @@ from agentgate.scenarios.pipeline import score_task
 from agentgate.scenarios.replay import REPLAY_PIPELINE_NAME, get_cached_attack
 from agentgate.scenarios.suites import load_suite
 
-FRAMEWORK_CONDITIONS = tuple(CONDITIONS)
+FRAMEWORK_CONDITIONS = tuple(CONDITIONS)   # every framework runs under every condition
+SCORE_KEYS = ("utility", "security", "security_executed")
+
+
+def invalidate_if_ungated(record: dict, ungated: list[dict]) -> dict:
+    """A run with any tool execution that bypassed the policy gate is invalid: `valid` is False, the scores move to
+    `excluded_scores` and are None in the record, so no summary counts them."""
+    record["ungated_calls"] = ungated
+    record["valid"] = not ungated
+    if ungated:
+        record["invalid_reason"] = ("ungated tool execution (policy gate bypassed): "
+                                    + ", ".join(sorted({u.get("tool") or "?" for u in ungated})))
+        record["excluded_scores"] = {key: record.get(key) for key in SCORE_KEYS}
+        for key in SCORE_KEYS:
+            record[key] = None
+    return record
 
 
 def default_attack_model_name(provider: str, model: str) -> str:
@@ -124,10 +139,17 @@ class Session:
             self.result = result
             return result
 
+    def ungated_executions(self) -> list[dict]:
+        """Tool functions called outside the gate during this session (refused by the runtime)."""
+        return list(self.runtime.ungated_executions)
+
     def record(self, **extra) -> dict:
-        """Per-pair record in the live_evaluation.py schema (check_enforcement / summarize_live read it as is)."""
+        """Per-pair record in the live_evaluation.py schema (check_enforcement / summarize_live read it as is).
+
+        `ungated_calls` (bridge audit) and the runtime's refused executions decide `valid` (`invalidate_if_ungated`)."""
         result = self.result or {}
-        return {
+        ungated = list(extra.pop("ungated_calls", None) or []) + self.ungated_executions()
+        record = {
             "condition": self.config.condition, "suite": self.config.suite, "user_task": self.config.user_task,
             "injection_task": self.config.injection_task,
             "attack": self.config.attack if self.injection_task else None,
@@ -140,3 +162,4 @@ class Session:
             "trace": self.runtime.trace_records(),
             **extra,
         }
+        return invalidate_if_ungated(record, ungated)

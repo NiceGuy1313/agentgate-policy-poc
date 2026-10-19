@@ -77,9 +77,14 @@ def summarize(run_dir: Path, price_in: float | None, price_out: float | None) ->
     runs = [r for r in load_runs(run_dir)]
     labels = load_injection_labels()
     user_tasks, injection_tasks = load_benchmark_tasks()
+    invalid = [r for r in runs if r.get("valid") is False]   # policy gate bypassed: never scored
+    runs = [r for r in runs if r.get("valid") is not False]
     errors = [r for r in runs if r.get("error")]
     runs = [r for r in runs if not r.get("error")]
     summary = {"run": str(run_dir.relative_to(PROJECT_ROOT)) if run_dir.is_relative_to(PROJECT_ROOT) else str(run_dir), "n_runs": len(runs), "n_errors": len(errors),
+               "n_invalid": len(invalid),
+               "invalid": [(r["condition"], r["suite"], r["user_task"], r["injection_task"], r.get("invalid_reason"))
+                           for r in invalid[:20]],
                "agent_model": next((r.get("agent_model") for r in runs), None),
                "agent": next((r.get("agent") for r in runs), None),
                "attack": next((r.get("attack") for r in runs if r.get("attack")), None),

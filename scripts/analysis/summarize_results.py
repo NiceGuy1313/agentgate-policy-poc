@@ -75,7 +75,7 @@ COMPONENTS = """**TaskSpec 추출기** (`{spec_model}`): 사용자가 허락한 
 - 출력: ALLOW 또는 BLOCK과 이유 한 문장.
 
 **룰북 정적 코드** (`src/agentgate/policy_gate/rule_checker.py`, gate_static_rules): 같은 입력을 코드로 검사한다. LLM 호출이 없다.
-- 입력: 판정 LLM과 같은 TaskSpec·ToolSpec·대기 중 호출, 툴 인자 역할(`config/tool_args.yaml`).
+- 입력: 판정 LLM과 같은 TaskSpec·ToolSpec·대기 중 호출, 툴 인자 역할(`config/agentdojo/tool_args.yaml`).
 - 출력: ALLOW 또는 BLOCK과 막은 규칙 id(R1–R8). 어떤 규칙도 막지 않으면 ALLOW(R10).
 
 **툴** (AgentDojo v1.2.2 환경):

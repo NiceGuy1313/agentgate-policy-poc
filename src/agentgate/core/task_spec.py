@@ -42,15 +42,3 @@ class TaskSpec(BaseModel):
 def llm_spec_dir(model: str, root: Path | None = None) -> Path:
     """Stored LLM TaskSpecs (scripts/taskspec/extract_llm_specs.py): data/cache/specs/<model>/."""
     return (root or PROJECT_ROOT) / "data" / "cache" / "specs" / model.replace("/", "_")
-
-
-def load_task_spec(kind: str, suite: str, user_task_id: str, root: Path | None = None) -> TaskSpec:
-    """kind = 'oracle' (data/agentdojo/oracle_specs) or 'llm:<model>' (data/cache/specs/<model>)."""
-    root = root or PROJECT_ROOT
-    if kind == "oracle":
-        path = root / "data" / "agentdojo" / "oracle_specs" / suite / f"{user_task_id}.yaml"
-    elif kind.startswith("llm:"):
-        path = llm_spec_dir(kind.split(":", 1)[1], root) / suite / f"{user_task_id}.yaml"
-    else:
-        raise ValueError(f"unknown spec kind {kind}")
-    return TaskSpec.load(path)

@@ -1,12 +1,12 @@
 """실제 AgentDojo AgentPipeline 안의 정책 Gate를 검사한다(scripted 에이전트, 룰북 정적 코드, LLM 없음)."""
 
 from agentgate.agents.scripted_agent import ScriptedAgent
-from agentgate.core.task_spec import load_task_spec
 from agentgate.policy_gate.rule_checker import RuleChecker
 from agentgate.policy_gate.runtime import PolicyGateRuntime
 from agentgate.scenarios.pipeline import RecordingPipeline, build_pipeline, run_live_task
 from agentgate.scenarios.replay import build_injections
 from agentgate.scenarios.suites import load_suite
+from agentgate.scenarios.task_specs import load_task_spec
 
 
 def _run(mode):
@@ -36,6 +36,9 @@ def test_enforce_blocks_password_change_and_agent_sees_message():
     assert any(event.tool == "update_password" for event in blocked)
     assert result["security"] is False
     tool_messages = [m for m in result["messages"] if m["role"] == "tool" and m["tool"] == "update_password"]
-    assert "blocked by security policy" in (tool_messages[0]["error"] or "")
+    message = tool_messages[0]["error"] or ""
     judgement = next(e for e in blocked if e.tool == "update_password").decision["judge"]
     assert "R6" in judgement["rule_ids"]
+    # the agent sees the judge's rule ids and reason, not the judge record
+    assert message.startswith(f"Tool call blocked by policy gate ({', '.join(judgement['rule_ids'])}): ")
+    assert "not requested" in message and "cached" not in message and "{" not in message

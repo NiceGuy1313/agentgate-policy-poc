@@ -93,7 +93,7 @@ def test_blocked_call_result_reaches_model(fake_post):
     pipeline.query("hi", runtime, suite.load_and_inject_default_environment({}))
     assert runtime.trace[0].blocked and "Authorization" not in sent[0]["headers"]
     tool_msg = next(m for m in sent[1]["json"]["messages"] if m["role"] == "tool")
-    assert "blocked by security policy" in tool_msg["content"]
+    assert tool_msg["content"].startswith("Tool call blocked by policy gate (R1, R6): ")
 
 
 def test_retry_then_error(fake_post, monkeypatch):

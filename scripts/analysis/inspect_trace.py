@@ -19,12 +19,13 @@ import argparse
 import json
 import textwrap
 
-from agentgate.core.task_spec import TaskSpec, load_task_spec
+from agentgate.core.task_spec import TaskSpec
 from agentgate.core.types import ToolCall
 from agentgate.experiment.conditions import CONDITIONS, make_runtime
 from agentgate.policy_gate.rule_checker import RuleChecker
 from agentgate.policy_gate.runtime import PolicyGateRuntime
 from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
+from agentgate.scenarios.task_specs import load_task_spec
 
 VERDICT_MARKERS = {"ALLOW": "  ", "ESCALATE": "? ", "BLOCK": "X "}
 

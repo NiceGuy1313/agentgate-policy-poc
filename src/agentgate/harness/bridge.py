@@ -30,9 +30,14 @@ class GateToolBridge:
         return {spec["name"] for spec in self.tool_specs()}
 
     def invoke(self, tool: str, args: dict | None) -> str:
+        """Run one tool call through the policy gate; the text is what the agent receives (a block message if blocked)."""
+        return self.invoke_detail(tool, args)[0]
+
+    def invoke_detail(self, tool: str, args: dict | None) -> tuple[str, dict]:
+        """Like `invoke`, also returning the gate trace record (blocked / executed / error / judge)."""
         text, record = self.session.invoke(tool, args or {})
         self.observe(tool, args, text, record)
-        return text
+        return text, record
 
     def observe(self, tool: str, args: dict | None, text: str, record: dict) -> None:
         """Publish a gate decision and remember what the agent received."""
@@ -76,6 +81,8 @@ class GateToolBridge:
 
         Uses the framework's own `tool_start` boundary logs: a suite tool started more often than the gate saw
         it, or a tool that is neither a suite tool nor a declared framework-internal tool, was not gated.
+        Tool functions called outside the gate are refused by the runtime itself and listed by `Session.record`
+        (`GatedRuntime.ungated_executions`).
         """
         names = self.tool_names
         started = [e.data.get("action") for e in self.sink.events if e.kind == "tool_start"]

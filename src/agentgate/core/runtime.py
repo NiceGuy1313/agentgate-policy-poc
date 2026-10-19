@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextvars
 import hashlib
+import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -75,6 +76,42 @@ def format_block_message(result: EngineResult) -> str:
     return f"Tool call blocked by security policy {policy_id}: {reason}"
 
 
+BLOCK_REASON_CHARS = 240
+_RULE_ID = re.compile(r"\bR(?:10|[1-9])\b")
+
+
+def format_judge_block_message(judgement: dict) -> str:
+    """What the agent receives when the judge blocks: rule ids and a short one-line reason from the judge record,
+    e.g. "Tool call blocked by policy gate (R2, R3): ...". The full judge record stays in the trace only."""
+    reason = " ".join(str(judgement.get("reason") or judgement.get("text") or "").split())
+    reason = re.sub(r"^[*#`_ ]*(?:BLOCK|ALLOW)\b[\s:.\-]*", "", reason, flags=re.IGNORECASE)   # LLM answer word
+    rule_ids = list(judgement.get("rule_ids") or dict.fromkeys(_RULE_ID.findall(reason)))
+    if len(reason) > BLOCK_REASON_CHARS:
+        reason = reason[:BLOCK_REASON_CHARS - 1].rstrip() + "…"
+    label = f" ({', '.join(rule_ids)})" if rule_ids else ""
+    return f"Tool call blocked by policy gate{label}: {reason or 'the call is outside the requested task'}"
+
+
+NO_TASKSPEC_MESSAGE = "Tool call blocked by policy gate: no TaskSpec is configured for this task (fail closed)."
+
+
+class UngatedExecutionError(PermissionError):
+    """A tool function was called outside `GatedRuntime.run_function` (a gate bypass); it was not executed."""
+
+
+def _guarded(function, ungated: list[dict]):
+    """Copy of an AgentDojo `Function` that runs only inside the gate; any other call is refused and recorded."""
+    run = function.run
+
+    def guarded_run(*args, **kwargs):
+        if not INSIDE_GATE.get():
+            ungated.append({"tool": function.name, "reason": "executed outside the policy gate (refused)"})
+            raise UngatedExecutionError(f"{function.name} may only run through the policy gate")
+        return run(*args, **kwargs)
+
+    return function.model_copy(update={"run": guarded_run})
+
+
 class GatedRuntime(FunctionsRuntime):
     index_class = ValueIndex
     trace_label_keys: tuple[str, ...] = ()   # label summaries copied into trace_records (subclasses)
@@ -93,6 +130,9 @@ class GatedRuntime(FunctionsRuntime):
         config: dict | None = None,
     ):
         super().__init__(functions)
+        # every tool function refuses to run outside run_function (bypass guard); refusals are listed here
+        self.ungated_executions: list[dict] = []
+        self.functions = {name: _guarded(f, self.ungated_executions) for name, f in self.functions.items()}
         if mode not in ("audit", "enforce"):
             raise ValueError("mode must be audit | enforce")
         self.engine = engine or AllowAllPolicyEngine()
@@ -159,7 +199,7 @@ class GatedRuntime(FunctionsRuntime):
 
         if self.mode == "enforce" and effective == Verdict.BLOCK:
             event.blocked = True
-            message = format_block_message(result)
+            message = self.block_message(result, judgement)
             event.output_text = message
             self.trace.append(event)
             return (message, None) if raise_on_error else (message, message)
@@ -194,6 +234,15 @@ class GatedRuntime(FunctionsRuntime):
             judgement = self.finalize_judgement(self.judge(call, result, self.context))
             return Verdict(judgement["verdict"]), judgement
         return Verdict.BLOCK, None
+
+    def block_message(self, result: EngineResult, judgement: dict | None) -> str:
+        """Text the agent receives for a blocked call: the judge's rule ids and reason when a judge decided, else the
+        engine's primary decision."""
+        if self.index is None:
+            return NO_TASKSPEC_MESSAGE
+        if judgement is not None:
+            return format_judge_block_message(judgement)
+        return format_block_message(result)
 
     def label_response(self, source, event: TraceEvent) -> None:
         """Attach labels to an executed response (PolicyGateRuntime: ToolSpec). Default: none."""

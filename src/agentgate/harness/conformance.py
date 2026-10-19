@@ -1,14 +1,16 @@
 """Conformance kit: does a framework adapter / Wrapper put every tool call through the gate correctly?
 
-LLM-free (the ToolSpec extractor is replaced by an empty one, `offline_toolspec`). Each framework is driven by the scripted fake LLM (`fake_llm.FakeLLMServer`) through its real model
-path; the reference is the native AgentDojo pipeline with `ScriptedAgent` (`run_live_task`). For each pair and
-condition the check requires:
+LLM-free and network-free: the ToolSpec extractor is replaced by an empty one (`offline_toolspec`), and each framework
+is driven by the scripted fake LLM (`fake_llm.FakeLLMServer`) through its real model path; the reference is the native
+AgentDojo pipeline with `ScriptedAgent` (`run_live_task`). For each pair and condition the check requires:
+  - the adapter declares the mandatory gate (`FrameworkAdapter.contract_problems` is empty);
   - same gate trace as the reference (tool, effective verdict, blocked) and same utility / security;
   - no blocked call executed, environment unchanged across blocked calls (check_enforcement.check_run);
-  - no ungated tool executions; event order tool_start -> gate_decision -> tool_end where tool_start is logged
-    (or the decisions sit inside a framework-internal dispatcher such as mini-swe-agent's `bash`).
+  - a valid run: no ungated tool executions (boundary-log audit and the runtime's refused executions); event order
+    tool_start -> gate_decision -> tool_end where tool_start is logged (or the decisions sit inside a
+    framework-internal dispatcher such as mini-swe-agent's `bash`).
 
-  python -m agentgate.harness.conformance --framework smolagents
+  python -m agentgate.harness.conformance --framework smolagents --condition gate_static_rules
   python -m agentgate.harness.conformance --entry "python path/to/wrapper.py"     # an unregistered Wrapper
 """
 
@@ -86,6 +88,10 @@ def _run_case(framework: str, pair, condition: str, options: dict | None = None)
     sys.path.insert(0, str(registry.CONFIG_DIR.parent / "scripts" / "analysis"))
     from check_enforcement import check_run
 
+    contract = [f"adapter contract: {p}" for p in registry.get(framework).contract_problems()]
+    if contract:   # the runner would refuse it; nothing to run
+        return {"framework": framework, "pair": ":".join(p or "none" for p in pair), "condition": condition,
+                "ok": False, "problems": contract, "trace": []}
     expected = reference(pair, condition)
     config = ScenarioConfig(*pair, condition=condition, attack_model_name="GPT-4")
     session = Session(config)
@@ -95,6 +101,8 @@ def _run_case(framework: str, pair, condition: str, options: dict | None = None)
                              options or {})
         record = run_scenario(request, sink, session)
     problems = []
+    if record.get("valid") is False:
+        problems.append(f"invalid run: {record.get('invalid_reason')}")
     if record.get("error"):
         problems.append(f"run error: {record['error'][:300]}")
     if _signature(record["trace"]) != _signature(expected["trace"]):
@@ -114,13 +122,17 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--framework", help="registered framework name")
     group.add_argument("--entry", help="command of an unregistered contract v1 Wrapper")
-    parser.add_argument("--conditions", nargs="+", default=list(DEFAULT_CONDITIONS), choices=list(CONDITIONS))
+    parser.add_argument("--conditions", "--condition", dest="conditions", nargs="+", default=list(DEFAULT_CONDITIONS),
+                        choices=list(CONDITIONS))
     parser.add_argument("--options", default="{}", help="framework options as JSON")
     args = parser.parse_args()
     name = args.framework
     if args.entry:
         name = "conformance-entry"
         registry._entries()[name] = {"contract": {"command": shlex.split(args.entry)}}
+    if reason := registry.get(name).unavailable_reason():
+        print(f"UNAVAILABLE {name}: {reason}")
+        sys.exit(2)
     results = [run_case(name, pair, condition, json.loads(args.options))
                for pair in DEFAULT_PAIRS for condition in args.conditions]
     for result in results:

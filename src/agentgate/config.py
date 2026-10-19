@@ -1,7 +1,7 @@
 """공통 경로, YAML 설정 loader, `.env` loader를 제공한다.
 
-Gate 설정(config/gate.yaml), 룰북(config/rulebook.yaml, config/tool_args.yaml)은 각 모듈이 읽는다. 여기에는
-AgentDojo 툴 환경 바인딩(config/agentdojo/) loader만 둔다.
+Gate 설정(config/gate.yaml), 룰북(config/rulebook.yaml)은 각 모듈이 읽는다. 여기에는 AgentDojo 툴 환경
+바인딩(config/agentdojo/: 툴 역할, 툴 인자 역할, 민감 읽기, 지목 자료 규칙) loader만 둔다.
 """
 
 from __future__ import annotations
@@ -34,9 +34,21 @@ def sensitive_categories_for_tool(tool: str) -> list[str]:
     return [category for category, tools in load_sensitive_read_categories().items() if tool in tools]
 
 
+def load_tool_roles() -> dict[str, list[str]]:
+    """Effect categories of config/agentdojo/tool_roles.yaml: category -> tool names."""
+    return load_config_yaml("agentdojo/tool_roles.yaml")["effect"]
+
+
 def load_effect_tools() -> set[str]:
-    roles = load_config_yaml("agentdojo/tool_roles.yaml")
-    return {tool for tools in roles["effect"].values() for tool in tools}
+    return {tool for tools in load_tool_roles().values() for tool in tools}
+
+
+TOOL_ARGS_FILE = "agentdojo/tool_args.yaml"
+
+
+def load_tool_args() -> dict:
+    """Argument roles of effect tools (config/agentdojo/tool_args.yaml)."""
+    return load_config_yaml(TOOL_ARGS_FILE)
 
 
 def load_dotenv(path: Path | None = None) -> None:

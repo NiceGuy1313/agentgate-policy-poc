@@ -1,7 +1,8 @@
 """Normalized run events.
 
 A superset of the event format used by the NiceGuy1313 framework dashboards (`run`, `llm_query`, `llm_response`,
-`llm_error`, `tool_start`, `tool_end`, `tool_error`, `step`, `log`) plus `gate_decision` and `result`. Those
+`llm_error`, `tool_start`, `tool_end`, `tool_error`, `step`, `log`) plus `gate_decision`, `gate_bypass` (a tool
+execution outside the policy gate: the run is invalid) and `result`. Those
 dashboards turn boundary log records such as ``"[TOOL_EXECUTION_START] action=%s params=%s"`` into events;
 `BoundaryLogHandler` does the same generically by reading the ``key=%s`` names from the format string, so a new
 framework that follows the same logging convention needs no parser of its own.
@@ -21,7 +22,8 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 KINDS = ("run", "llm_query", "llm_response", "llm_error", "tool_start", "gate_decision", "tool_end", "tool_error",
-         "step", "result", "log")
+         "step", "result", "log", "gate_bypass")
+AGENTGATE_ONLY_KINDS = ("gate_decision", "gate_bypass", "result")   # never accepted from a Wrapper
 TAG_TO_KIND = {
     "[LLM_QUERY]": "llm_query",
     "[LLM_RESPONSE]": "llm_response",

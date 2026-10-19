@@ -25,10 +25,10 @@ from pathlib import Path
 
 from agentgate import BENCHMARK_VERSION, SUITES
 from agentgate.config import PROJECT_ROOT, load_dotenv
-from agentgate.core.task_spec import load_task_spec
 from agentgate.experiment.conditions import CONDITIONS, get_condition, make_runtime
 from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
 from agentgate.scenarios.suites import load_suite
+from agentgate.scenarios.task_specs import load_task_spec
 
 
 def _run_job(job):

@@ -10,10 +10,11 @@ import os
 import time
 
 from agentgate.agents.ollama_agent import OllamaAgentLLM
-from agentgate.core.task_spec import TaskSpec, load_task_spec
+from agentgate.core.task_spec import TaskSpec
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.scenarios.suites import describe_tools, load_suite
+from agentgate.scenarios.task_specs import load_task_spec
 
 
 class UsageMeter:

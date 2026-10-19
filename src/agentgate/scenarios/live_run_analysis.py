@@ -19,11 +19,13 @@ ATTACKER_DESTINATIONS = [   # 공격 태스크의 외부 목적지. 검증 결�
 
 
 def live_run_files(run_dir: Path) -> list[Path]:
-    """Per-pair live-run records under run_dir (C*/<suite>/<user_task>/<injection_task>.json), sorted.
+    """Per-pair live-run records under run_dir (<condition>/<suite>/<user_task>/<injection_task>.json, condition a
+    current name such as gate_static_rules or a legacy C* name), sorted.
 
     Raw run directories are committed only as runs.tar.gz, so a fresh clone has none until it is unpacked.
     Raises instead of returning [] so that callers never overwrite committed summaries with empty ones."""
-    files = sorted(run_dir.glob("C*/*/*/*.json"))
+    from agentgate.experiment.conditions import CONDITIONS
+    files = sorted(p for p in run_dir.glob("*/*/*/*.json") if p.parts[-4] in CONDITIONS or p.parts[-4].startswith("C"))
     if not files:
         raise FileNotFoundError(f"no live-run records under {run_dir}; unpack them first: "
                                 f"tar -xzf {run_dir}/runs.tar.gz -C {run_dir}")

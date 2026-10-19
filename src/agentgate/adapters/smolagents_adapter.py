@@ -140,6 +140,7 @@ class SmolagentsAdapter(FrameworkAdapter):
     package = "smolagents"
     loggers = ("smolagents",)
     internal_tools = frozenset({"final_answer"})
+    routes_tools_through_bridge = True   # every tool's forward / command calls bridge.invoke
 
     def options_schema(self) -> dict:
         return {"type": "object", "properties": {

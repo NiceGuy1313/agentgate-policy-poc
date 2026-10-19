@@ -170,6 +170,7 @@ class MiniSweAgentAdapter(FrameworkAdapter):
     package = "mini-swe-agent"
     loggers = ("agent",)
     internal_tools = frozenset({"bash"})   # the dispatcher: every command inside it is gated
+    routes_tools_through_bridge = True   # every tool's forward / command calls bridge.invoke
 
     def architecture_html(self) -> Path | None:
         path = DASHBOARD_DIR / "static" / "arch" / "mini-swe-agent.html"

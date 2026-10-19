@@ -3,6 +3,13 @@
 To add a framework: subclass `FrameworkAdapter`, implement `run`, and register it (built-in table in
 `agentgate.harness.registry`, a `config/frameworks.yaml` entry, or an `agentgate.frameworks` entry point).
 Nothing else (server, UI, batch script, conformance test) changes.
+
+Mandatory policy gate: an adapter executes AgentDojo tools only through `GateToolBridge.invoke` (or
+`invoke_detail`) -> `Session.invoke` -> `PolicyGateRuntime.run_function`, and declares it with
+`routes_tools_through_bridge = True`. The registry and the runner refuse an adapter without the declaration
+(`contract_problems`), the conformance kit (`python -m agentgate.harness.conformance`) checks the behaviour, and a
+run with any tool execution outside the gate is reported invalid with its scores excluded.
+Every adapter runs under every experiment condition.
 """
 
 from __future__ import annotations
@@ -60,11 +67,24 @@ class FrameworkAdapter:
     package: str | None = None                # distribution name for the run manifest
     loggers: tuple[str, ...] = ()             # boundary-log loggers to capture
     internal_tools: frozenset[str] = frozenset()   # framework-own tools that are not AgentDojo tools
-    conditions: tuple[str, ...] = FRAMEWORK_CONDITIONS
+    routes_tools_through_bridge: bool = False  # the adapter's declaration of the mandatory-gate contract (above)
+    conditions: tuple[str, ...] = FRAMEWORK_CONDITIONS   # informational: every adapter runs every condition
     default_max_steps = 15                    # AgentDojo's tool loop limit, for comparability
     subprocess_python: str | None = None      # set by the registry from `python:` in config/frameworks.yaml
 
+    def contract_problems(self) -> list[str]:
+        """Why this adapter breaks the adapter contract (empty when it may run)."""
+        problems = []
+        if self.routes_tools_through_bridge is not True:
+            problems.append("does not declare routes_tools_through_bridge = True (tools must run through "
+                            "GateToolBridge.invoke)")
+        if type(self).run is FrameworkAdapter.run:
+            problems.append("does not implement run()")
+        return problems
+
     def unavailable_reason(self) -> str | None:
+        if problems := self.contract_problems():
+            return "adapter contract: " + "; ".join(problems)
         if self.subprocess_python:
             return _probe_interpreter(self.subprocess_python, self.requires)
         missing = [m for m in self.requires if importlib.util.find_spec(m) is None]

@@ -52,8 +52,8 @@ def _git_commit() -> str | None:
 
 def config_hash() -> str:
     digest = hashlib.sha1()
-    for path in sorted(CONFIG_DIR.glob("*.yaml")):
-        digest.update(path.name.encode() + path.read_bytes())
+    for path in sorted(CONFIG_DIR.rglob("*.yaml")):   # config/agentdojo/ (tool bindings) included
+        digest.update(str(path.relative_to(CONFIG_DIR)).encode() + path.read_bytes())
     return digest.hexdigest()[:12]
 
 
@@ -68,10 +68,10 @@ def manifest(request: RunRequest, adapter) -> dict:
 def run_scenario(request: RunRequest, sink: EventSink | None = None, session: Session | None = None) -> dict:
     sink = sink or EventSink(run_id=str(uuid.uuid4()))
     adapter = registry.get(request.framework)
+    if problems := adapter.contract_problems():   # registration check: the mandatory policy gate
+        raise RuntimeError(f"framework {request.framework!r} breaks the adapter contract: {'; '.join(problems)}")
     if reason := adapter.unavailable_reason():
         raise RuntimeError(f"framework {request.framework!r} unavailable: {reason}")
-    if request.scenario.condition not in adapter.conditions:
-        raise ValueError(f"{request.framework} does not support {request.scenario.condition}")
     max_steps = request.max_steps or adapter.default_max_steps
     run_manifest = manifest(request, adapter)
     session = session or Session(request.scenario)
@@ -103,14 +103,16 @@ def run_scenario(request: RunRequest, sink: EventSink | None = None, session: Se
                                                  if e.kind in ("llm_response", "llm_error")), 1),
                       "steps": result.steps},
         ungated_calls=ungated, framework_info=result.info)
-    if ungated:
-        record["valid"] = False
+    if not record["valid"]:
+        sink.emit("gate_bypass", f"Run invalid: {record['invalid_reason']}", level="ERROR",
+                  data={"ungated_calls": record["ungated_calls"], "excluded_scores": record["excluded_scores"]})
     sink.emit("result", "Run finished" if error is None else f"Run failed: {result.error}",
               level="ERROR" if error else "INFO",
               data={"utility": scored.get("utility"), "security": scored.get("security"),
                     "security_executed": scored.get("security_executed"), "final_output": scored.get("final_output"),
                     "blocked": sum(1 for e in record["trace"] if e["blocked"]), "tool_calls": len(record["trace"]),
-                    "ungated_calls": ungated, "error": error, "usage": record["agent_tokens"]})
+                    "ungated_calls": record["ungated_calls"], "valid": record["valid"], "error": error,
+                    "usage": record["agent_tokens"]})
     return record
 
 

@@ -1,6 +1,7 @@
 """live run의 차단 무결성을 검사한다.
 
 run별 검사 항목:
+  0. 정책 Gate를 거치지 않은 툴 실행(ungated_calls)이 없는가
   1. blocked=True인 호출이 실행되지 않았는가
   2. 차단된 호출 전후로 환경이 바뀌지 않았는가 (차단 호출 직전 hash == 다음 gate event 직전 hash,
      마지막 호출이면 최종 hash)
@@ -35,6 +36,8 @@ def check_run(run: dict) -> list[dict]:
                 issues.append({"check": "env_changed_on_block", "step": i, "tool": event["tool"]})
         if event["executed"] and event.get("effective") == "BLOCK" and get_condition(run["condition"]).mode == "enforce":
             issues.append({"check": "enforce_block_executed", "step": i, "tool": event["tool"]})
+    for ungated in run.get("ungated_calls") or []:   # a tool execution outside the policy gate (run is invalid)
+        issues.append({"check": "ungated_execution", "tool": ungated.get("tool"), "reason": ungated.get("reason")})
     # Every tool result the agent received must come from exactly one gate event (same tool, same order).
     tool_messages = [m for m in run.get("messages", []) if m["role"] == "tool"]
     processed_tools = [m["tool"] for m in tool_messages

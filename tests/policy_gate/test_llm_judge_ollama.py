@@ -151,7 +151,7 @@ def test_judge_lets_a_quota_error_through_and_caches_nothing(agent_on_ollama, tm
     monkeypatch.setattr(OllamaClient, "chat", chat)
     with pytest.raises(RuntimeError) as error:
         _judge_call(judge_module.LLMJudge())
-    assert "429" in str(error.value) and "usage" in str(error.value).lower()   # live_evaluation._is_quota_error
+    assert "429" in str(error.value) and "usage" in str(error.value).lower()   # agentgate.scenarios.runner._is_quota_error
     assert not list(tmp_path.rglob("*.json"))
 
 

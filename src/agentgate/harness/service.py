@@ -2,6 +2,11 @@
 
 Mounted by the dashboard (`dashboard/app.py`); `serve_background()` starts it alone for batch runs of
 contract Wrappers. Binds to 127.0.0.1 only; every session endpoint needs the session's bearer token.
+
+Fail closed: `/invoke` is the only way to execute a scenario tool, and it goes through the policy gate. A session
+without a TaskSpec blocks every call; `/decide` judges only the Wrapper's own tools (scenario tools: 400); a Wrapper
+cannot report gate decisions, bypasses or results; tool executions the Wrapper reports (`tool_start`) that the gate
+never saw make the run invalid.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from pydantic import BaseModel
 
 from agentgate.harness import CONTRACT_VERSION
 from agentgate.harness.bridge import GateToolBridge
-from agentgate.harness.events import EventSink
+from agentgate.harness.events import AGENTGATE_ONLY_KINDS, EventSink
 from agentgate.harness.session import ScenarioConfig, Session
 
 
@@ -29,6 +34,7 @@ class Entry:
     token: str
     framework: str = "external"
     model: dict = field(default_factory=dict)
+    internal_tools: frozenset[str] = frozenset()   # the Wrapper's own tools (not scenario tools)
     final_output: str | None = None
     finished: bool = False
     record: dict | None = None
@@ -41,11 +47,12 @@ class SessionStore:
         self.lock = threading.Lock()
 
     def add(self, session: Session, bridge: GateToolBridge, sink: EventSink, framework: str = "external",
-            model: dict | None = None) -> tuple[str, str]:
+            model: dict | None = None, internal_tools=()) -> tuple[str, str]:
         session_id, token = sink.run_id or str(uuid.uuid4()), secrets.token_urlsafe(24)
         sink.run_id = session_id
         with self.lock:
-            self.entries[session_id] = Entry(session, bridge, sink, token, framework, model or {})
+            self.entries[session_id] = Entry(session, bridge, sink, token, framework, model or {},
+                                             frozenset(internal_tools))
         return session_id, token
 
     def get(self, session_id: str, authorization: str | None) -> Entry:
@@ -66,6 +73,7 @@ class CreateSession(BaseModel):
     scenario: dict
     framework: str = "external"
     model: dict = {}
+    internal_tools: list[str] = []
 
 
 class ToolCallBody(BaseModel):
@@ -89,7 +97,8 @@ def create_session(body: CreateSession) -> dict:
     except Exception as error:
         raise HTTPException(400, f"{type(error).__name__}: {error}") from None
     sink = EventSink(run_id=str(uuid.uuid4()))
-    session_id, token = store.add(session, GateToolBridge(session, sink), sink, body.framework, body.model)
+    session_id, token = store.add(session, GateToolBridge(session, sink), sink, body.framework, body.model,
+                                  body.internal_tools)
     sink.emit("run", f"Run started: {body.framework} · {session.config.suite}/{session.config.user_task}/"
                      f"{session.config.injection_task or '-'} · {session.config.condition}",
               data={"task": session.prompt, "scenario": session.config.as_dict(), "external": True})
@@ -113,23 +122,27 @@ def invoke(session_id: str, body: ToolCallBody, authorization: str | None = Head
     entry = store.get(session_id, authorization)
     if entry.finished:
         raise HTTPException(409, "session finished")
-    output = entry.bridge.invoke(body.tool, body.args)
-    last = entry.sink.events[-1].data if entry.sink.events else {}
-    return {"output": output, "blocked": bool(last.get("blocked")), "verdict": last.get("verdict"),
-            "effective": last.get("effective"), "policy_id": last.get("policy_id"), "reason": last.get("reason")}
+    output, record = entry.bridge.invoke_detail(body.tool, body.args)   # the gate (fail closed without a TaskSpec)
+    last = next((e.data for e in reversed(entry.sink.events) if e.kind == "gate_decision"), {})
+    return {"output": output, "blocked": bool(record.get("blocked")), "verdict": record.get("verdict"),
+            "effective": record.get("effective"), "policy_id": last.get("policy_id"), "reason": last.get("reason")}
 
 
 @router.post("/sessions/{session_id}/decide")
 def decide(session_id: str, body: ToolCallBody, authorization: str | None = Header(None)) -> dict:
-    return store.get(session_id, authorization).bridge.decide(body.tool, body.args)
+    """Decision only, for the Wrapper's own tools. Scenario tools execute only through /invoke."""
+    entry = store.get(session_id, authorization)
+    if body.tool in entry.bridge.tool_names:
+        raise HTTPException(400, f"{body.tool} is a scenario tool: call /invoke (the policy gate executes it)")
+    return entry.bridge.decide(body.tool, body.args)
 
 
 @router.post("/sessions/{session_id}/events")
 def events(session_id: str, body: EventsBody, authorization: str | None = Header(None)) -> dict:
     entry = store.get(session_id, authorization)
     for event in body.events:
-        if event.get("kind") in ("gate_decision", "result"):
-            continue   # only agentgate itself reports gate decisions and results
+        if event.get("kind") in AGENTGATE_ONLY_KINDS:
+            continue   # only agentgate itself reports gate decisions, bypasses and results
         try:
             entry.sink.emit_raw(event)
         except ValueError as error:
@@ -147,10 +160,15 @@ def finish(session_id: str, body: FinishBody, authorization: str | None = Header
         if entry.framework == "external":   # nobody else will build the record
             entry.record = entry.session.record(agent="framework", framework="external",
                                                 messages=entry.bridge.messages(body.final_output),
-                                                ungated_calls=[])
-            entry.sink.emit("result", "Run finished", data={k: result.get(k) for k in
+                                                ungated_calls=entry.bridge.ungated_calls(entry.internal_tools))
+            if not entry.record["valid"]:
+                entry.sink.emit("gate_bypass", f"Run invalid: {entry.record['invalid_reason']}", level="ERROR",
+                                data={"ungated_calls": entry.record["ungated_calls"]})
+            entry.sink.emit("result", "Run finished", data={k: entry.record.get(k) for k in
                                                             ("utility", "security", "security_executed",
-                                                             "final_output")})
+                                                             "final_output", "valid")})
+    if entry.record is not None:
+        return {k: entry.record.get(k) for k in ("utility", "security", "security_executed", "valid")}
     return {k: result.get(k) for k in ("utility", "security", "security_executed")}
 
 

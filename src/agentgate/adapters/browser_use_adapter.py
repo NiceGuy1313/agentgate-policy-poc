@@ -138,6 +138,7 @@ class BrowserUseAdapter(FrameworkAdapter):
     package = "browser-use"
     loggers = ("browser_use",)
     internal_tools = frozenset({"done", *FILE_ACTIONS})
+    routes_tools_through_bridge = True   # every AgentDojo action calls bridge.invoke
 
     def options_schema(self) -> dict:
         return {"type": "object", "properties": {

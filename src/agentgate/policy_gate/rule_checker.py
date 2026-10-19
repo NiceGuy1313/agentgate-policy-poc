@@ -2,7 +2,7 @@
 
 입력은 TaskSpec, 지금까지 실행된 툴 응답의 표준 ToolSpec(`IndexedSource.labels["toolspec"]`), ValueIndex, 대기 중
 호출뿐이다. 툴 응답 원문은 ValueIndex의 출처 판정(origin_of)과 겹침 검사(R4)에만 쓴다. 인자 역할은
-config/tool_args.yaml(AgentDojo 바인딩)이다.
+config/agentdojo/tool_args.yaml(AgentDojo 바인딩)이다.
 
 판정은 ALLOW / BLOCK 두 가지뿐이다(ESCALATE 없음). 규칙 함수는 BLOCK 이유(str) 또는 None을 낸다. 모든 규칙을
 돌려 막은 규칙 id를 모두 남기고, 하나라도 막으면 BLOCK, 아무도 막지 않으면 ALLOW(R10)다. 규칙 함수가 예외를 내면
@@ -42,7 +42,7 @@ config/tool_args.yaml(AgentDojo 바인딩)이다.
   R6 삭제·계정·권한: tool_roles의 delete·account·share 툴은 requested_ops에 있어야 하고, target_id 값은 프롬프트나
      지목 자료에서 와야 하고(origin PROMPT 계열·NAMED_SOURCE, 짧은 id는 프롬프트의 독립 토큰도 인정하되 "10:00"·
      "2024-05-13" 같은 시각·날짜 안의 숫자는 제외), 새 비밀번호는
-     프롬프트에 있어야 한다. 이 세션에서 보낸 이메일을 지우면 BLOCK.
+     프롬프트에 있어야 한다. 이 세션에서 보낸 메시지(tool_args.yaml message_tools)를 지우면 BLOCK.
   R7 URL: 방문 URL은 근거 있는 값이어야 한다(프롬프트, 지목 데이터 urls, 위임 요청 targets). outgoing 툴의 content 속
      URL은 출처가 OTHER_TOOL(지목하지 않은 응답에만 있음)이고 위임 요청 targets에도 없으면 BLOCK.
   R8 권한·긴급성 사칭: R2에서 일치한 요청(위임 자료 포함) 중 claims(authority·override·urgency·conceal)가 하나라도
@@ -297,6 +297,8 @@ class RuleChecker:
         categories = tool_roles()
         self.visit_tools = set(categories.get("visit", []))
         self.r6_tools = {t for c in ("delete", "account", "share") for t in categories.get(c, [])}
+        # deleting a message this session sent (covering tracks): delete tools of kind message
+        self.message_delete_tools = set(categories.get("delete", [])) & set(config.get("message_tools", []))
         self.rules: dict[str, Callable[[_Facts], str | None]] = {
             "R1": self.r1, "R2": self.r2, "R3": self.r3, "R4": self.r4_egress, "R5": self.r5, "R6": self.r6,
             "R7": self.r7, "R8": self.r8}
@@ -388,10 +390,10 @@ class RuleChecker:
     def r6(self, f: _Facts) -> str | None:
         if f.call.tool in self.r6_tools and f.call.tool not in f.spec.requested_ops:
             return f"{f.call.tool} (deletion/account/permission) was not requested"
-        if f.call.tool == "delete_email":
-            sent = [v for v in f.args.get("target_id", []) if str(v) in f.session.sent_email_ids]
+        if f.call.tool in self.message_delete_tools:
+            sent = [v for v in f.args.get("target_id", []) if str(v) in f.session.sent_message_ids]
             if sent:
-                return f"deletes e-mail {sent} sent in this session"
+                return f"deletes message {sent} sent in this session"
         if f.call.tool in self.r6_tools:
             bad = [str(v) for v in f.args.get("target_id", []) if not f.from_prompt_or_named(v)]
             if bad:

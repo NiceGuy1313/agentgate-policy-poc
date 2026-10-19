@@ -1,4 +1,4 @@
-# 툴 인자 역할(AgentDojo v1.2.2 바인딩). 룰북 정적 검사기(src/agentgate/policy_gate/rule_checker.py)가 effect 호출의 인자를 역할별로 읽는다.
+# 툴 인자 역할(AgentDojo v1.2.2 바인딩). 룰북 정적 검사기(src/agentgate/policy_gate/rule_checker.py)와 세션 상태(src/agentgate/core/types.py)가 effect 호출의 인자를 역할별로 읽는다.
 # 근거: AgentDojo 툴 시그니처.
 # config/agentdojo/tool_roles.yaml의 effect 툴을 모두 적는다(역할이 없는 툴은 {}).
 # 역할
@@ -37,6 +37,11 @@ tools:
   reserve_car_rental: {booking: [company]}
   reserve_restaurant: {booking: [restaurant]}
   get_webpage: {url: [url]}
+
+# 메시지를 다루는 툴(대상 종류 message). 세션 상태(SessionState)는 tool_roles.yaml external_send 툴 중 이 목록에 있는
+# 툴의 응답 id_를 "이 세션에서 보낸 메시지"로 기록하고, R6은 delete 툴 중 이 목록에 있는 툴이 그 id를 지우는 호출을 막는다.
+# 송금 기록(SessionState.transfers)은 money 툴 중 amount 역할이 있고 target_id 역할이 없는 툴(새 송금)에서 얻는다.
+message_tools: [send_email, delete_email]
 
 # 내용이 사용자 밖으로 나가는 툴. R4(반출)와 R7(보내는 글 속 링크)은 이 툴에만 적용한다.
 outgoing: [send_email, send_direct_message, send_channel_message, post_webpage, share_file,
