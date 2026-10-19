@@ -15,7 +15,7 @@ from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.events import preview
 from agentgate.harness.tool_schema import arguments
 
-DASHBOARD_DIR = Path(__file__).resolve().parents[4] / "dashboard"
+DASHBOARD_DIR = Path(__file__).resolve().parents[3] / "dashboard"
 
 
 def make_tools(bridge):

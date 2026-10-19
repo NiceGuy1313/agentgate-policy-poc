@@ -3,727 +3,873 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>agentgate 관측 대시보드</title>
-<!-- Layout and call-history rendering adapted from the NiceGuy1313 "Agent Observatory" dashboards
-     (smolagents fork, Apache-2.0; mini-swe-agent and browser-use forks, MIT). -->
-<!-- JSON viewer: json-formatter-js 2.5.23 (MIT), vendored under static/vendor/ -->
+<title>agentgate 검증 콘솔</title>
+<!-- JSON viewer: json-formatter-js 2.5.23 (MIT), vendored under static/vendor/. Mono font: JetBrains Mono (OFL), vendored. -->
 <link rel="stylesheet" href="/vendor/json-formatter-js-2.5.23/json-formatter.css">
 <script src="/vendor/json-formatter-js-2.5.23/json-formatter.umd.js"></script>
 <style>
-/* light palette only: the dashboard ignores the OS dark-mode preference */
+@font-face{font-family:"JetBrains Mono";font-weight:400 800;font-display:swap;
+  src:url(/vendor/jetbrains-mono/JetBrainsMono-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215}
+
+/* Tokens. Cool slate surfaces, one cobalt accent for "selected", and verdict colors (green ALLOW / red BLOCK) that
+   carry the meaning. Not an editorial palette: this is an instrument panel. */
 :root{
-  color-scheme:light;
-  --bg:#f8fafc;--panel:#ffffff;--panel-2:#f1f5f9;--line:#e2e8f0;--line-2:#cbd5e1;
-  --text:#0f172a;--muted:#55657e;--faint:#94a3b8;
-  --llm:#0e7490;--llm-bg:rgba(14,116,144,.07);
-  --tool:#a16207;--tool-bg:rgba(161,98,7,.07);
-  --plan:#6d28d9;--inj:#be185d;
-  --ok:#15803d;--ok-bg:rgba(21,128,61,.07);--warn:#b45309;--err:#be123c;--err-bg:rgba(190,18,60,.06);
-  --accent:#0284c7;--accent-ink:#ffffff;
-  --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light dark;
+  --bg:#eceff4;--surface:#ffffff;--surface-2:#f4f6f9;--surface-3:#e8ecf1;
+  --line:#d6dce5;--line-strong:#b4becb;
+  --ink:#0e1a27;--muted:#52606f;--faint:#7e8b9a;
+  --accent:#2152e0;--accent-ink:#ffffff;--accent-soft:rgba(33,82,224,.09);
+  --allow:#0c7752;--allow-soft:rgba(12,119,82,.10);
+  --block:#bd2f26;--block-soft:rgba(189,47,38,.09);
+  --warn:#955600;--warn-soft:rgba(149,86,0,.11);
+  --shadow:0 1px 2px rgba(14,26,39,.06),0 10px 24px -14px rgba(14,26,39,.18);
+  --sans:"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,"Apple SD Gothic Neo","Noto Sans KR",monospace;
+  --r:12px;
 }
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a1016;--surface:#111921;--surface-2:#16202a;--surface-3:#1d2935;
+  --line:#233140;--line-strong:#374a5e;
+  --ink:#e7edf3;--muted:#9aa9b9;--faint:#6d7e90;
+  --accent:#7ba3ff;--accent-ink:#0a1016;--accent-soft:rgba(123,163,255,.13);
+  --allow:#4ccb9f;--allow-soft:rgba(76,203,159,.13);
+  --block:#ff7a6e;--block-soft:rgba(255,122,110,.13);
+  --warn:#e8ab42;--warn-soft:rgba(232,171,66,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 24px -14px rgba(0,0,0,.6)}}
+:root[data-theme="dark"]{
+  --bg:#0a1016;--surface:#111921;--surface-2:#16202a;--surface-3:#1d2935;
+  --line:#233140;--line-strong:#374a5e;
+  --ink:#e7edf3;--muted:#9aa9b9;--faint:#6d7e90;
+  --accent:#7ba3ff;--accent-ink:#0a1016;--accent-soft:rgba(123,163,255,.13);
+  --allow:#4ccb9f;--allow-soft:rgba(76,203,159,.13);
+  --block:#ff7a6e;--block-soft:rgba(255,122,110,.13);
+  --warn:#e8ab42;--warn-soft:rgba(232,171,66,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 24px -14px rgba(0,0,0,.6)}
+
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
-header{min-height:52px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
-h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap}
-h1 span{color:var(--muted);font-weight:500}
-.hint{color:var(--muted);font-size:12px}
-.layout{display:grid;grid-template-columns:var(--side,340px) 6px minmax(0,1fr);height:calc(100vh - 52px)}
-.layout.collapsed{grid-template-columns:0 0 minmax(0,1fr)}
-.layout.collapsed aside,.layout.collapsed #side-split{display:none}
-.splitter{cursor:col-resize;background:var(--line);position:relative;touch-action:none;user-select:none}
-.splitter::after{content:"";position:absolute;top:50%;left:50%;width:2px;height:28px;margin:-14px 0 0 -1px;border-left:1px dotted var(--faint);border-right:1px dotted var(--faint)}
-.splitter:hover,.splitter.drag{background:var(--accent)}
-body.resizing{cursor:col-resize;user-select:none}
-body.resizing iframe{pointer-events:none}
-aside{border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
-.panelbox{padding:12px 14px;border-bottom:1px solid var(--line)}
-.panelbox h2{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:650}
-label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
-input,select,button,textarea{font:inherit;color:var(--text);background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
-input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.two label{margin-top:8px}
-button{cursor:pointer;white-space:nowrap;width:auto}
-button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650;width:100%;margin-top:12px;padding:9px}
-button:disabled{opacity:.45;cursor:not-allowed}
-.check{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--text)}
-.check input{width:auto}
-.compare{border:1px dashed var(--line-2);border-radius:8px;padding:0 10px 10px;margin-top:8px}
-.compare[hidden]{display:none}
-details.advanced{margin-top:12px;border:1px dashed var(--line-2);border-radius:8px;padding:6px 10px 10px}
-details.advanced summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
-.notice{margin:0;padding:9px 14px;font-size:12px;color:var(--err);background:var(--err-bg);border-bottom:1px solid var(--line);white-space:pre-wrap}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1440px;margin:0 auto;padding:0 clamp(16px,3vw,32px)}
+.mono{font-family:var(--mono)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+
+/* header */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:26px 0 18px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:34px;height:34px;flex:none;color:var(--accent)}
+.brand h1{font:700 21px/1.2 var(--mono);letter-spacing:-.01em}
+.brand h1 span{font:600 15px var(--sans);color:var(--muted);letter-spacing:0;margin-left:8px}
+.lead{color:var(--muted);max-width:62ch;margin-top:6px;font-size:14px}
+.iconbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:13px;color:var(--muted)}
+.iconbtn:hover{color:var(--ink);border-color:var(--ink)}
+.iconbtn svg{width:16px;height:16px}
+
+/* steps */
+.steps{display:grid;gap:14px;grid-template-columns:1fr;align-items:start}
+@media (min-width:760px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1200px){.steps{grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,1.05fr) minmax(0,1.3fr)}}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);min-width:0}
+.step-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step-n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--mono);background:var(--ink);color:var(--surface);flex:none}
+.step-h h2{font-size:15px;font-weight:650;letter-spacing:-.01em}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+.choices{display:grid;gap:8px}
+.choice{display:block;position:relative;cursor:pointer}
+.choice input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.choice-body{display:block;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);transition:border-color .15s,background .15s,box-shadow .15s}
+.choice:hover .choice-body{border-color:var(--line-strong)}
+.choice input:checked+.choice-body{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.choice input:focus-visible+.choice-body{outline:2px solid var(--accent);outline-offset:2px}
+.choice-body b{display:block;font-weight:650;font-size:14px}
+.choice-body small{display:block;color:var(--muted);font-size:12.5px;line-height:1.45;margin-top:2px}
+.choice.off .choice-body{opacity:.62}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.tag{font:600 10.5px/1 var(--mono);padding:4px 7px;border-radius:5px;background:var(--surface-3);color:var(--muted);letter-spacing:.02em}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.llm{background:var(--accent-soft);color:var(--accent)}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 4px;font-weight:550}
+.step>label.f:first-of-type{margin-top:0}
+select,input[type=text],input[type=number],input:not([type]){width:100%;min-width:0;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:14px}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px;text-overflow:ellipsis}
+select:disabled{opacity:.5}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.hint.err{color:var(--warn)}
+.preview{margin-top:12px;border:1px dashed var(--line-strong);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted);background:var(--surface-2)}
+.preview b{display:block;font:600 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin:0 0 2px}
+.preview p{color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:8px;max-height:9.5em;overflow:auto}
+.preview p.goal{color:var(--block)}
+.preview p:last-child{margin-bottom:0}
+details.more{margin-top:8px}
+details.more>summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+
+/* run bar */
+.advanced{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 16px;box-shadow:var(--shadow)}
+.advanced>summary{cursor:pointer;padding:12px 0;font-size:13.5px;font-weight:600;color:var(--muted)}
+.advanced[open]>summary{border-bottom:1px solid var(--line);margin-bottom:14px}
+.advanced .grid{display:grid;gap:4px 16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding-bottom:16px}
+.advanced label.f{margin-top:10px}
+.runbar{position:sticky;bottom:0;z-index:5;margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line-strong);border-radius:var(--r);padding:12px 16px;box-shadow:var(--shadow)}
+.sel-summary{flex:1 1 360px;min-width:0;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 9px;border-radius:999px;background:var(--surface-3);font:550 12px/1.3 var(--mono);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.accent{background:var(--accent-soft);color:var(--accent)}
+.compare{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.compare input{width:17px;height:17px;accent-color:var(--accent)}
+.compare select{width:auto;max-width:210px;padding:5px 28px 5px 9px;font-size:13px}
+.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);padding:11px 30px;font-size:15px;letter-spacing:.01em}
+.btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.notice{margin-top:12px;padding:10px 14px;border-radius:10px;font-size:13.5px;border:1px solid;background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 40%,transparent);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.notice.err{background:var(--block-soft);border-color:color-mix(in srgb,var(--block) 40%,transparent)}
 .notice[hidden]{display:none}
-.preview{font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
-.preview b{color:var(--text);font-weight:600}
-.preview .goal{color:var(--inj)}
-.preview pre{margin:4px 0 8px;padding:6px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:11.5px/1.5 var(--mono);white-space:pre-wrap;max-height:180px;overflow:auto}
-main{min-width:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
-main.two{grid-template-columns:minmax(0,var(--split,1fr)) 6px minmax(0,1fr)}
-.run{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
-.run:last-child{border-right:0}
-.runhead{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-.run.gate-on{--gate:var(--ok)}
-.run.gate-off{--gate:var(--err)}
-.run.gate-on,.run.gate-off{border-right:3px solid var(--line-2)}
-.gatebanner{display:none;align-items:baseline;gap:10px;padding:10px 14px;border-top:5px solid var(--gate);border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--gate) 13%,var(--panel))}
-.run.gate-on .gatebanner,.run.gate-off .gatebanner{display:flex}
-.gatebanner b{font:750 16px/1.2 var(--mono);color:var(--gate);letter-spacing:.02em;white-space:nowrap}
-.gatebanner span{font-size:12.5px;color:var(--muted)}
-.run.gate-on .scroll,.run.gate-off .scroll{background:color-mix(in srgb,var(--gate) 4%,var(--bg))}
-.run.gate-on .final,.run.gate-off .final{border-color:color-mix(in srgb,var(--gate) 55%,var(--line))}
-.runhead .top{display:flex;gap:10px;align-items:center}
-.runhead .lbl{font:600 12.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.pill{font:600 11px/1 var(--mono);padding:5px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* results */
+section.block{margin-top:26px}
+.block-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.block-h h2{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.block-h .sp{flex:1}
+.block-h select{width:auto;max-width:min(100%,420px);font-size:13px;padding:6px 28px 6px 10px}
+.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));align-items:start}
+.empty{border:1px dashed var(--line-strong);border-radius:var(--r);padding:20px;color:var(--muted);font-size:14px;background:color-mix(in srgb,var(--surface) 60%,transparent)}
+.rc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;container-type:inline-size;min-width:0}
+.rc-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.rc-head .cond{font:700 13px var(--sans);padding:5px 11px;border-radius:7px;background:var(--ink);color:var(--surface)}
+.rc-head .cond.c-no_gate{background:var(--block);color:#fff}
+.rc-head .cond.c-gate_llm_judge,.rc-head .cond.c-gate_static_rules{background:var(--allow);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rc-head .cond.c-no_gate,:root:not([data-theme="light"]) .rc-head .cond[class*=c-gate]{color:#0a1016}}
+:root[data-theme="dark"] .rc-head .cond.c-no_gate,:root[data-theme="dark"] .rc-head .cond[class*=c-gate]{color:#0a1016}
+.rc-head .what{font:12.5px var(--mono);color:var(--muted);overflow-wrap:anywhere;flex:1 1 220px;min-width:0}
+.rc-head .what b{color:var(--ink);font-weight:600}
+.pill{font:650 11px/1 var(--mono);padding:6px 10px;border-radius:999px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
 .pill.running{color:var(--accent);border-color:var(--accent)}
-.pill.finished{color:var(--ok);border-color:var(--ok)}
-.pill.failed{color:var(--err);border-color:var(--err)}
-.stats{display:flex;gap:12px;color:var(--muted);font:12px var(--mono);flex-wrap:wrap;margin-top:4px}
-.stats b{color:var(--text);font-weight:600}
-.stats .blk b{color:var(--err)}
-.bar{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px}
-.tabs{display:flex;gap:2px;margin-right:auto}
-.tabs button{border:0;background:none;padding:5px 9px;color:var(--muted);border-radius:6px;font-size:12px}
-.tabs button[aria-selected="true"]{background:var(--panel-2);color:var(--text)}
-.ghost{background:none;font-size:12px;padding:4px 9px}
-.scroll{flex:1;overflow:auto;padding:12px}
-.scroll[hidden]{display:none}
-iframe{flex:1;width:100%;border:0;background:var(--bg)}
-.empty{color:var(--muted);padding:28px 6px;text-align:center}
-.task{font-size:13px;color:var(--muted);margin:0 0 10px;padding:9px 11px;border:1px dashed var(--line-2);border-radius:8px;white-space:pre-wrap}
-.task b{color:var(--text);font-weight:600}
-.task .goal{color:var(--inj)}
-.step{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px;overflow:hidden}
-.step.err{border-color:color-mix(in srgb,var(--err) 45%,var(--line))}
-.step-head{display:flex;align-items:baseline;gap:10px;padding:7px 11px;border-bottom:1px solid var(--line);background:var(--panel-2)}
-.step-head .n{font:650 12px var(--mono);flex:1}
-.step-head .dur{color:var(--faint);font:12px var(--mono)}
-.badge{font:600 10.5px/1 var(--mono);padding:3px 6px;border-radius:5px;border:1px solid var(--ok);color:var(--ok);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
-.badge.block{border-color:var(--err);color:var(--err)}
-.badge.escalate{border-color:var(--warn);color:var(--warn)}
-.badge.inj{border-color:var(--inj);color:var(--inj)}
-.badge.audit{border-style:dashed}
-.goalline{padding:7px 11px 0;font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
-.goalline b{color:var(--text);font-weight:600}
-.row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:start;margin:7px 11px;padding:7px 9px;border-radius:7px}
-.row.llm{background:var(--llm-bg)}
-.row.tool{background:var(--tool-bg)}
-.row.blocked,.row.error{background:var(--err-bg)}
-.tag{font:700 10.5px/20px var(--mono);letter-spacing:.06em}
-.row.llm .tag{color:var(--llm)}.row.tool .tag{color:var(--tool)}.row.blocked .tag,.row.error .tag{color:var(--err)}
-.main{min-width:0}
-.title{font:600 12.5px var(--mono);overflow-wrap:anywhere;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.detail{margin-top:3px;font:12px/1.55 var(--mono);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
-.detail.err{color:var(--err)}
-.detail.reason{color:var(--text)}
-details.detail summary{cursor:pointer;color:var(--faint)}
-pre.code{margin:6px 0 0;padding:7px 9px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:12px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
-.meta{font:12px var(--mono);color:var(--faint);white-space:nowrap;text-align:right}
-.final{border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px;overflow:hidden}
-.final .fhead{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
-.final .fhead b{font:650 12px var(--mono);letter-spacing:.08em;text-transform:uppercase}
-.final .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
-.final .cell{padding:10px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
-.final .cell:last-child{border-right:0}
-.final .cell span{font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.final .cell b{font:700 20px/1.1 var(--mono);font-variant-numeric:tabular-nums}
-.final .answer{padding:9px 12px;border-top:1px solid var(--line)}
-.final .answer span{display:block;font:600 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
-.final .answer pre{margin:0;white-space:pre-wrap;font:12px/1.55 var(--mono);color:var(--text)}
-.final .answer.err pre{color:var(--err)}
-.run{container-type:inline-size}
-@container (max-width:620px){.final .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.final .cell:nth-child(2){border-right:0}.final .cell:nth-child(-n+2){border-bottom:1px solid var(--line)}}
-.good{color:var(--ok)}.bad{color:var(--err)}
-.log{display:grid;grid-template-columns:66px 92px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font:12px/1.55 var(--mono)}
-.log .t{color:var(--faint)}.log .k{font-weight:700;color:var(--muted)}
-.log .m{white-space:pre-wrap;overflow-wrap:anywhere}
-.log.error .m{color:var(--err)}
-.log .m .jv{margin-top:3px}
+.pill.running::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--accent);animation:pulse 1.1s ease-in-out infinite}
+.pill.finished{color:var(--allow);border-color:var(--allow)}
+.pill.failed{color:var(--block);border-color:var(--block)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+.strip{display:flex;gap:12px;align-items:flex-start;padding:13px 18px;border-bottom:1px solid var(--line);border-left:5px solid var(--line-strong);font-weight:600;font-size:14.5px;line-height:1.5}
+.strip.allow{border-left-color:var(--allow);background:var(--allow-soft)}
+.strip.block{border-left-color:var(--block);background:var(--block-soft)}
+.strip.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.strip small{display:block;font-weight:450;color:var(--muted);font-size:13px;margin-top:2px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--line)}
+.tile{padding:15px 18px 16px;border-right:1px solid var(--line);min-width:0}
+.tile:last-child{border-right:0}
+.tile .k{font:650 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font:750 26px/1.2 var(--sans);margin-top:5px;letter-spacing:-.02em}
+.tile .v.num{font-family:var(--mono);letter-spacing:-.03em}
+.tile .v.good{color:var(--allow)}.tile .v.bad{color:var(--block)}.tile .v.warn{color:var(--warn)}.tile .v.none{color:var(--faint)}
+.tile .s{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+@container (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile:nth-child(2){border-right:0}.tile:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@container (max-width:420px){.tiles{grid-template-columns:1fr}.tile{border-right:0;border-bottom:1px solid var(--line)}.tile:last-child{border-bottom:0}}
+.alert{margin:14px 18px 0;padding:10px 14px;border-radius:10px;font-size:13.5px;background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.alert.err{background:var(--block-soft);border-color:color-mix(in srgb,var(--block) 40%,transparent)}
+.alert pre{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 var(--mono);max-height:160px;overflow:auto}
+.live{display:flex;align-items:center;gap:12px;padding:14px 18px;font-size:14px}
+.spinner{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.live .clock{margin-left:auto;font:13px var(--mono);color:var(--muted)}
+.sec-h{display:flex;align-items:baseline;gap:10px;padding:14px 18px 8px;font-size:13px;color:var(--muted)}
+.sec-h b{font:650 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink)}
+
+/* fixed pilot scenario (step 4) */
+.fixed{font-size:13.5px;color:var(--muted)}
+.fixed dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}
+.fixed dt{font:600 11px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding-top:2px}
+.fixed dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.fixed .big{font:750 22px/1.2 var(--mono);color:var(--ink);letter-spacing:-.02em}
+.fixed p{margin:10px 0 0}
+.tasks{margin-top:12px}
+.tasks p{white-space:pre-wrap;overflow-wrap:anywhere;margin:2px 0 10px;color:var(--ink);font-size:13px}
+.tasks b{font:650 11.5px var(--mono);color:var(--muted)}
+.tasks b.atk{color:var(--block)}
+
+/* progress */
+.progress-line{display:flex;align-items:center;gap:12px;padding:14px 18px 10px;font-size:14px;flex-wrap:wrap}
+.progress-line .n{font:700 15px var(--mono)}
+.progress-line .clock{margin-left:auto;font:13px var(--mono);color:var(--muted)}
+.bar{height:8px;border-radius:999px;background:var(--surface-3);overflow:hidden;margin:0 18px 14px}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width .5s ease}
+.counts{font:12px var(--mono);color:var(--muted);padding:0 18px 12px}
+
+/* per-scenario list */
+.sc-head,.sc>summary,.sc.static{display:grid;grid-template-columns:1rem minmax(0,2fr) minmax(0,.9fr) minmax(0,1fr) 5.2rem;gap:4px 12px;align-items:center;padding:10px 18px}
+.sc-head{background:var(--surface-2);border-top:1px solid var(--line);font:650 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:7px;padding-bottom:7px}
+.sc{border-top:1px solid var(--line)}
+.sc>summary{cursor:pointer;list-style:none}
+.sc>summary::-webkit-details-marker{display:none}
+.sc>summary:hover{background:var(--surface-2)}
+.sc[open]>summary{background:var(--surface-2)}
+.sc-chev::before{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--faint);border-bottom:2px solid var(--faint);transform:rotate(-45deg);transition:transform .15s}
+.sc[open] .sc-chev::before{transform:rotate(45deg)}
+.sc-name{min-width:0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.sc-name .ut{font:650 13px var(--mono)}
+.sc-name .tag{font-size:10.5px}
+.tag.atk{background:var(--block-soft);color:var(--block)}
+.tag.ben{background:var(--surface-3);color:var(--muted)}
+.sc-cell{font-size:13px;min-width:0}
+.sc-cell .good{color:var(--allow);font-weight:650}
+.sc-cell .bad{color:var(--block);font-weight:650}
+.sc-cell .dim{color:var(--faint)}
+.sc-cell .warn{color:var(--warn);font-weight:650}
+.sc-cell .lbl{display:none}
+.sc-body{padding:2px 0 14px;background:var(--surface-2)}
+.sc-body .calls{background:var(--surface)}
+.sc-body .alert{margin:12px 18px 0}
+.sc-body .fold{border-top:0;margin:0 18px}
+.sc-body .fold>summary{padding:10px 0}
+.sc-body .fold .body{padding:0 0 8px}
+@container (max-width:640px){
+  .sc-head{display:none}
+  .sc>summary,.sc.static{grid-template-columns:1rem minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}
+  .sc-name{grid-column:2/5}
+  .sc-cell:nth-child(3){grid-column:2}
+  .sc-cell .lbl{display:block;font:650 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+}
+
+/* per-call table */
+.calls{padding:0 0 4px}
+.crow{display:grid;grid-template-columns:2.2rem minmax(0,1.35fr) 5.6rem minmax(0,2.4fr) 6.4rem;gap:4px 12px;align-items:start;padding:10px 18px;border-top:1px solid var(--line);font-size:13.5px}
+.crow.head{border-top:1px solid var(--line);background:var(--surface-2);font:650 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:7px;padding-bottom:7px;align-items:center}
+.crow.is-block{background:var(--block-soft)}
+.crow .i{font:12px var(--mono);color:var(--faint);padding-top:2px}
+.crow .tool{font:650 13px var(--mono);overflow-wrap:anywhere}
+.crow .args{font:11.5px/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere;margin-top:2px}
+.verdict{display:inline-flex;align-items:center;gap:6px;font:700 12px/1 var(--mono);letter-spacing:.04em;padding:6px 9px;border-radius:6px;border:1px solid}
+.verdict.allow{color:var(--allow);border-color:color-mix(in srgb,var(--allow) 50%,transparent);background:var(--allow-soft)}
+.verdict.block{color:var(--block);border-color:color-mix(in srgb,var(--block) 55%,transparent);background:var(--block-soft)}
+.verdict.unk{color:var(--muted);border-color:var(--line-strong)}
+.basis{min-width:0}
+.basis .by{display:flex;flex-wrap:wrap;gap:5px 6px;align-items:center}
+.basis .kind{font-size:12px;color:var(--muted);font-weight:600}
+.rid{font:700 11.5px var(--mono);padding:3px 6px;border-radius:5px;background:var(--block-soft);color:var(--block)}
+.rid.ok{background:var(--allow-soft);color:var(--allow)}
+.reason{display:block;width:100%;text-align:left;background:none;border:0;padding:0;margin-top:3px;cursor:pointer;font-size:12.5px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.reason[aria-expanded=true]{-webkit-line-clamp:unset;color:var(--ink)}
+.basis .none{color:var(--faint);font-size:12.5px}
+.exec{font-size:12.5px;color:var(--muted)}
+.exec.no{color:var(--block);font-weight:600}
+.exec.err{color:var(--warn)}
+.crow .lbl{display:none}
+@container (max-width:640px){
+  .crow.head{display:none}
+  .crow{grid-template-columns:2rem minmax(0,1fr) auto;gap:6px 10px}
+  .crow .basis{grid-column:2/4}
+  .crow .exec{grid-column:2/4}
+  .crow .lbl{display:inline;font:650 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-right:6px}
+}
+.fold{border-top:1px solid var(--line)}
+.fold>summary{cursor:pointer;padding:12px 18px;font-size:13.5px;font-weight:600;color:var(--muted);list-style:none;display:flex;align-items:center;gap:8px}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.fold[open]>summary::before{transform:rotate(45deg)}
+.fold>summary small{font-weight:450;color:var(--faint)}
+.fold .body{padding:0 18px 16px}
+.fold pre.txt{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 var(--mono);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;max-height:240px;overflow:auto}
+.fold .tools{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;font-size:13px}
+.fold .tools a{color:var(--accent);text-decoration:none;font-weight:600}
+.fold .tools a:hover{text-decoration:underline}
+.ev{display:grid;grid-template-columns:62px 104px minmax(0,1fr);gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font:12px/1.55 var(--mono)}
+.ev .t{color:var(--faint)}.ev .k{font-weight:700;color:var(--muted)}
+.ev.error .m{color:var(--block)}
+.ev .m{white-space:pre-wrap;overflow-wrap:anywhere}
+.ev .m .jv{margin-top:4px}
+
 /* JSON viewer (json-formatter-js) */
-.jv{margin-top:5px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);font:12px/1.55 var(--mono);overflow:hidden}
-.jv-head{display:flex;align-items:center;gap:6px;padding:2px 4px 2px 2px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel) 60%,var(--panel-2))}
+.jv{margin-top:6px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);font:12px/1.55 var(--mono);overflow:hidden}
+.jv-head{display:flex;align-items:center;gap:6px;padding:2px 4px 2px 2px;border-bottom:1px solid var(--line)}
 .jv.closed .jv-head{border-bottom:0}
-.jv-toggle{display:flex;align-items:center;gap:6px;flex:1;min-width:0;border:0;background:none;padding:3px 6px;font:12px var(--mono);color:var(--muted);text-align:left}
-.jv-toggle:hover{color:var(--text)}
-.jv-toggle b{color:var(--text);font-weight:600}
+.jv-toggle{display:flex;align-items:center;gap:6px;flex:1;min-width:0;border:0;background:none;padding:4px 8px;font:12px var(--mono);color:var(--muted);text-align:left;cursor:pointer}
+.jv-toggle:hover{color:var(--ink)}
+.jv-toggle b{color:var(--ink);font-weight:600}
 .jv-toggle .caret{display:inline-block;width:10px;transition:transform .15s}
 .jv.closed .jv-toggle .caret{transform:rotate(-90deg)}
 .jv-toggle .kind{color:var(--faint)}
 .jv-actions{display:flex;gap:2px;flex:none}
-.jv-actions button{font-size:11px;padding:2px 6px;border:0;color:var(--muted)}
-.jv-actions button:hover{color:var(--accent);background:var(--panel)}
-.jv-body{padding:6px 9px;max-height:320px;overflow:auto}
-.jv .json-formatter-row,.jv .json-formatter-row a,.jv .json-formatter-row a:hover{font:12px/1.55 var(--mono);color:var(--text)}
-.jv .json-formatter-row .json-formatter-key{color:var(--llm)}
-.jv .json-formatter-row .json-formatter-string{color:var(--ok);white-space:pre-wrap;word-break:break-word}
-.jv .json-formatter-row .json-formatter-number,.jv .json-formatter-row .json-formatter-boolean{color:var(--plan)}
+.jv-actions button{font-size:11px;padding:2px 7px;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:5px}
+.jv-actions button:hover{color:var(--accent);background:var(--surface)}
+.jv-body{padding:6px 10px;max-height:320px;overflow:auto}
+.jv .json-formatter-row,.jv .json-formatter-row a,.jv .json-formatter-row a:hover{font:12px/1.55 var(--mono);color:var(--ink)}
+.jv .json-formatter-row .json-formatter-key{color:var(--accent)}
+.jv .json-formatter-row .json-formatter-string{color:var(--allow);white-space:pre-wrap;word-break:break-word}
+.jv .json-formatter-row .json-formatter-number,.jv .json-formatter-row .json-formatter-boolean{color:var(--warn)}
 .jv .json-formatter-row .json-formatter-null,.jv .json-formatter-row .json-formatter-undefined{color:var(--faint)}
 .jv .json-formatter-row .json-formatter-constructor-name{color:var(--muted)}
 .jv .json-formatter-row .json-formatter-toggler{color:var(--faint)}
 .jv pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
-/* live progress */
-header{position:relative}
-.progress{position:absolute;left:0;right:0;bottom:-1px;height:3px;overflow:hidden;background:color-mix(in srgb,var(--accent) 15%,transparent)}
-.progress[hidden]{display:none}
-.progress::before{content:"";position:absolute;inset:0 auto 0 0;width:35%;background:var(--accent);border-radius:3px;animation:indeterminate 1.3s ease-in-out infinite}
-@keyframes indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
-.pill.running::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:var(--accent);vertical-align:1px;animation:pulse 1.1s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(.7)}}
-.live{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 9px;border-radius:7px;font:12px var(--mono);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
-.live[hidden]{display:none}
-.live .what{color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.live .clock{color:var(--muted);font-variant-numeric:tabular-nums}
-.spinner{width:12px;height:12px;flex:none;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.step.active{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
-.step.active .step-head{background:linear-gradient(90deg,var(--panel-2) 0%,color-mix(in srgb,var(--accent) 14%,var(--panel-2)) 50%,var(--panel-2) 100%);background-size:200% 100%;animation:shimmer 1.6s linear infinite}
-@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
-.waiting{display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle}
-.row.pending .title .wait-label{margin-left:8px;font-weight:500}
-.waiting i{width:4px;height:4px;border-radius:50%;background:currentColor;animation:pulse 1s ease-in-out infinite}
-.waiting i:nth-child(2){animation-delay:.15s}.waiting i:nth-child(3){animation-delay:.3s}
-.row.pending .title{color:var(--accent)}
-@media (prefers-reduced-motion:reduce){
-  .progress::before,.pill.running::before,.spinner,.step.active .step-head,.waiting i{animation:none}
-}
-@media (max-width:980px){
-  .layout,.layout.collapsed{grid-template-columns:1fr;height:auto}
-  .splitter{display:none}
-  main.two{grid-template-columns:1fr}
-  aside{border-right:0;border-bottom:1px solid var(--line)}
-  main{grid-template-columns:1fr}
-  .run{min-height:80vh;border-right:0;border-bottom:1px solid var(--line)}
-  header{padding:8px 16px}
-}
+
+/* architecture: the Archify diagram of the selected framework, embedded as it is */
+.dia{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:10px 12px 14px}
+.dia-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:2px 4px 10px;font-size:13px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent);font-weight:650}
+.dia-bar a{color:var(--accent);text-decoration:none;font-weight:600;margin-left:auto}
+.dia-bar a:hover{text-decoration:underline}
+.dia iframe{display:block;width:100%;height:min(88vh,1000px);min-height:520px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.dia-cap{font-size:13.5px;color:var(--muted);padding:10px 4px 0;max-width:100ch}
+.dia-cap b{color:var(--ink)}
+.dia .none{border:1px dashed var(--line-strong);border-radius:10px;padding:22px;color:var(--muted);font-size:14px}
+.newnodes{display:inline-flex;flex-wrap:wrap;gap:6px}
+
+footer{margin:34px 0 40px;color:var(--faint);font-size:12.5px;max-width:90ch}
+@media (prefers-reduced-motion:reduce){.pill.running::before,.spinner{animation:none}.choice-body{transition:none}}
 </style>
 </head>
 <body>
-<header>
-  <h1>agentgate 관측 대시보드 <span>· AgentDojo 시나리오 × 에이전트 × 정책 Gate</span></h1>
-  <button type="button" id="toggle-side" class="ghost" style="width:auto" title="설정 패널 접기/펴기">◧ 설정 패널</button>
-  <button type="button" id="reset-cols" class="ghost" style="width:auto" title="컬럼 너비를 기본값으로">컬럼 초기화</button>
-  <span class="hint" id="active-hint"></span>
-  <div class="progress" id="progress" hidden role="progressbar" aria-label="실행 중"></div>
-  <label style="margin:0 0 0 auto;display:flex;gap:6px;align-items:center;font-size:12px">
-    지난 실행 <select id="history" style="width:auto;max-width:280px"><option value="">—</option></select>
-  </label>
-</header>
-<p id="notice" class="notice" hidden></p>
-<div class="layout">
-  <aside>
-    <form id="form" class="panelbox">
-      <h2>테스트 설정</h2>
-      <label for="framework">에이전트</label>
-      <select id="framework"></select>
-      <label for="model-preset">모델</label>
-      <select id="model-preset"></select>
-      <label for="suite">도메인</label>
-      <select id="suite"></select>
-      <label for="user_task">사용자 작업</label><select id="user_task"></select>
-      <label for="injection_task">공격 (인젝션)</label><select id="injection_task"></select>
-      <label for="defense">방어</label>
-      <select id="defense"><option value="gate">Gate 적용</option><option value="none">Gate 없음</option></select>
-      <label class="check"><input type="checkbox" id="compare-on" checked> Gate 없이 실행한 결과와 나란히 비교</label>
-      <details class="advanced">
-        <summary>고급 설정</summary>
-        <div class="two">
-          <div><label for="provider">제공자</label><select id="provider"></select></div>
-          <div><label for="max_steps">최대 단계</label><input id="max_steps" type="number" min="1" max="40" value="15"></div>
-        </div>
-        <label for="model">모델 직접 입력</label>
-        <input id="model" list="model-list" value="gpt-oss:120b"><datalist id="model-list"></datalist>
-        <label for="base_url">Base URL (openai_compat일 때 필수)</label>
-        <input id="base_url" placeholder="기본값 (ollama: OLLAMA_HOST)">
-        <div class="two">
-          <div><label for="attack">공격 문구 방식</label><select id="attack"></select></div>
-          <div><label for="spec">TaskSpec 출처</label><select id="spec"><option value="oracle">oracle (정답)</option><option value="llm">LLM 추출</option></select></div>
-        </div>
-        <label for="escalate">Gate 판정기</label>
-        <select id="escalate"><option value="gate_static_rules">룰북 정적 코드 (gate_static_rules)</option><option value="gate_llm_judge">판정 LLM + 룰북 (gate_llm_judge)</option></select>
-        <div id="fw-options"></div>
-      </details>
-      <button id="run" class="primary" type="submit">실행</button>
-      <div class="hint" id="cost-hint" style="margin-top:6px"></div>
-    </form>
-    <div class="panelbox"><h2>시나리오</h2><div id="preview" class="preview">—</div></div>
-  </aside>
-  <div class="splitter" id="side-split" title="드래그해서 너비 조정 (더블클릭: 초기화)"></div>
-  <main id="runs"><section class="run"><div class="empty">왼쪽에서 설정을 고르고 실행을 누르면 LLM 호출, 툴 호출, Gate 판정이 실시간으로 쌓입니다.</div></section></main>
-</div>
-<script>
-const $ = s => document.querySelector(s);
-const notice = $('#notice');
-let CATALOG = null;
-const panels = [];
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">
+        <svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 3 5 8v9c0 8.2 5.2 14.2 13 16 7.8-1.8 13-7.8 13-16V8z"/><path d="m12.5 18 4 4 7-8"/></svg>
+        <h1>agentgate<span>검증 콘솔</span></h1>
+      </div>
+      <p class="lead">에이전트가 호출하는 툴을 정책 Gate가 어떻게 판정하는지, 설정을 고르고 한 번 실행해서 결과로 확인합니다.</p>
+    </div>
+    <button type="button" class="iconbtn" id="theme" aria-label="테마 전환">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <span id="theme-label">테마</span>
+    </button>
+  </header>
 
-function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
-const fmtDur = s => s == null ? '' : s < 1 ? `${Math.round(s * 1000)}ms` : `${Number(s).toFixed(2)}s`;
-const fmtTime = iso => new Date(iso).toLocaleTimeString('ko-KR', {hour12: false});
-const short = (v, n = 220) => { if (v == null) return ''; const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n) + '…' : s; };
-const fmtClock = sec => { const t = Math.max(0, Math.floor(sec)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
-function asData(v) {   // an object/array, or a string holding one; anything else is not JSON data
+  <form id="form" autocomplete="off">
+    <div class="steps">
+      <section class="step" aria-labelledby="h-fw">
+        <div class="step-h"><span class="step-n">1</span><h2 id="h-fw">에이전트 프레임워크</h2></div>
+        <fieldset id="fw-choices" class="choices"><legend class="sr">에이전트 프레임워크</legend></fieldset>
+      </section>
+
+      <section class="step" aria-labelledby="h-model">
+        <div class="step-h"><span class="step-n">2</span><h2 id="h-model">에이전트 모델</h2></div>
+        <label class="f" for="model-select">모델 (provider:model)</label>
+        <select id="model-select"></select>
+        <input id="model-custom" type="text" placeholder="예: anthropic:claude-sonnet-4-5" spellcheck="false" hidden style="margin-top:8px" aria-label="모델 직접 입력">
+        <p class="hint" id="model-hint">모델 목록을 불러오는 중입니다.</p>
+        <p class="hint"><b>Policy 판단 LLM</b>의 판정 모델은 기본적으로 에이전트와 같은 모델입니다. 서버에 <span class="mono">AGENTGATE_JUDGE_PROVIDER·MODEL</span>이 설정되어 있으면 그쪽을 따릅니다.</p>
+      </section>
+
+      <section class="step" aria-labelledby="h-cond">
+        <div class="step-h"><span class="step-n">3</span><h2 id="h-cond">검증 방식</h2></div>
+        <fieldset id="cond-choices" class="choices"><legend class="sr">검증 방식</legend></fieldset>
+      </section>
+
+      <section class="step" aria-labelledby="h-sc">
+        <div class="step-h"><span class="step-n">4</span><h2 id="h-sc">시나리오 (고정)</h2></div>
+        <div class="fixed" id="pilot"></div>
+      </section>
+    </div>
+
+    <details class="advanced" id="advanced">
+      <summary>고급 설정</summary>
+      <div class="grid">
+        <div><label class="f" for="spec">TaskSpec 출처</label>
+          <select id="spec"><option value="oracle">oracle (사람이 쓴 정답 spec, LLM 호출 없음)</option><option value="llm">LLM 추출 (TaskSpec 추출기)</option></select></div>
+        <div><label class="f" for="max_steps">최대 단계</label><input id="max_steps" type="number" min="1" max="40" placeholder="프레임워크 기본값"></div>
+        <div id="fw-options" style="display:contents"></div>
+      </div>
+    </details>
+
+    <div class="runbar">
+      <div class="sel-summary" id="sel-summary"></div>
+      <div class="compare">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="compare"> 다른 검증 방식과 나란히 비교</label>
+        <select id="compare-condition" aria-label="비교할 검증 방식" disabled></select>
+      </div>
+      <button class="btn primary" id="run" type="submit">실행</button>
+    </div>
+    <p class="notice" id="unavail" hidden></p>
+    <p class="notice err" id="notice" hidden role="alert"></p>
+  </form>
+
+  <section class="block" id="results-block" aria-labelledby="h-res">
+    <div class="block-h">
+      <h2 id="h-res">실행 결과</h2>
+      <span class="sp"></span>
+      <label class="sr" for="history">지난 실행</label>
+      <select id="history"><option value="">지난 실행 열기</option></select>
+    </div>
+    <div class="cards" id="cards">
+      <div class="empty">위에서 프레임워크, 모델, 검증 방식을 고르고 <b>실행</b>을 누르면 고정 시나리오를 바로 실행합니다. 진행 상황(완료 수 / 전체)이 보이고, 끝나면 정상 작업 성공률(Utility), 공격 성공률(ASR), 공격 중 Utility, 차단된 호출 수와 시나리오별 판정을 이 자리에 보여 줍니다.</div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="h-dia">
+    <div class="block-h">
+      <h2 id="h-dia">검증 구조</h2>
+      <span class="hint" style="margin:0">선택한 프레임워크의 구조도입니다. 툴 실행 지점에 AgentGate 구성요소가 들어 있습니다.</span>
+    </div>
+    <div class="dia">
+      <div class="dia-bar">
+        <span class="newnodes"><span class="tag llm">AgentGate Adapter</span><span class="tag llm">Policy Gate</span><span class="tag llm">AgentDojo tool</span></span>
+        <span class="seg" role="group" aria-label="강조">
+          <button type="button" id="focus-off" aria-pressed="true">전체</button>
+          <button type="button" id="focus-gate" aria-pressed="false">Policy Gate 강조</button>
+        </span>
+        <a id="fw-arch" href="#" target="_blank" rel="noopener" hidden>새 창에서 열기</a>
+      </div>
+      <div id="diagram"></div>
+      <p class="dia-cap" id="dia-cap"></p>
+    </div>
+  </section>
+
+  <div class="sr" id="sr-status" role="status"></div>
+  <footer>실행 기록은 <span class="mono">dashboard/runs/</span>(git 제외)에 저장되며 점검용입니다. 보고서에 쓰는 수치는 <span class="mono">scripts/evaluation/live_evaluation.py</span>의 출력만 사용합니다.</footer>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const fit = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const pad = n => String(n).padStart(2, '0');
+const clock = sec => { const t = Math.max(0, Math.floor(sec)); return `${pad(Math.floor(t / 60))}:${pad(t % 60)}`; };
+const timeOf = v => new Date(v).toLocaleTimeString('ko-KR', {hour12: false});
+const pct = v => v == null ? '—' : `${+(v * 100).toFixed(1)}%`;
+const opt = (value, text) => { const o = el('option', null, text); o.value = value; return o; };
+const CUSTOM = '__custom__';
+let CATALOG = null;
+
+// ------------------------------------------------------------------ theme
+const THEME_KEY = 'agentgate.theme';
+function effectiveTheme() { const t = document.documentElement.dataset.theme; return t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
+function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem(THEME_KEY, t); } catch {} labelTheme(); renderDiagram(); }
+function labelTheme() { $('#theme-label').textContent = effectiveTheme() === 'dark' ? '라이트로 보기' : '다크로 보기'; }
+try { const t = localStorage.getItem(THEME_KEY); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+labelTheme();
+$('#theme').addEventListener('click', () => setTheme(effectiveTheme() === 'dark' ? 'light' : 'dark'));
+
+// ------------------------------------------------------------------ JSON viewer (collapsible, for the trace detail)
+function asData(v) {
   if (v != null && typeof v === 'object') return v;
   if (typeof v !== 'string' || !/^\s*[[{]/.test(v)) return null;
   try { const d = JSON.parse(v); return d && typeof d === 'object' ? d : null; } catch { return null; }
 }
 function jsonView(value, open = 1, label = '', collapsed = false) {
-  // accordion: the header folds the whole block; json-formatter-js folds each node; expand/collapse all; copy
   const box = el('div', 'jv'), data = asData(value);
   const text = data ? JSON.stringify(data, null, 2) : String(value ?? '');
   const kind = !data ? `텍스트 · ${text.length.toLocaleString()}자` : Array.isArray(data) ? `Array · ${data.length}개` : `Object · ${Object.keys(data).length}개 키`;
-  const head = el('div', 'jv-head'), toggle = el('button', 'jv-toggle'), body = el('div', 'jv-body');
+  const head = el('div', 'jv-head'), toggle = el('button', 'jv-toggle'), body = el('div', 'jv-body'), actions = el('span', 'jv-actions');
   toggle.type = 'button';
   toggle.append(el('span', 'caret', '▾'), ...(label ? [el('b', null, label)] : []), el('span', 'kind', kind));
   const setOpen = on => { box.classList.toggle('closed', !on); body.hidden = !on; toggle.setAttribute('aria-expanded', on); };
   toggle.onclick = () => setOpen(body.hidden);
-  const actions = el('span', 'jv-actions');
-  const action = (name, fn) => { const b = el('button', 'ghost', name); b.type = 'button'; b.onclick = e => { e.stopPropagation(); fn(b); }; actions.append(b); };
-  let tree = null;
+  const action = (name, fn) => { const b = el('button', null, name); b.type = 'button'; b.onclick = e => { e.stopPropagation(); fn(b); }; actions.append(b); };
   if (data && window.JSONFormatter) {
-    tree = new JSONFormatter(data, open, {hoverPreviewEnabled: true, animateOpen: false, animateClose: false, maxArrayItems: 50});
+    const tree = new JSONFormatter(data, open, {hoverPreviewEnabled: true, animateOpen: false, animateClose: false, maxArrayItems: 50});
     body.append(tree.render());
     action('모두 펼치기', () => { setOpen(true); tree.openAtDepth(Infinity); });
     action('모두 접기', () => { setOpen(true); tree.openAtDepth(1); });
   } else body.append(el('pre', null, text));
   action('복사', b => navigator.clipboard?.writeText(text).then(() => { b.textContent = '복사됨'; setTimeout(() => { b.textContent = '복사'; }, 1200); }).catch(() => {}));
-  head.append(toggle, actions);
-  box.append(head, body);
-  setOpen(!collapsed);
+  head.append(toggle, actions); box.append(head, body); setOpen(!collapsed);
   return box;
 }
-function showNotice(msg) { notice.textContent = msg || ''; notice.hidden = !msg; }
-function option(sel, value, text, disabled) { const o = el('option', null, text ?? value); o.value = value; if (disabled) o.disabled = true; sel.append(o); }
 
 // ------------------------------------------------------------------ form
-function fwInfo(name) { return CATALOG.frameworks.find(f => f.name === name); }
+const fwInfo = name => CATALOG.frameworks.find(f => f.name === name);
+const condInfo = name => CATALOG.conditions.find(c => c.name === name);
+const checked = name => document.querySelector(`input[name="${name}"]:checked`)?.value;
+
+// What each adapter does at the framework boundary (the AgentGate Adapter node of the diagram).
+const ADAPTER = {
+  'native': 'AgentDojo 자체 파이프라인이 GatedRuntime을 직접 사용',
+  'smolagents': 'smolagents Tool의 forward를 bridge.invoke로 교체',
+  'mini-swe-agent': 'bash 환경을 툴 호출만 받는 GatedShell로 교체',
+  'browser-use': 'browser-use 액션 함수를 bridge.invoke로 교체',
+};
+const COST = {no_gate: '에이전트 LLM만', gate_llm_judge: '에이전트 + ToolSpec + 판정 LLM', gate_static_rules: '에이전트 + ToolSpec LLM'};
+const CAPTION = {
+  no_gate: '<b>Gate 없음</b>: Policy Gate는 audit 모드입니다. 호출을 기록만 하고 모두 실행하며, 판정과 ToolSpec 추출을 하지 않습니다.',
+  gate_llm_judge: '<b>Policy 판단 LLM</b>: Policy Gate가 effect 호출마다 ToolSpec을 추출하고, 판정 LLM이 룰북(R1–R10)으로 ALLOW / BLOCK을 정합니다.',
+  gate_static_rules: '<b>정규식·정적 규칙 비교</b>: Policy Gate가 같은 입력을 rule_checker(정적 코드)로 판정합니다. 판정에 LLM 호출이 없고 ToolSpec 추출만 LLM을 씁니다.',
+};
+
+function buildFrameworks() {
+  const box = $('#fw-choices'); box.replaceChildren();
+  CATALOG.frameworks.forEach(f => {
+    const lab = el('label', `choice${f.unavailable ? ' off' : ''}`), input = el('input');
+    input.type = 'radio'; input.name = 'framework'; input.value = f.name;
+    const body = el('span', 'choice-body');
+    body.append(el('b', null, f.name), el('small', null, ADAPTER[f.name] || f.description || f.display_name));
+    if (f.unavailable) { const t = el('span', 'tags'); t.append(el('span', 'tag warn', '이 환경에서 사용 불가')); body.append(t); lab.title = f.unavailable; }
+    lab.append(input, body); box.append(lab);
+  });
+  const first = CATALOG.frameworks.find(f => !f.unavailable) || CATALOG.frameworks[0];
+  box.querySelector(`input[value="${first.name}"]`).checked = true;
+}
+
+function buildConditions() {
+  const box = $('#cond-choices'); box.replaceChildren();
+  CATALOG.conditions.forEach(c => {
+    const lab = el('label', 'choice'), input = el('input');
+    input.type = 'radio'; input.name = 'condition'; input.value = c.name;
+    const body = el('span', 'choice-body'), tags = el('span', 'tags');
+    tags.append(el('span', `tag${c.judge === 'llm' ? ' llm' : ''}`, `LLM 호출: ${COST[c.name] || '—'}`));
+    body.append(el('b', null, c.label), el('small', null, c.summary), tags);
+    lab.append(input, body); box.append(lab);
+  });
+  (box.querySelector('input[value="gate_static_rules"]') || box.querySelector('input')).checked = true;
+}
+
+function buildPilot() {
+  const p = CATALOG.pilot, box = $('#pilot'); box.replaceChildren();
+  const dl = el('dl');
+  const row = (k, v) => { dl.append(el('dt', null, k)); const d = el('dd'); if (v instanceof Node) d.append(v); else d.textContent = v; dl.append(d); };
+  row('suite', p.suites.join(', '));
+  row('사용자 작업', `${p.user_tasks.length}개 (${p.user_tasks.map(t => t.id.replace('user_task_', '#')).join(' ')})`);
+  row('공격', `${p.injection_tasks.length}개 (${p.injection_tasks.map(t => t.id.replace('injection_task_', '#')).join(' ')})`);
+  row('공격 문구', p.attack);
+  dl.style.marginTop = '12px';
+  box.append(el('div', 'big', `${p.total}건`), el('p', null, `공격 ${p.attacks}건 + 정상 ${p.benign}건. 검증 방식을 둘 고르면 같은 시나리오를 두 번 실행합니다.`), dl);
+  const d = el('details', 'more'); d.append(el('summary', null, '시나리오 내용 보기'));
+  const tasks = el('div', 'tasks');
+  p.user_tasks.forEach(t => { tasks.append(el('b', null, t.id), el('p', null, t.prompt)); });
+  p.injection_tasks.forEach(t => { tasks.append(el('b', 'atk', `${t.id} · 공격 목표`), el('p', null, t.goal)); });
+  d.append(tasks); box.append(d);
+}
 
 function renderFrameworkOptions() {
   const box = $('#fw-options'); box.replaceChildren();
-  const info = fwInfo($('#framework').value); if (!info) return;
+  const info = fwInfo(checked('framework')); if (!info) return;
   for (const [key, prop] of Object.entries(info.options_schema?.properties || {})) {
-    const lab = el('label', null, prop.title || key); lab.htmlFor = `opt-${key}`;
+    const wrap = el('div'), lab = el('label', 'f', prop.title || key); lab.htmlFor = `opt-${key}`;
     let input;
-    if (prop.enum) { input = el('select'); prop.enum.forEach(v => option(input, v)); }
+    if (prop.enum) { input = el('select'); prop.enum.forEach(v => input.append(opt(v, v))); }
     else input = el('input');
     input.id = `opt-${key}`; input.dataset.opt = key; input.value = prop.default ?? '';
-    box.append(lab, input);
+    wrap.append(lab, input); box.append(wrap);
   }
-  [...$('#escalate').options].forEach(o => { o.disabled = !info.conditions.includes(o.value); });
-  if ($('#escalate').selectedOptions[0]?.disabled) $('#escalate').value = 'gate_static_rules';
-  $('#max_steps').value = info.default_max_steps || 15;
-}
-
-function fillTasks() {
-  const s = CATALOG.suites[$('#suite').value];
-  const ut = $('#user_task'), it = $('#injection_task'); ut.replaceChildren(); it.replaceChildren();
-  s.user_tasks.forEach(t => option(ut, t.id, `${t.id} · ${short(t.prompt, 60)}`));
-  option(it, 'none', '공격 없음 (정상 작업만)');
-  s.injection_tasks.forEach(t => option(it, t.id, `${t.id} · ${short(t.goal, 60)}`));
-  if (s.injection_tasks.length) it.value = s.injection_tasks[0].id;
-  updatePreview();
+  $('#max_steps').placeholder = `기본값 ${info.default_max_steps || 15}`;
 }
 
 async function loadModels() {
-  const list = $('#model-list'); list.replaceChildren();
-  const r = await fetch(`/api/models?provider=${$('#provider').value}`).then(r => r.json()).catch(() => ({models: []}));
-  (r.models || []).forEach(m => option(list, m));
+  const sel = $('#model-select'), hint = $('#model-hint');
+  const fill = names => {
+    const keep = sel.value; sel.replaceChildren();
+    names.forEach(n => sel.append(opt(`ollama:${n}`, `ollama:${n}`)));
+    sel.append(opt(CUSTOM, '직접 입력…'));
+    const preset = CATALOG.model_presets[0]; const want = keep || (preset ? `${preset.provider}:${preset.model}` : '');
+    sel.value = [...sel.options].some(o => o.value === want) ? want : (sel.options[0]?.value || CUSTOM);
+    syncModel();
+  };
+  fill(CATALOG.model_presets.filter(p => p.provider === 'ollama').map(p => p.model));
+  const r = await fetch('/api/models?provider=ollama').then(r => r.json()).catch(() => null);
+  if (!r) { hint.textContent = '모델 목록을 불러오지 못했습니다. 기본 모델을 표시합니다.'; hint.className = 'hint err'; return; }
+  fill(r.models || []);
+  hint.className = r.error ? 'hint err' : 'hint';
+  hint.textContent = r.error ? `Ollama 서버에 연결하지 못해 기본 모델을 표시합니다. (${fit(r.error, 90)})` : `Ollama 서버에서 모델 ${r.models.length}개를 불러왔습니다.`;
+}
+function syncModel() { const custom = $('#model-select').value === CUSTOM; $('#model-custom').hidden = !custom; update(); }
+const modelValue = () => $('#model-select').value === CUSTOM ? $('#model-custom').value.trim() : $('#model-select').value;
+
+function selection() {
+  const fw = checked('framework'), cond = checked('condition');
+  return {fw, info: fwInfo(fw), cond, condition: condInfo(cond), model: modelValue(), spec: $('#spec').value};
 }
 
-let previewTimer = null;
-function updatePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(doPreview, 150); }
-async function doPreview() {
-  const q = new URLSearchParams({suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value, attack: $('#attack').value});
-  const p = await fetch(`/api/scenario?${q}`).then(r => r.json()).catch(() => null);
-  const box = $('#preview'); box.replaceChildren(); if (!p) return;
-  box.append(el('b', null, '사용자 요청'), el('pre', null, p.prompt));
-  if (p.goal) { box.append(el('b', null, '공격 목표'), el('pre', 'goal', p.goal)); }
-  if (p.injections) for (const [k, v] of Object.entries(p.injections)) { box.append(el('b', null, `주입 위치 · ${k}`), el('pre', null, short(v, 600))); }
-  if (p.oracle_spec) box.append(el('b', null, 'TaskSpec (oracle, Gate가 보는 사용자 의도)'), jsonView(p.oracle_spec, 2, 'TaskSpec'));
+function update() {
+  if (!CATALOG) return;
+  const s = selection(), p = CATALOG.pilot;
+  const sum = $('#sel-summary'); sum.replaceChildren();
+  const n = $('#compare').checked ? 2 : 1;
+  sum.append(el('span', 'chip accent', s.fw), el('span', 'chip', s.model || '모델 미입력'), el('span', 'chip accent', s.condition.label),
+             el('span', 'chip', `${p.suites.join(', ')} ${p.total}건${n > 1 ? ' × 2' : ''}`));
+  const cc = $('#compare-condition'), prev = cc.value; cc.replaceChildren();
+  CATALOG.conditions.filter(c => c.name !== s.cond).forEach(c => cc.append(opt(c.name, c.label)));
+  cc.value = [...cc.options].some(o => o.value === prev) ? prev : (s.cond === 'no_gate' ? 'gate_static_rules' : 'no_gate');
+  cc.disabled = !$('#compare').checked;
+  const blocked = s.info?.unavailable;
+  $('#run').disabled = !!blocked || running();
+  const un = $('#unavail'); un.textContent = blocked ? `${s.fw}는 이 환경에서 실행할 수 없습니다: ${blocked}\n구조도는 그대로 확인할 수 있습니다.` : ''; un.hidden = !blocked;
+  renderDiagram();
 }
+function showNotice(msg) { const n = $('#notice'); n.textContent = msg || ''; n.hidden = !msg; }
 
-function readRun(gate, label) {
-  const options = {};
-  document.querySelectorAll('[data-opt]').forEach(i => { options[i.dataset.opt] = i.value; });
-  const baseUrl = $('#base_url').value.trim();
-  return {framework: $('#framework').value, options, max_steps: Number($('#max_steps').value),
-          model: {provider: $('#provider').value, model: $('#model').value.trim(), ...(baseUrl ? {base_url: baseUrl} : {})},
-          scenario: {suite: $('#suite').value, user_task: $('#user_task').value, injection_task: $('#injection_task').value,
-                     condition: gate ? $('#escalate').value : 'no_gate', spec: $('#spec').value, attack: $('#attack').value},
-          label};
+// ------------------------------------------------------------------ architecture: the Archify diagram, embedded as it is
+let focusGate = false, diagramKey = '', diagramNonce = 0;
+function renderDiagram() {
+  if (!CATALOG) return;
+  const s = selection(), host = $('#diagram'), has = s.info?.has_architecture;
+  const key = `${s.fw}|${effectiveTheme()}|${focusGate}|${has}`;
+  $('#dia-cap').innerHTML = `${CAPTION[s.cond] || ''} 어댑터 <b>${esc(s.fw)}</b>: ${esc(ADAPTER[s.fw] || '툴 본문을 bridge.invoke로 교체')}.`;
+  const link = $('#fw-arch'); link.hidden = !has; if (has) link.href = `/architecture/${s.fw}?theme=${effectiveTheme()}${focusGate ? '#focus=gate' : ''}`;
+  if (key === diagramKey) return;
+  diagramKey = key; host.replaceChildren();
+  if (!has) {
+    host.append(el('div', 'none', s.fw === 'native'
+      ? 'native는 AgentDojo 자체 파이프라인이 GatedRuntime(PolicyGateRuntime)을 직접 사용하므로 별도 Adapter 구조도가 없습니다. smolagents, mini-swe-agent, browser-use를 고르면 Archify 구조도를 볼 수 있습니다.'
+      : `${s.fw}에는 구조도가 없습니다.`));
+    return;
+  }
+  const f = el('iframe'); f.title = `${s.fw} 구조도 (Archify)`; f.loading = 'lazy';
+  f.src = `/architecture/${s.fw}?theme=${effectiveTheme()}${focusGate ? `&v=${++diagramNonce}#focus=gate` : ''}`;
+  host.append(f);
 }
+function setFocus(on) { focusGate = on; $('#focus-off').setAttribute('aria-pressed', !on); $('#focus-gate').setAttribute('aria-pressed', on); renderDiagram(); }
+$('#focus-off').addEventListener('click', () => setFocus(false));
+$('#focus-gate').addEventListener('click', () => setFocus(true));
 
-function applyPreset() {
-  const v = $('#model-preset').value; if (!v) return;
-  const [provider, ...rest] = v.split('|'); $('#provider').value = provider; $('#model').value = rest.join('|');
-  loadModels();
+// ------------------------------------------------------------------ per-call table (shared by every scenario row)
+const JUDGE_KIND = {rules: '정적 규칙', llm: '판정 LLM', 'llm-norules': '판정 LLM (룰북 없음)'};
+function argsText(a) {
+  if (a == null) return '';
+  if (typeof a === 'string') return a;
+  const e = Object.entries(a); if (!e.length) return '(인자 없음)';
+  return e.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`).join(', ');
 }
-
-function updateCost() {
-  const n = $('#compare-on').checked ? 2 : 1;
-  $('#cost-hint').textContent = `실행 ${n}건 · 최대 LLM 호출 약 ${n * Number($('#max_steps').value)}회`;
-  $('#defense').disabled = $('#compare-on').checked;
+function callRow(c, condName) {
+  const row = el('div', `crow${c.blocked ? ' is-block' : ''}`);
+  row.append(el('span', 'i', String(c.index)));
+  const tool = el('div'); tool.append(el('div', 'tool', c.tool || '?'));
+  const at = argsText(c.args); if (at) { const a = el('div', 'args', fit(at, 140)); a.title = at; tool.append(a); }
+  row.append(tool);
+  const vd = el('div'), cls = c.verdict === 'ALLOW' ? 'allow' : c.verdict === 'BLOCK' ? 'block' : 'unk';
+  const mark = el('span', null, cls === 'allow' ? '✓' : cls === 'block' ? '✕' : '?'); mark.setAttribute('aria-hidden', 'true');
+  const v = el('span', `verdict ${cls}`); v.append(mark, c.verdict);
+  vd.append(el('span', 'lbl', '판정'), v); row.append(vd);
+  const basis = el('div', 'basis'); basis.append(el('span', 'lbl', '근거'));
+  if (c.judged || c.rule_ids.length || c.reason) {
+    const by = el('div', 'by');
+    by.append(el('span', 'kind', c.judge ? (JUDGE_KIND[c.judge.kind] || c.judge.kind || '판정') : '정책 엔진'));
+    c.rule_ids.forEach(id => by.append(el('span', `rid${c.verdict === 'ALLOW' ? ' ok' : ''}`, id)));
+    if (c.judge?.cached && c.judge.kind !== 'rules') by.append(el('span', 'tag', '캐시'));
+    if (c.judge?.unparsed) by.append(el('span', 'tag warn', '응답 해석 실패'));
+    basis.append(by);
+    if (c.reason) { const r = el('button', 'reason', c.reason); r.type = 'button'; r.title = '눌러서 전체 보기'; r.setAttribute('aria-expanded', 'false'); r.onclick = () => r.setAttribute('aria-expanded', r.getAttribute('aria-expanded') !== 'true'); basis.append(r); }
+  } else basis.append(el('span', 'none', condName === 'no_gate' ? 'Gate 없음 · 기록만' : '읽기 호출 · 판정 생략'));
+  row.append(basis);
+  const stopped = c.blocked || (!c.executed && c.verdict === 'BLOCK');
+  const ex = el('div', `exec${stopped ? ' no' : c.error ? ' err' : ''}`);
+  ex.append(el('span', 'lbl', '실행'), stopped ? '실행 안 됨' : c.error ? '실행됨 · 오류' : c.executed ? '실행됨' : '—');
+  if (c.error) ex.title = c.error;
+  row.append(ex);
+  return row;
 }
+function callsTable(calls, condName) {
+  const t = el('div', 'calls'); t.setAttribute('role', 'table');
+  const head = el('div', 'crow head'); ['#', '툴 호출', '판정', '근거', '실행'].forEach(h => head.append(el('span', null, h))); t.append(head);
+  calls.forEach(c => t.append(callRow(c, condName)));
+  return t;
+}
+function fold(summary, hint) { const d = el('details', 'fold'), s = el('summary', null, summary); if (hint) s.append(el('small', null, hint)); d.append(s); const body = el('div', 'body'); d.append(body); return [d, body]; }
 
-// ------------------------------------------------------------------ run panels
-class Panel {
-  constructor(runId, title) {
-    this.runId = runId; this.state = {seen: new Set(), steps: new Map(), order: [], final: null, start: null, raw: [],
-      counts: {llm: 0, tool: 0, blocked: 0, errors: 0, tokens: 0}, last: null};
-    this.cache = new Map();   // nodes reused across renders, so open details and JSON trees stay open
-    this.root = el('section', 'run');
-    this.banner = el('div', 'gatebanner');
-    const head = el('div', 'runhead'), top = el('div', 'top');
-    this.lbl = el('span', 'lbl', title); this.pill = el('span', 'pill running', '실행 중');
-    top.append(this.lbl, this.pill);
-    this.stats = el('div', 'stats');
-    this.live = el('div', 'live'); this.liveWhat = el('span', 'what'); this.liveClock = el('span', 'clock');
-    this.live.append(el('span', 'spinner'), this.liveWhat, this.liveClock);
-    this.liveClock.title = '마지막 이벤트 이후 · 실행 시작 이후';
-    head.append(top, this.stats, this.live);
-    const bar = el('div', 'bar'), tabs = el('div', 'tabs');
-    this.views = {};
-    for (const [key, name] of [['timeline', '호출 이력'], ['raw', '원본 로그'], ['arch', '구조도']]) {
-      const b = el('button', null, name); b.type = 'button'; b.setAttribute('aria-selected', key === 'timeline');
-      b.onclick = () => { tabs.querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', x === b)); this.show(key); };
-      tabs.append(b);
+// ------------------------------------------------------------------ result cards (one per condition of a run)
+const scKey = r => `${r.condition}|${r.user_task}|${r.injection_task || 'none'}`;
+const STATE_TEXT = {pending: '대기 중', missing: '미실행', error: '오류', invalid: '무효'};
+
+class RunView {
+  constructor(id) {
+    this.id = id; this.fails = 0; this.opened = new Set(); this.sig = ''; this.stopped = false; this.pills = [];
+    this.poll(); this.tickTimer = setInterval(() => this.tick(), 1000);
+  }
+  stop() { this.stopped = true; clearTimeout(this.timer); clearInterval(this.tickTimer); }
+  async poll() {
+    if (this.stopped) return;
+    try {
+      const r = await fetch(`/api/runs/${this.id}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      this.fails = 0; this.d = await r.json(); this.got = Date.now();
+      const sig = `${this.d.status}|${this.d.results.map(x => `${x.done}/${x.total}`).join(',')}|${this.d.error || ''}`;
+      if (sig !== this.sig) { this.sig = sig; this.render(); }
+      this.tick();
+      if (this.d.status === 'running') this.timer = setTimeout(() => this.poll(), 1500);
+      else { clearInterval(this.tickTimer); $('#sr-status').textContent = `실행이 ${this.d.status === 'finished' ? '완료' : '실패'}되었습니다.`; update(); loadHistory(); }
+    } catch (e) {
+      if (++this.fails >= 4) { $('#cards').replaceChildren(el('div', 'alert err', `서버에서 결과를 가져오지 못했습니다 (${e.message}).`)); this.stop(); update(); return; }
+      this.timer = setTimeout(() => this.poll(), 2000);
     }
-    const exp = el('a'); exp.href = `/api/runs/${runId}/trace.json`; exp.download = ''; exp.append(el('button', 'ghost', 'JSON 내보내기'));
-    bar.append(tabs, exp);
-    this.timeline = el('div', 'scroll'); this.rawEl = el('div', 'scroll'); this.rawEl.hidden = true;
-    this.archBox = el('div', 'scroll'); this.archBox.hidden = true; this.archBox.style.padding = 0; this.archBox.style.display = 'none';
-    this.root.append(this.banner, head, bar, this.timeline, this.rawEl, this.archBox);
-    this.stream = new EventSource(`/api/runs/${runId}/events`);
-    this.stream.onmessage = e => this.apply(JSON.parse(e.data));
-    this.timer = setInterval(() => this.tick(), 500);
-    this.render();
   }
-  close() { this.stream.close(); clearInterval(this.timer); }
-  keep(key, build) { let n = this.cache.get(key); if (!n) { n = build(); this.cache.set(key, n); } return n; }
-  tick() {   // live status line: what the run is doing now and for how long
-    const s = this.state;
-    if (s.final) { this.live.hidden = true; clearInterval(this.timer); return; }
-    this.live.hidden = false;
-    const now = Date.now(), last = s.last, d = last?.data || {};
-    let what = s.start ? '진행 중' : '시작하는 중 · TaskSpec 준비';
-    switch (last?.kind) {
-      case 'llm_query': what = 'LLM 응답 대기 중'; break;
-      case 'llm_response': what = 'LLM 응답 받음 · 다음 동작 준비'; break;
-      case 'llm_error': what = 'LLM 응답 오류 · 다시 시도'; break;
-      case 'tool_start': what = `툴 실행 중 · ${d.action || ''}`; break;
-      case 'gate_decision': what = `Gate 판정 ${d.effective || d.verdict || ''} · ${d.tool || ''}`; break;
-      case 'tool_end': case 'tool_error': what = `툴 완료 · ${d.action || ''}`; break;
-    }
-    const steps = s.order.filter(k => k > 0).length;
-    this.liveWhat.textContent = `${steps ? `${steps}단계 · ` : ''}${what}`;
-    const since = last ? (now - Date.parse(last.timestamp)) / 1000 : 0, total = s.start ? (now - Date.parse(s.start.timestamp)) / 1000 : 0;
-    this.liveClock.textContent = `${fmtClock(since)} · 전체 ${fmtClock(total)}`;
+  tick() {
+    const d = this.d; if (!d) return;
+    const secs = d.status === 'running' ? d.elapsed + (Date.now() - this.got) / 1000 : d.elapsed;
+    this.pills.forEach(p => { p.textContent = d.status === 'running' ? `실행 중 · ${clock(secs)}` : `${d.status === 'finished' ? '완료' : '실패'} · ${clock(secs)}`; });
+    document.querySelectorAll('.clock').forEach(c => { c.textContent = clock(secs); });
   }
-  setGate(condition) {
-    if (!condition || this.gate === condition) return;
-    this.gate = condition;
-    const on = ['gate_llm_judge', 'gate_static_rules'].includes(condition);
-    this.root.classList.remove('gate-on', 'gate-off'); this.root.classList.add(on ? 'gate-on' : 'gate-off');
-    const desc = on ? {gate_static_rules: 'effect 호출을 룰북 정적 코드로 판정해 실행 전에 차단', gate_llm_judge: 'effect 호출을 판정 LLM(룰북)으로 판정해 실행 전에 차단'}[condition]
-                    : 'Gate는 호출을 기록만 하고 모든 호출을 실행';
-    this.banner.replaceChildren(el('b', null, `${on ? 'GATE ON' : 'GATE OFF'} · ${on ? 'Gate 적용' : 'Gate 없음'} (${condition})`), el('span', null, desc));
-  }
-  show(view) {
-    this.timeline.hidden = view !== 'timeline'; this.rawEl.hidden = view !== 'raw'; this.archBox.hidden = view !== 'arch';
-    this.archBox.style.display = view === 'arch' ? 'flex' : 'none';
-    if (view === 'arch' && !this.archBox.childElementCount) {
-      const fw = this.state.start?.data?.manifest?.framework;
-      const info = fw && fwInfo(fw);
-      if (info?.has_architecture) { const f = el('iframe'); f.src = `/architecture/${fw}?theme=light`; f.title = `${fw} architecture`; this.archBox.append(f); }
-      else this.archBox.append(el('div', 'empty', '이 프레임워크에는 구조도가 없습니다.'));
-    }
-    this.render();
-  }
-  stepOf(n) {
-    const key = n ?? 0, s = this.state;
-    if (!s.steps.has(key)) { s.steps.set(key, {n: key, llm: [], tools: [], info: null, plan: null}); s.order.push(key); }
-    return s.steps.get(key);
-  }
-  apply(ev) {
-    const s = this.state, d = ev.data || {};
-    if (s.seen.has(ev.seq)) return; s.seen.add(ev.seq); s.raw.push(ev); s.last = ev;
-    switch (ev.kind) {
-      case 'run': if (!s.start) { s.start = ev; const m = d.manifest; if (m) this.setGate(m.scenario.condition); if (m) this.lbl.textContent = `${this.lbl.textContent} · ${m.framework} · ${m.model.provider}:${m.model.model} · ${m.scenario.condition}`; } break;
-      case 'llm_query': s.counts.llm++; this.stepOf(ev.step).llm.push({query: ev, response: null, error: null}); break;
-      case 'llm_response': case 'llm_error': {
-        const call = this.stepOf(ev.step).llm.findLast(c => !c.response && !c.error);
-        if (call) call[ev.kind === 'llm_error' ? 'error' : 'response'] = ev; else this.stepOf(ev.step).llm.push({query: ev, response: ev});
-        if (ev.kind === 'llm_error') s.counts.errors++;
-        s.counts.tokens += Number(d.input_tokens || 0) + Number(d.output_tokens || 0);
-        break;
-      }
-      case 'tool_start': this.stepOf(ev.step).tools.push({name: d.action, start: ev, gate: null, end: null}); break;
-      case 'gate_decision': {
-        const st = this.stepOf(ev.step);
-        let t = st.tools.findLast(x => x.name === d.tool && !x.gate && !x.end);
-        if (!t) { t = {name: d.tool, start: null, gate: null, end: null}; st.tools.push(t); }
-        t.gate = ev;
-        if (!d.decide_only) s.counts.tool++;
-        if (d.blocked) s.counts.blocked++;
-        break;
-      }
-      case 'tool_end': case 'tool_error': {
-        const t = this.stepOf(ev.step).tools.findLast(x => !x.end && x.name === d.action);
-        if (t) t.end = ev; else this.stepOf(ev.step).tools.push({name: d.action, start: null, gate: null, end: ev});
-        if (ev.kind === 'tool_error' && d.error_type !== 'Submitted') s.counts.errors++;
-        break;
-      }
-      case 'step': {   // several step events per step (mini-swe-agent: thought, observation, exit) merge into one
-        const st = this.stepOf(ev.step);
-        if (d.type === 'planning') st.plan = d.plan;
-        else st.info = {...ev, data: {...st.info?.data, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v != null))}};
-        break;
-      }
-      case 'result': s.final = ev; this.stream.close(); break;
-    }
-    this.schedule();
-  }
-  schedule() { if (!this.pending) { this.pending = true; requestAnimationFrame(() => { this.pending = false; this.render(); }); } }
   render() {
-    const s = this.state, c = s.counts;
-    const status = s.final ? (s.final.level === 'ERROR' ? 'failed' : 'finished') : 'running';
-    this.pill.textContent = {running: '실행 중', finished: '완료', failed: '실패'}[status]; this.pill.className = `pill ${status}`;
-    this.stats.replaceChildren();
-    for (const [k, v, cls] of [['단계', s.order.filter(k => k > 0).length], ['LLM 호출', c.llm], ['툴 호출', c.tool], ['차단', c.blocked, 'blk'], ['토큰', c.tokens.toLocaleString()], ['오류', c.errors]]) {
-      const sp = el('span', cls); sp.append(`${k} `, el('b', null, String(v))); this.stats.append(sp);
-    }
-    if (!this.timeline.hidden) this.renderTimeline();
-    if (!this.rawEl.hidden) this.renderRaw();
+    const d = this.d; this.pills = [];
+    const host = $('#cards'); host.replaceChildren(...d.results.map(r => this.card(d, r)));
+    if (d.status === 'failed' && d.error) { const a = el('div', 'alert err'); a.append(el('b', null, '실행이 중단되었습니다.'), el('pre', null, fit(d.error, 1500))); host.prepend(a); }
     this.tick();
-    refreshActive();
   }
-  renderTimeline() {
-    const s = this.state, tl = this.timeline;
-    const stick = tl.scrollHeight - tl.scrollTop - tl.clientHeight < 40;
-    tl.replaceChildren();
-    if (s.start) {
-      const d = s.start.data, t = el('div', 'task');
-      t.append(el('b', null, '사용자 요청 '), d.task || '');
-      if (d.injection_goal) { t.append('\n'); t.append(el('b', null, '공격 목표 ')); t.append(el('span', 'goal', d.injection_goal)); }
-      if (d.spec) { t.append('\n', el('b', null, `TaskSpec (${d.spec_source})`), this.keep('spec', () => jsonView(d.spec, 1, 'TaskSpec'))); }
-      tl.append(t);
-    } else tl.append(el('div', 'empty', '시작하는 중… (TaskSpec 준비)'));
-    const activeKey = s.final ? null : s.order[s.order.length - 1];
-    for (const key of s.order) tl.append(this.renderStep(s.steps.get(key), key === activeKey));
-    if (s.final) tl.append(this.renderFinal());
-    if (stick) tl.scrollTop = tl.scrollHeight;
-  }
-  renderStep(st, active = false) {
-    const info = st.info?.data;
-    const box = el('div', `step${info?.error || st.llm.some(c => c.error) ? ' err' : ''}${active ? ' active' : ''}`);
-    const head = el('div', 'step-head');
-    head.append(el('span', 'n', st.n === 0 ? '시작 전' : `${st.n}단계`));
-    if (active) head.append(el('span', 'spinner'));
-    if (info?.is_final_answer) head.append(el('span', 'badge', '최종 답'));
-    head.append(el('span', 'dur', fmtDur(info?.duration_seconds)));
-    box.append(head);
-    if (st.plan) { const g = el('div', 'goalline'); g.append(el('b', null, '계획 · '), short(st.plan, 600)); box.append(g); }
-    const thought = (info?.model_output || '').split('<code>')[0].replace(/^Thought:\s*/i, '').trim();
-    if (thought) { const g = el('div', 'goalline'); g.append(el('b', null, '생각 · '), short(thought, 400)); box.append(g); }
-    for (const c of st.llm) box.append(this.llmRow(c));
-    for (const t of st.tools) box.append(this.toolRow(t));
-    if (info?.error) { const r = el('div', 'row error'), m = el('div', 'main'); m.append(el('div', 'title', '단계 오류'), el('div', 'detail err', short(info.error, 800))); r.append(el('span', 'tag', 'STEP'), m, el('div', 'meta')); box.append(r); }
+  card(d, r) {
+    const v = d.view, m = r.metrics, box = el('article', 'rc');
+    const head = el('div', 'rc-head');
+    head.append(el('span', `cond c-${r.name}`, r.label));
+    const what = el('span', 'what'); what.append(el('b', null, v.framework), ` · ${v.model} · ${v.suites.join(', ')} pilot · ${v.attack}`);
+    const pill = el('span', `pill ${d.status}`); this.pills.push(pill);
+    head.append(what, pill); box.append(head);
+    if (d.status === 'running') {
+      const line = el('div', 'progress-line');
+      line.append(el('span', 'spinner'), el('span', null, '시나리오 '), el('span', 'n', `${r.done} / ${r.total}`), el('span', null, '완료'), el('span', 'clock'));
+      const bar = el('div', 'bar'), fill = el('i'); fill.style.width = `${r.total ? 100 * r.done / r.total : 0}%`;
+      bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', 0); bar.setAttribute('aria-valuemax', r.total); bar.setAttribute('aria-valuenow', r.done); bar.setAttribute('aria-label', `${r.label} 진행`);
+      bar.append(fill); box.append(line, bar);
+    } else {
+      box.append(this.strip(d, r), this.tiles(d, r));
+      this.alerts(box, d, r);
+    }
+    box.append(this.scenarios(d, r));
+    if (d.status !== 'running') box.append(this.exportFold(d));
     return box;
   }
-  llmRow(c) {
-    const d = c.response?.data, pending = !c.response && !c.error && !this.state.final;
-    const r = el('div', `row ${c.error ? 'error' : 'llm'}${pending ? ' pending' : ''}`), main = el('div', 'main');
-    const title = el('div', 'title', c.query.message);
-    if (pending) { const w = el('span', 'waiting'); w.append(el('i'), el('i'), el('i')); title.append(el('span', 'wait-label', '응답 대기'), w); }
-    main.append(title);
-    (Array.isArray(d?.actions) ? d.actions : []).forEach((a, i) => {
-      const [k, v] = Object.entries(a)[0] ?? ['?', {}];
-      if (k === 'python_interpreter') main.append(el('pre', 'code', String(v)));
-      else if (asData(v) && Object.keys(asData(v)).length) main.append(el('div', 'detail', `→ ${k}`), this.keep(`act${c.response.seq}-${i}`, () => jsonView(v, 1, '인자')));
-      else if (asData(v)) main.append(el('div', 'detail', `→ ${k} (인자 없음)`));
-      else main.append(el('div', 'detail', `→ ${k} ${short(v, 160)}`));
-    });
-    if (d?.content) main.append(el('div', 'detail', short(d.content, 300)));
-    if (c.error) main.append(el('div', 'detail err', c.error.message));
-    const tokens = d && d.output_tokens != null ? `${d.input_tokens}→${d.output_tokens} tok · ` : '';
-    r.append(el('span', 'tag', 'LLM'), main, el('div', 'meta', d ? tokens + fmtDur(d.duration_seconds) : ''));
-    return r;
+  strip(d, r) {
+    const m = r.metrics; let tone = '', text = '', sub = '';
+    if (!m.scored_runs) { tone = 'warn'; text = '점수가 계산된 시나리오가 없습니다.'; sub = '오류나 무효 실행만 있습니다. 아래 시나리오별 결과를 확인하십시오.'; }
+    else if (m.attack_runs) {
+      tone = m.attack_success ? 'block' : 'allow';
+      text = `공격 ${m.attack_runs}건 중 ${m.attack_success}건이 성공했습니다 (ASR ${pct(m.asr)}).`;
+      sub = `정상 작업은 ${m.benign_runs}건 중 ${m.benign_success}건 성공했고, ${r.gated ? `Gate가 호출 ${m.blocked_calls}건을 차단했습니다.` : 'Gate 없이 실행한 기준선입니다.'}`;
+    } else { text = `정상 작업 ${m.benign_runs}건 중 ${m.benign_success}건이 성공했습니다.`; sub = r.gated ? `Gate가 호출 ${m.blocked_calls}건을 차단했습니다.` : ''; }
+    const s = el('div', `strip ${tone}`), box = el('div'); box.append(text); if (sub) box.append(el('small', null, sub)); s.append(box);
+    return s;
   }
-  toolRow(t) {
-    const g = t.gate?.data, blocked = !!g?.blocked;
-    const submitted = t.end?.kind === 'tool_error' && t.end.data?.error_type === 'Submitted';   // mini-swe-agent ends a run this way
-    const failed = t.end?.kind === 'tool_error' && !submitted;
-    const r = el('div', `row ${blocked ? 'blocked' : failed ? 'error' : 'tool'}`), main = el('div', 'main');
-    const title = el('div', 'title', t.name);
-    if (g) {
-      const eff = g.effective || g.verdict || '?';
-      const cls = eff === 'BLOCK' ? 'block' : eff === 'ESCALATE' ? 'escalate' : '';
-      const b = el('span', `badge ${cls}`, `${eff}${g.policy_id ? ' · ' + g.policy_id : ''}`); title.append(b);
-      if (g.verdict && g.effective && g.verdict !== g.effective) title.append(el('span', 'badge escalate', `판정 ${g.verdict}`));
-      if (!blocked && g.effective === 'BLOCK') title.append(el('span', 'badge block audit', '기록만 (실행됨)'));
-      if (g.decide_only) title.append(el('span', 'badge audit', '판정만'));
-      if ((g.output || '').includes('<INFORMATION>')) title.append(el('span', 'badge inj', '인젝션 포함'));
-    } else if (t.start) {
-      const internal = fwInfo(this.state.start?.data?.manifest?.framework)?.internal_tools || [];
-      title.append(internal.includes(t.name) ? el('span', 'badge audit', '프레임워크 내부 툴') : el('span', 'badge block audit', 'NO GATE'));
+  tiles(d, r) {
+    const m = r.metrics, t = el('div', 'tiles');
+    const tile = (k, value, tone, sub, num) => { const c = el('div', 'tile'); c.append(el('div', 'k', k), el('div', `v ${tone}${num ? ' num' : ''}`, value), el('div', 's', sub)); t.append(c); };
+    tile('Utility · 정상 작업 성공률', pct(m.utility), m.utility == null ? 'none' : '', m.benign_runs ? `정상 ${m.benign_runs}건 중 ${m.benign_success}건 성공` : '정상 실행 없음', true);
+    const differs = m.asr != null && m.asr_executed_only != null && m.asr !== m.asr_executed_only;
+    tile('ASR · 공격 성공률', pct(m.asr), m.asr == null ? 'none' : m.asr === 0 ? 'good' : 'bad',
+      m.attack_runs ? `공격 ${m.attack_runs}건 중 ${m.attack_success}건 성공${differs ? ` · 실행된 호출만 ${pct(m.asr_executed_only)}` : ''}` : '공격 실행 없음', true);
+    tile('공격 중 Utility', pct(m.utility_under_attack), m.utility_under_attack == null ? 'none' : '', m.attack_runs ? `공격 ${m.attack_runs}건 중 ${m.attack_utility_success}건에서 작업 성공` : '공격 실행 없음', true);
+    tile('차단된 호출 수', String(m.blocked_calls), m.blocked_calls ? 'warn' : 'none', r.gated ? `전체 툴 호출 ${m.tool_calls}건 중` : 'Gate 없음: 차단하지 않음', true);
+    return t;
+  }
+  alerts(box, d, r) {
+    const m = r.metrics;
+    if (m.invalid_runs) {
+      const a = el('div', 'alert'); a.append(el('b', null, `무효 실행 ${m.invalid_runs}건. `), 'Gate를 거치지 않은 툴 실행이 있어 점수 집계에서 제외했습니다.');
+      a.append(el('pre', null, m.invalid.map(x => `${x.pair}: ${x.reason || ''}`).join('\n'))); box.append(a);
     }
-    main.append(title);
-    const args = g?.args_value ?? asData(g?.args) ?? asData(t.start?.data?.params);
-    const key = t.gate?.seq ?? t.start?.seq;
-    if (args && !Object.keys(args).length) main.append(el('div', 'detail', '(인자 없음)'));
-    else if (args) main.append(this.keep(`args${key}`, () => jsonView(args, 2, '인자')));
-    else main.append(el('div', 'detail', short(g?.args ?? t.start?.data?.params, 300)));
-    if (!t.end && !g && t.start && !this.state.final) { r.classList.add('pending'); title.append(el('span', 'spinner')); }
-    if (g?.reason) main.append(el('div', 'detail reason', `${g.policy_id}: ${g.reason}`));
-    if (g?.judge) main.append(this.keep(`judge${key}`, () => jsonView(g.judge, 1, '판정 LLM')));
-    if (g?.output && blocked) {   // the block message is what the agent received instead of the tool output: always shown
-      const b = el('div', 'detail err'); b.append(el('b', null, '에이전트에게 전달된 차단 메시지 · '), g.output); main.append(b);
-    } else if (g?.output) main.append(this.keep(`out${key}`, () => jsonView(g.output, 2, '툴 출력', true)));
-    if (submitted) main.append(el('div', 'detail', '제출 · 작업 종료'));
-    else if (failed) main.append(el('div', 'detail err', t.end.data.error_type));
-    r.append(el('span', 'tag', blocked ? 'BLOCK' : 'TOOL'), main, el('div', 'meta', `${g?.decide_ms != null ? 'gate ' + g.decide_ms + 'ms · ' : ''}${fmtDur(t.end?.data?.duration_seconds)}`));
-    return r;
+    if (m.errors) { const a = el('div', 'alert err'); a.append(el('b', null, `오류 ${m.errors}건. `), '오류가 난 시나리오는 점수 집계에서 제외했습니다. 시나리오별 결과에서 오류 내용을 확인하십시오.'); box.append(a); }
+    const missing = r.scenarios.filter(x => x.state === 'missing').length;
+    if (missing) { const a = el('div', 'alert err'); a.append(el('b', null, `미실행 ${missing}건. `), d.counts?.quota ? '모델 사용 한도에 도달해 중단했습니다.' : '기록이 만들어지지 않았습니다.'); box.append(a); }
   }
-  renderFinal() {
-    const d = this.state.final.data || {}, f = el('div', 'final');
-    const failed = this.state.final.level === 'ERROR';
-    const head = el('div', 'fhead');
-    head.append(el('b', null, 'Result'), el('span', `pill ${failed ? 'failed' : 'finished'}`, failed ? 'failed' : 'finished'));
-    f.append(head);
-    const grid = el('div', 'grid');
-    const cell = (name, value, good) => { const c = el('div', 'cell'); c.title = name; c.append(el('span', null, name), el('b', value == null ? '' : good ? 'good' : 'bad', value == null ? '—' : String(value))); grid.append(c); };
-    const yn = v => v == null ? null : v ? 'Yes' : 'No';
-    cell('Utility', yn(d.utility), d.utility === true);
-    cell('ASR', yn(d.security), d.security === false);
-    cell('ASR (executed)', yn(d.security_executed), d.security_executed === false);
-    cell('Blocked / Calls', `${d.blocked ?? 0} / ${d.tool_calls ?? 0}`, true);
-    f.append(grid);
-    const block = (label, text, cls = '') => { const b = el('div', `answer ${cls}`); b.append(el('span', null, label), el('pre', null, text)); f.append(b); };
-    if (d.ungated_calls?.length) { const b = el('div', 'answer err'); b.append(el('span', null, 'Ungated calls'), this.keep('ungated', () => jsonView(d.ungated_calls, 1, 'Ungated calls'))); f.append(b); }
-    if (d.final_output) block('Final answer', d.final_output);
-    if (d.error) block('Error', short(d.error, 1500), 'err');
+  scenarios(d, r) {
+    const wrap = el('div', 'sc-list');
+    wrap.append(el('div', 'sec-h', ''));
+    wrap.firstChild.append(el('b', null, '시나리오별 결과'), `${r.total}건 · 눌러서 호출별 판정 보기`);
+    const head = el('div', 'sc-head'); ['', '시나리오', 'Utility', '공격 결과', '차단 / 호출'].forEach(h => head.append(el('span', null, h))); wrap.append(head);
+    r.scenarios.forEach(sc => wrap.append(this.scenario(sc)));
+    return wrap;
+  }
+  scenario(sc) {
+    const done = sc.state === 'done' || sc.state === 'error' || sc.state === 'invalid';
+    const expandable = done && (sc.calls.length || sc.error || sc.state === 'invalid' || sc.final_output);
+    const node = expandable ? el('details', 'sc') : el('div', 'sc static');
+    const sum = expandable ? el('summary') : node;
+    sum.append(el('span', 'sc-chev'));
+    const name = el('span', 'sc-name'); name.append(el('span', 'ut', sc.user_task), el('span', `tag ${sc.attacked ? 'atk' : 'ben'}`, sc.attacked ? `공격 ${sc.injection_task}` : '정상 실행'));
+    sum.append(name);
+    const cell = (label, content, cls) => { const c = el('span', 'sc-cell'); c.append(el('span', 'lbl', label)); c.append(typeof content === 'string' ? el('span', cls || '', content) : content); sum.append(c); };
+    if (sc.state === 'done') {
+      cell('Utility', sc.utility ? '✓ 성공' : '✕ 실패', sc.utility ? 'good' : 'bad');
+      cell('공격', !sc.attacked ? '—' : sc.security ? '공격 성공' : '공격 실패', !sc.attacked ? 'dim' : sc.security ? 'bad' : 'good');
+      cell('차단', `${sc.blocked} / ${sc.tool_calls}`, '');
+    } else {
+      cell('상태', STATE_TEXT[sc.state] || sc.state, sc.state === 'pending' ? 'dim' : sc.state === 'missing' ? 'bad' : 'warn');
+      cell('공격', '—', 'dim');
+      cell('차단', sc.state === 'pending' || sc.state === 'missing' ? '—' : `${sc.blocked} / ${sc.tool_calls}`, 'dim');
+    }
+    node.append(...(expandable ? [sum] : []));
+    if (!expandable) return node;
+    const key = scKey(sc); node.open = this.opened.has(key);
+    node.addEventListener('toggle', () => { node.open ? this.opened.add(key) : this.opened.delete(key); });
+    const body = el('div', 'sc-body');
+    if (sc.state === 'invalid') { const a = el('div', 'alert'); a.append(el('b', null, '무효 실행 · 점수 제외. '), sc.invalid_reason || 'Gate를 거치지 않은 툴 실행이 있습니다.'); if (sc.excluded_scores) a.append(el('pre', null, '제외된 점수: ' + JSON.stringify(sc.excluded_scores))); if (sc.ungated_calls?.length) a.append(el('pre', null, JSON.stringify(sc.ungated_calls))); body.append(a); }
+    if (sc.error) { const a = el('div', 'alert err'); a.append(el('b', null, '오류'), el('pre', null, fit(sc.error, 1200))); body.append(a); }
+    if (sc.state === 'done' && sc.attacked && sc.security !== sc.security_executed && sc.security_executed != null) { const a = el('div', 'alert'); a.append(`AgentDojo 원판정은 공격 ${sc.security ? '성공' : '실패'}이지만 실행된 호출만 보면 ${sc.security_executed ? '성공' : '실패'}입니다 (차단된 시도 포함 여부 차이).`); body.append(a); }
+    if (sc.calls.length) body.append(callsTable(sc.calls, sc.condition)); else body.append(el('div', 'sec-h', '툴 호출이 없었습니다.'));
+    if (sc.final_output) { const [f, b] = fold('에이전트 최종 답변'); b.append(el('pre', 'txt', sc.final_output)); body.append(f); }
+    body.append(this.recordFold(sc));
+    node.append(body);
+    return node;
+  }
+  recordFold(sc) {
+    const [f, b] = fold('원본 record', '디버깅용 · 열면 불러옵니다'); let loaded = false;
+    f.addEventListener('toggle', async () => {
+      if (!f.open || loaded) return; loaded = true; b.textContent = '불러오는 중…';
+      try {
+        const rec = await fetch(`/api/runs/${this.id}/records/${sc.condition}/${sc.user_task}/${sc.injection_task || 'none'}`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+        b.replaceChildren();
+        if (rec.manifest) b.append(jsonView(rec.manifest, 1, 'manifest', true));
+        if (rec.spec) b.append(jsonView(rec.spec, 1, 'TaskSpec', true));
+        if (rec.trace) b.append(jsonView(rec.trace, 1, 'Gate trace (판정 원본)', true));
+        if (rec.messages) b.append(jsonView(rec.messages, 1, 'messages', true));
+      } catch (e) { loaded = false; b.textContent = `record를 불러오지 못했습니다: ${e.message}`; }
+    });
     return f;
   }
-  renderRaw() {
-    const stick = this.rawEl.scrollHeight - this.rawEl.scrollTop - this.rawEl.clientHeight < 40;
-    this.rawEl.replaceChildren(...this.state.raw.map(ev => this.keep(`raw${ev.seq}`, () => {
-      const row = el('div', `log${ev.level === 'ERROR' ? ' error' : ''}`), m = el('span', 'm', `${ev.step != null ? `step=${ev.step} ` : ''}${ev.message}`);
-      if (Object.keys(ev.data || {}).length) m.append(jsonView(ev.data, 1, 'data', true));
-      row.append(el('span', 't', fmtTime(ev.timestamp)), el('span', 'k', ev.kind), m);
-      return row;
-    })));
-    if (stick) this.rawEl.scrollTop = this.rawEl.scrollHeight;
+  exportFold(d) {
+    const [f, b] = fold('상세 trace', '디버깅용'); const a = el('a', null, '전체 JSON 내보내기 (요약 + 모든 시나리오 record)');
+    a.href = `/api/runs/${d.id}/trace.json`; a.download = ''; a.style.cssText = 'color:var(--accent);font-weight:600;text-decoration:none';
+    b.append(a); if (d.counts) b.append(el('div', 'counts', `status: ${Object.entries(d.counts).map(([k, v]) => `${k} ${v}`).join(' · ')}`));
+    return f;
   }
 }
 
-function openPanels(items) {
-  panels.forEach(p => p.close()); panels.length = 0;
-  const main = $('#runs'); main.replaceChildren(); main.classList.toggle('two', items.length === 2);
-  items.forEach(([id, title, condition], i) => {
-    const p = new Panel(id, title); p.setGate(condition); panels.push(p);
-    if (i === 1) main.append(makeSplitter('run-split'));
-    main.append(p.root);
-  });
-}
-
-function refreshActive() {
-  const running = panels.some(p => !p.state.final);
-  $('#run').disabled = running;
-  $('#active-hint').textContent = running ? '실행 중…' : '';
-  $('#progress').hidden = !running;
-}
+// ------------------------------------------------------------------ runs
+let view = null;
+const running = () => !!view && !view.stopped && (!view.d || view.d.status === 'running') && view.fails < 4;
+function openRun(id) { view?.stop(); $('#cards').replaceChildren(el('div', 'empty', '결과를 불러오는 중입니다.')); view = new RunView(id); update(); }
 
 async function loadHistory() {
   const r = await fetch('/api/runs').then(r => r.json()).catch(() => ({runs: []}));
-  const sel = $('#history'); const keep = sel.value; sel.replaceChildren(); option(sel, '', '—');
+  const sel = $('#history'), keep = sel.value; sel.replaceChildren(opt('', r.runs.length ? '지난 실행 열기' : '지난 실행 없음'));
   for (const run of r.runs) {
-    const sc = run.request?.scenario || {};
-    option(sel, run.id, `${new Date(run.started * 1000).toLocaleTimeString('ko-KR', {hour12: false})} ${run.label || ''} ${run.request?.framework || ''} ${sc.condition || ''} ${sc.user_task || ''}/${sc.injection_task || '-'} [${run.status}]`);
+    const labels = run.conditions.map(c => condInfo(c)?.label || c).join(' vs ');
+    sel.append(opt(run.id, `${timeOf(run.started * 1000)} · ${run.framework} · ${labels} · [${{running: '실행 중', finished: '완료', failed: '실패'}[run.status]}]`));
   }
-  sel.value = keep;
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
 }
-
-// ------------------------------------------------------------------ resizable columns
-const LAYOUT_KEY = 'agentgate.layout';
-function loadLayout() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {}; } catch { return {}; } }
-function saveLayout(patch) { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify({...loadLayout(), ...patch})); } catch {} }
-function applyLayout() {
-  const l = loadLayout(), layout = $('.layout'), main = $('#runs');
-  layout.style.setProperty('--side', `${l.side ?? 340}px`);
-  layout.classList.toggle('collapsed', !!l.collapsed);
-  main.style.setProperty('--split', `${l.split ?? 1}fr`);
-}
-function makeSplitter(id) {
-  const sp = el('div', 'splitter'); sp.id = id; sp.title = '드래그해서 너비 조정 (더블클릭: 반반)'; bindSplitter(sp); return sp;
-}
-function bindSplitter(sp) {
-  sp.addEventListener('pointerdown', e => {
-    e.preventDefault(); sp.setPointerCapture(e.pointerId); sp.classList.add('drag'); document.body.classList.add('resizing');
-    const move = ev => {
-      if (sp.id === 'side-split') {
-        const w = Math.max(240, Math.min(640, ev.clientX - $('.layout').getBoundingClientRect().left));
-        $('.layout').style.setProperty('--side', `${w}px`); saveLayout({side: Math.round(w)});
-      } else {
-        const r = $('#runs').getBoundingClientRect();
-        const left = Math.max(0.2, Math.min(0.8, (ev.clientX - r.left) / r.width));
-        const ratio = left / (1 - left);
-        $('#runs').style.setProperty('--split', `${ratio}fr`); saveLayout({split: ratio});
-      }
-    };
-    const up = () => { sp.classList.remove('drag'); document.body.classList.remove('resizing'); sp.removeEventListener('pointermove', move); sp.removeEventListener('pointerup', up); };
-    sp.addEventListener('pointermove', move); sp.addEventListener('pointerup', up);
-  });
-  sp.addEventListener('dblclick', () => {
-    if (sp.id === 'side-split') { saveLayout({side: 340}); } else { saveLayout({split: 1}); }
-    applyLayout();
-  });
-}
-bindSplitter($('#side-split'));
-$('#toggle-side').addEventListener('click', () => { saveLayout({collapsed: !loadLayout().collapsed}); applyLayout(); });
-$('#reset-cols').addEventListener('click', () => { saveLayout({side: 340, split: 1, collapsed: false}); applyLayout(); });
-applyLayout();
-
-// ------------------------------------------------------------------ boot
-async function boot() {
-  CATALOG = await fetch('/api/catalog').then(r => r.json());
-  for (const f of CATALOG.frameworks) { option($('#framework'), f.name, `${f.display_name}${f.unavailable ? ' — ' + f.unavailable : ''}`, !!f.unavailable); }
-  $('#framework').value = CATALOG.frameworks.find(f => f.name === 'smolagents' && !f.unavailable) ? 'smolagents' : 'native';
-  for (const p of CATALOG.model_presets) option($('#model-preset'), `${p.provider}|${p.model}`, `${p.model} (${p.provider})`);
-  option($('#model-preset'), '', '직접 입력 (고급 설정)');
-  CATALOG.providers.forEach(p => option($('#provider'), p));
-  Object.keys(CATALOG.suites).forEach(s => option($('#suite'), s)); $('#suite').value = 'banking';
-  CATALOG.attacks.forEach(a => option($('#attack'), a));
-  applyPreset(); renderFrameworkOptions(); fillTasks(); updateCost(); loadHistory();
-  const st = await fetch('/api/status').then(r => r.json()).catch(() => ({}));
-  const used = new Set(CATALOG.model_presets.map(p => p.provider));
-  const missing = Object.entries(st.missing_keys || {}).filter(([p]) => used.has(p)).map(([p, k]) => `${p}: ${k}`);
-  if (missing.length) showNotice(`설정되지 않은 키 — ${missing.join(', ')} (.env 또는 환경 변수, 서버 재시작 필요)`);
-}
-
-$('#framework').addEventListener('change', renderFrameworkOptions);
-$('#model-preset').addEventListener('change', applyPreset);
-$('#provider').addEventListener('change', () => { $('#model-preset').value = ''; loadModels(); });
-$('#model').addEventListener('input', () => { $('#model-preset').value = ''; });
-$('#suite').addEventListener('change', fillTasks);
-['#user_task', '#injection_task', '#attack'].forEach(s => $(s).addEventListener('change', updatePreview));
-['#max_steps', '#compare-on'].forEach(s => $(s).addEventListener('input', updateCost));
-$('#compare-on').addEventListener('change', updateCost);
-$('#history').addEventListener('change', () => { const id = $('#history').value; if (id) openPanels([[id, '지난 실행']]); });
 
 $('#form').addEventListener('submit', async e => {
   e.preventDefault(); showNotice('');
-  const items = $('#compare-on').checked ? [readRun(true, 'Gate 적용'), readRun(false, 'Gate 없음')]
-    : [readRun($('#defense').value === 'gate', $('#defense').value === 'gate' ? 'Gate 적용' : 'Gate 없음')];
+  const s = selection();
+  if (!s.model || !s.model.includes(':')) { showNotice('모델을 provider:model 형식으로 입력하십시오. 예: ollama:gpt-oss:120b'); return; }
+  const body = {framework: s.fw, model: s.model, condition: s.cond, spec: s.spec};
+  const ms = Number($('#max_steps').value); if (ms) body.max_steps = ms;
+  const options = {}; document.querySelectorAll('[data-opt]').forEach(i => { if (i.value !== '') options[i.dataset.opt] = i.value; });
+  if (Object.keys(options).length) body.options = options;
+  if ($('#compare').checked) body.compare_condition = $('#compare-condition').value;
   $('#run').disabled = true;
-  const res = await fetch('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runs: items})});
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) { showNotice(typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail || body)); $('#run').disabled = false; return; }
-  openPanels(body.run_ids.map((id, i) => [id, items[i].label, items[i].scenario.condition]));
+  const res = await fetch('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).catch(err => ({ok: false, json: async () => ({detail: String(err)})}));
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = out.detail;
+    showNotice(typeof d === 'string' ? d : Array.isArray(d) ? d.map(x => `${(x.loc || []).slice(1).join('.')}: ${x.msg}`).join('\n') : JSON.stringify(d || out));
+    update(); return;
+  }
+  openRun(out.run_id); $('#history').value = '';
+  $('#results-block').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
   loadHistory();
 });
+$('#history').addEventListener('change', () => { const id = $('#history').value; if (id) openRun(id); });
 
-boot().catch(err => showNotice(`초기화 실패: ${err}`));
+// ------------------------------------------------------------------ boot
+document.addEventListener('change', e => {
+  if (!CATALOG || !e.target.closest('#form')) return;
+  if (e.target.name === 'framework') renderFrameworkOptions();
+  if (e.target.id === 'model-select') { syncModel(); return; }
+  update();
+});
+$('#model-custom').addEventListener('input', update);
+
+async function boot() {
+  CATALOG = await fetch('/api/catalog').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+  buildFrameworks(); buildConditions(); buildPilot(); renderFrameworkOptions();
+  $('#spec').value = CATALOG.default_spec || 'oracle';
+  update(); loadHistory(); loadModels();
+  const st = await fetch('/api/status').then(r => r.json()).catch(() => ({}));
+  const missing = Object.entries(st.missing_keys || {}).map(([p, k]) => `${p}: ${k}`);
+  if (missing.length) $('#model-hint').textContent += ` 설정되지 않은 키: ${missing.join(', ')} (.env 또는 환경 변수, 서버 재시작 필요)`;
+  if ((st.active || []).length) openRun(st.active[0].id);
+}
+boot().catch(err => showNotice(`초기화에 실패했습니다: ${err}`));
 </script>
 </body>
 </html>

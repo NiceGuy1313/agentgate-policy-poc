@@ -18,7 +18,7 @@ from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.events import preview
 from agentgate.harness.tool_schema import arguments
 
-DASHBOARD_DIR = Path(__file__).resolve().parents[4] / "dashboard"
+DASHBOARD_DIR = Path(__file__).resolve().parents[3] / "dashboard"
 SUBMIT = "submit"
 
 SYSTEM_TEMPLATE = """You are a helpful assistant that completes the user's task.
