@@ -5,7 +5,7 @@ LLM·네트워크 없이 돈다. ToolSpec 추출기는 빈 것으로 바꾸고(`
 pipeline(`run_live_task`)이다. 쌍·조건마다 다음을 요구한다.
   - 어댑터가 의무 Gate를 선언한다(`FrameworkAdapter.contract_problems`가 비어 있음).
   - Gate trace(툴, 최종 판정, 차단 여부)와 utility·security가 기준과 같다.
-  - 차단된 호출이 실행되지 않고 차단 전후 환경이 같다(check_enforcement.check_run).
+  - 차단된 호출이 실행되지 않고 차단 전후 환경이 같다(`agentgate.harness.enforcement.check_run`).
   - 유효한 run이다: Gate 밖 툴 실행이 없다(경계 로그 감사, 런타임이 거부한 실행). tool_start가 기록되면 이벤트 순서가
     tool_start -> gate_decision -> tool_end이다(mini-swe-agent `bash` 같은 프레임워크 내부 dispatcher 안의 판정은 예외).
 
@@ -23,10 +23,9 @@ from contextlib import contextmanager
 from unittest import mock
 
 from agentgate.harness import registry
+from agentgate.harness.enforcement import check_run
 from agentgate.harness.events import EventSink
-from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
-from agentgate.harness.models import ModelSpec
-from agentgate.harness.runner import RunRequest, run_scenario
+from agentgate.harness.runner import run_scripted
 from agentgate.harness.session import CONDITIONS, ScenarioConfig, Session
 from agentgate.policy_gate.toolspec import ToolSpecResult
 
@@ -84,21 +83,13 @@ def run_case(framework: str, pair, condition: str, options: dict | None = None) 
 
 
 def _run_case(framework: str, pair, condition: str, options: dict | None = None) -> dict:
-    sys.path.insert(0, str(registry.CONFIG_DIR.parent / "scripts" / "analysis"))
-    from check_enforcement import check_run
-
     contract = [f"adapter contract: {p}" for p in registry.get(framework).contract_problems()]
     if contract:   # the runner would refuse it; nothing to run
         return {"framework": framework, "pair": ":".join(p or "none" for p in pair), "condition": condition,
                 "ok": False, "problems": contract, "trace": []}
     expected = reference(pair, condition)
-    config = ScenarioConfig(*pair, condition=condition, attack_model_name="GPT-4")
-    session = Session(config)
     sink = EventSink()
-    with FakeLLMServer(ScriptedPlan(session)) as server:
-        request = RunRequest(framework, ModelSpec("openai_compat", "scripted", base_url=server.base_url), config,
-                             options or {})
-        record = run_scenario(request, sink, session)
+    record = run_scripted(framework, ScenarioConfig(*pair, condition=condition), options, sink=sink)
     problems = []
     if record.get("valid") is False:
         problems.append(f"invalid run: {record.get('invalid_reason')}")

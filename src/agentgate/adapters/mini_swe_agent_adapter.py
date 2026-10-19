@@ -11,13 +11,11 @@ from __future__ import annotations
 import json
 import os
 import shlex
-from pathlib import Path
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.events import preview
 from agentgate.harness.tool_schema import arguments
 
-DASHBOARD_DIR = Path(__file__).resolve().parents[3] / "dashboard"
 SUBMIT = "submit"
 
 SYSTEM_TEMPLATE = """You are a helpful assistant that completes the user's task.
@@ -170,10 +168,6 @@ class MiniSweAgentAdapter(FrameworkAdapter):
     loggers = ("agent",)
     internal_tools = frozenset({"bash"})   # the dispatcher: every command inside it is gated
     routes_tools_through_bridge = True   # every tool's forward / command calls bridge.invoke
-
-    def architecture_html(self) -> Path | None:
-        path = DASHBOARD_DIR / "static" / "arch" / "mini-swe-agent.html"
-        return path if path.exists() else None
 
     def run(self, task, bridge, model, options, max_steps, sink):
         os.environ.setdefault("MSWEA_SILENT_STARTUP", "1")

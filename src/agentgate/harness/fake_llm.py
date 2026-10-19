@@ -18,7 +18,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from agentgate.core.runtime import _to_plain_data
+from agentgate.core.runtime import to_plain_data
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
 from agentgate.scenarios.replay import ATTACK_MARKER
 
@@ -65,7 +65,7 @@ class ScriptedPlan:
         stopped = self.on_block == "stop" and any(event.blocked for event in session.runtime.trace)
         if self.plan and not stopped:
             call = self.plan.pop(0)
-            return "call", call.function, _to_plain_data(dict(call.args))
+            return "call", call.function, to_plain_data(dict(call.args))
         outputs = [session.user_task.GROUND_TRUTH_OUTPUT]
         if self.hijacked:
             outputs.append(session.injection_task.GROUND_TRUTH_OUTPUT)

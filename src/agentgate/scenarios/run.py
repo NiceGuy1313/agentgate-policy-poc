@@ -26,13 +26,13 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import time
 from pathlib import Path
 
 from agentgate import SUITES
 from agentgate.config import load_dotenv
 from agentgate.experiment.conditions import CONDITIONS
+from agentgate.harness.session import default_attack_model_name
 from agentgate.scenarios import runner
 
 
@@ -88,8 +88,7 @@ def main(argv: list[str] | None = None, *, legacy: bool = False) -> dict:
         args.suites, args.user_tasks, args.injection_tasks = (runner.PILOT["suites"], runner.PILOT["user_tasks"],
                                                               runner.PILOT["injection_tasks"])
     provider, agent_model = runner.set_agent_model(args.model)
-    attack_model = args.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
-        provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
+    attack_model = args.attack_model_name or default_attack_model_name(provider, agent_model)
     if args.pairs:
         pairs = runner.parse_pairs(args.pairs)
     else:

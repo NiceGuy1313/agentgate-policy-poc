@@ -1,6 +1,7 @@
 """(프레임워크, 모델, 시나리오) 하나를 실행해 쌍별 레코드를 돌려준다. 대시보드와 배치 실행이 함께 쓴다.
 
-`run_scenario`는 이 프로세스에서 돈다. `run_scenario_subprocess`는 같은 함수를 다른 인터프리터의 worker 프로세스
+`run_scenario`는 이 프로세스에서 돈다. `run_scripted`는 API 키 없이 대본형 가짜 LLM(`fake_llm.FakeLLMServer`)으로
+같은 경로를 돈다(scripted 배치 실행, conformance 검사). `run_scenario_subprocess`는 같은 함수를 다른 인터프리터의 worker 프로세스
 (`python -m agentgate.harness.worker`)에서 돌린다. 의존성을 agentdojo와 함께 설치할 수 없는 프레임워크용이며,
 이벤트는 JSON lines로 돌아온다.
 """
@@ -114,6 +115,20 @@ def run_scenario(request: RunRequest, sink: EventSink | None = None, session: Se
                     "ungated_calls": record["ungated_calls"], "valid": record["valid"], "error": error,
                     "usage": record["agent_tokens"]})
     return record
+
+
+def run_scripted(framework: str, config: ScenarioConfig, options: dict | None = None, *, sink: EventSink | None = None,
+                 on_block: str = "continue", max_steps: int | None = None) -> dict:
+    """`run_scenario` with the scripted fake LLM (`ScriptedPlan` behind `FakeLLMServer`) driving the framework's real
+    model path. The attack template names "GPT-4", as for the native scripted agent."""
+    from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
+
+    config.attack_model_name = "GPT-4"
+    session = Session(config)
+    with FakeLLMServer(ScriptedPlan(session, on_block=on_block)) as server:
+        request = RunRequest(framework, ModelSpec("openai_compat", "scripted", base_url=server.base_url), config,
+                             options or {}, max_steps)
+        return run_scenario(request, sink, session)
 
 
 def run_scenario_subprocess(request: RunRequest, python: str, sink: EventSink | None = None) -> dict:

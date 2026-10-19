@@ -8,7 +8,7 @@ config/agentdojo/tool_args.yaml). 읽기 호출은 판정하지 않는다. TaskS
 
 from __future__ import annotations
 
-from agentgate.config import TOOL_ARGS_FILE, load_config_yaml, load_tool_args, load_tool_roles
+from agentgate.config import TOOL_ARGS_FILE, load_config_yaml, load_effect_tools, load_tool_args, load_tool_roles
 
 RULEBOOK_FILE = "rulebook.yaml"
 
@@ -18,14 +18,8 @@ def load_rulebook() -> list[dict]:
     return load_config_yaml(RULEBOOK_FILE)["rules"]
 
 
-def tool_roles() -> dict[str, list[str]]:
-    """Effect categories of config/agentdojo/tool_roles.yaml: category -> tool names."""
-    return load_tool_roles()
-
-
-def effect_tools() -> set[str]:
-    """Calls that change state, send something out or visit a URL (config/agentdojo/tool_roles.yaml)."""
-    return {tool for tools in tool_roles().values() for tool in tools}
+tool_roles = load_tool_roles       # effect categories of config/agentdojo/tool_roles.yaml: category -> tool names
+effect_tools = load_effect_tools   # calls that change state, send something out or visit a URL
 
 
 __all__ = ["RULEBOOK_FILE", "TOOL_ARGS_FILE", "effect_tools", "load_rulebook", "load_tool_args", "tool_roles"]

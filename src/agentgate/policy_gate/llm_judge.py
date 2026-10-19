@@ -25,7 +25,6 @@ from agentgate.config import PROJECT_ROOT, load_dotenv, write_text_atomic
 from agentgate.core.engine import EngineResult
 from agentgate.core.types import PolicyContext, ToolCall
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, parse_think
-from agentgate.llm.judge_io import data_block
 from agentgate.policy_gate import load_rulebook
 from agentgate.policy_gate.toolspec import CLAIM_KEYS, DATA_KEYS, TARGET_KEYS
 
@@ -65,6 +64,13 @@ def render_system(use_rules: bool = True) -> str:
         return SYSTEM_HEADER.format(**NO_RULES)
     document = "\n".join(f"- {r['id']} {r['title']}: {' '.join(r['text'].split())}" for r in load_rulebook())
     return SYSTEM_HEADER.format(**WITH_RULES) + "\n## Rulebook\n" + document
+
+
+def data_block(text: str, limit: int) -> str:
+    """A value wrapped in <data> tags, clipped to `limit` characters."""
+    text = str(text)
+    clipped = text[:limit] + (" …[truncated]" if len(text) > limit else "")
+    return f"<data>{clipped}</data>"
 
 
 def build_facts(call: ToolCall, context: PolicyContext, prompt: str) -> dict:

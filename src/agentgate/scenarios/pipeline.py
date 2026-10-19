@@ -92,7 +92,7 @@ def run_live_task(suite, pipeline: RecordingPipeline, user_task, injection_task,
     result = score_task(suite, user_task, injection_task, model_output or [], pre_environment, task_environment,
                         requested_calls, runtime)
     result["wall_ms"] = wall_ms
-    result["messages"] = [_serialize_message(m) for m in messages]
+    result["messages"] = [serialize_message(m) for m in messages]
     result["final_output"] = get_text_content_as_str(model_output or [])[:2000]
     return result
 
@@ -123,7 +123,7 @@ def score_task(suite, user_task, injection_task, output, pre_environment, task_e
     return result
 
 
-def _serialize_message(message) -> dict:
+def serialize_message(message) -> dict:
     serialized = {"role": message["role"]}
     content = message.get("content")
     serialized["content"] = (
@@ -137,3 +137,6 @@ def _serialize_message(message) -> dict:
         tool_call = message.get("tool_call")
         serialized["tool"] = tool_call.function if tool_call else None
     return serialized
+
+
+_serialize_message = serialize_message   # former private name

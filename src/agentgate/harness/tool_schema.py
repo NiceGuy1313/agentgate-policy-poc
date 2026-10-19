@@ -1,4 +1,4 @@
-"""AgentDojo 툴 인자(pydantic JSON schema)를 인자별 평면 설명으로 바꾼다. 어댑터들이 함께 쓴다."""
+"""AgentDojo 툴 인자(pydantic JSON schema)를 인자별 평면 설명으로 바꾸고, 툴 하나를 Gate 경유 호출로 감싼다. 어댑터들이 함께 쓴다."""
 
 from __future__ import annotations
 
@@ -59,3 +59,14 @@ def arguments(schema: dict) -> list[Argument]:
         result.append(Argument(name, types, description, name in required, nullable or name not in required,
                                items, enum))
     return result
+
+
+def gated_callable(bridge, name: str, drop_none: bool = True):
+    """args dict -> text the agent receives, through `GateToolBridge.invoke` (the mandatory gate path). drop_none:
+    leave out arguments the framework filled with None (an omitted optional argument)."""
+    def call(args: dict):
+        if drop_none:
+            args = {k: v for k, v in args.items() if v is not None}
+        return bridge.invoke(name, args)
+
+    return call

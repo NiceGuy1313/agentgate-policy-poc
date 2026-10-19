@@ -17,11 +17,17 @@ import importlib.util
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from agentgate.harness.bridge import GateToolBridge
-from agentgate.harness.events import EventSink
-from agentgate.harness.models import ModelSpec
-from agentgate.harness.session import FRAMEWORK_CONDITIONS
+from agentgate.config import PROJECT_ROOT
+from agentgate.experiment.conditions import CONDITIONS
+
+if TYPE_CHECKING:   # type hints only: importing the harness here would load the whole Gate stack
+    from agentgate.harness.bridge import GateToolBridge
+    from agentgate.harness.events import EventSink
+    from agentgate.harness.models import ModelSpec
+
+ARCH_DIR = PROJECT_ROOT / "dashboard" / "static" / "arch"   # Archify diagrams, one <name>.html per framework
 
 
 @dataclass
@@ -41,7 +47,6 @@ def _probe_interpreter(python: str, modules: tuple[str, ...]) -> str | None:
     """Can `python` (another venv) import agentgate and `modules`? Cached per process."""
     key = (python, modules)
     if key not in _PROBES:
-        from agentgate.config import PROJECT_ROOT
         code = ("import importlib.util, sys; missing = [m for m in sys.argv[1:] if importlib.util.find_spec(m) is None]; "
                 "print(','.join(missing))")
         try:
@@ -66,7 +71,7 @@ class FrameworkAdapter:
     loggers: tuple[str, ...] = ()             # boundary-log loggers to capture
     internal_tools: frozenset[str] = frozenset()   # framework-own tools that are not AgentDojo tools
     routes_tools_through_bridge: bool = False  # the adapter's declaration of the mandatory-gate contract (above)
-    conditions: tuple[str, ...] = FRAMEWORK_CONDITIONS   # informational: every adapter runs every condition
+    conditions: tuple[str, ...] = tuple(CONDITIONS)   # informational: every adapter runs every condition
     default_max_steps = 15                    # AgentDojo's tool loop limit, for comparability
     subprocess_python: str | None = None      # set by the registry from `python:` in config/frameworks.yaml
 
@@ -93,7 +98,9 @@ class FrameworkAdapter:
         return {"type": "object", "properties": {}}
 
     def architecture_html(self) -> Path | None:
-        return None
+        """dashboard/static/arch/<name>.html when it exists."""
+        path = ARCH_DIR / f"{self.name}.html"
+        return path if self.name and path.exists() else None
 
     def version(self) -> str | None:
         if not self.package:

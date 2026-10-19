@@ -76,13 +76,13 @@ from agentgate.core.provenance import (
     TRUSTED_ORIGINS,
     IndexedSource,
     Origin,
-    _names_match,
     compute_kgram_hashes,
     is_named_source_response,
+    names_match,
 )
 from agentgate.core.types import PolicyContext, ToolCall
 from agentgate.policy_gate import load_tool_args, tool_roles
-from agentgate.policy_gate.toolspec import CLAIM_KEYS, DATA_KEYS, TARGET_KEYS
+from agentgate.policy_gate.toolspec_schema import CLAIM_KEYS, DATA_KEYS, TARGET_KEYS
 
 RULE_IDS = ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8")
 MATCH_ROLES = ("destination", "url", "password", "target_id", "booking")   # + amount (numeric match)
@@ -123,7 +123,7 @@ def target_hit(value, targets: dict) -> bool:
             if is_url and (key == "urls" or classify_value_kind(str(target)) == "url") \
                     and _host(target) == _host(value):
                 return True
-            if key in ("names", "texts") and _names_match(target_normalized, normalized, CONTAINMENT_MIN_LEN):
+            if key in ("names", "texts") and names_match(target_normalized, normalized, CONTAINMENT_MIN_LEN):
                 return True
     return False
 

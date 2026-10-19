@@ -1,4 +1,4 @@
-"""live run의 차단 무결성을 검사한다.
+"""live run의 차단 무결성을 검사한다. run별 검사는 `agentgate.harness.enforcement.check_run`이다.
 
 run별 검사 항목:
   0. 정책 Gate를 거치지 않은 툴 실행(ungated_calls)이 없는가
@@ -20,39 +20,8 @@ import json
 from collections import Counter
 
 from agentgate.config import PROJECT_ROOT
-from agentgate.experiment.conditions import get_condition
+from agentgate.harness.enforcement import check_run, unexecuted_requests
 from agentgate.scenarios.live_run_analysis import live_run_files
-
-
-def check_run(run: dict) -> list[dict]:
-    issues = []
-    trace = run.get("trace", [])
-    for i, event in enumerate(trace):
-        if event["blocked"] and event["executed"]:
-            issues.append({"check": "blocked_executed", "step": i, "tool": event["tool"]})
-        if event["blocked"]:
-            hash_after = trace[i + 1]["env_hash_before"] if i + 1 < len(trace) else run.get("final_env_hash")
-            if event.get("env_hash_before") is None or hash_after != event["env_hash_before"]:
-                issues.append({"check": "env_changed_on_block", "step": i, "tool": event["tool"]})
-        if event["executed"] and event.get("effective") == "BLOCK" and get_condition(run["condition"]).mode == "enforce":
-            issues.append({"check": "enforce_block_executed", "step": i, "tool": event["tool"]})
-    for ungated in run.get("ungated_calls") or []:   # a tool execution outside the policy gate (run is invalid)
-        issues.append({"check": "ungated_execution", "tool": ungated.get("tool"), "reason": ungated.get("reason")})
-    # Every tool result the agent received must come from exactly one gate event (same tool, same order).
-    tool_messages = [m for m in run.get("messages", []) if m["role"] == "tool"]
-    processed_tools = [m["tool"] for m in tool_messages
-                       if not (m.get("error") or "").startswith(("Invalid tool", "Empty function"))]
-    gate_tools = [e["tool"] for e in trace]
-    if processed_tools != gate_tools:
-        issues.append({"check": "gate_trace_mismatch", "tool_results": len(processed_tools),
-                       "gate_events": len(gate_tools)})
-    return issues
-
-
-def unexecuted_requests(run: dict) -> int:
-    """Calls the model requested that never got a tool result (AgentDojo loop limit)."""
-    requested = sum(len(m.get("tool_calls") or []) for m in run.get("messages", []))
-    return requested - sum(1 for m in run.get("messages", []) if m["role"] == "tool")
 
 
 def main():

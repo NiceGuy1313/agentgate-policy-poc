@@ -159,12 +159,3 @@ def extract_typed_candidates(text: str) -> dict[str, set[str]]:
         "phone": {re.sub(r"\D", "", m) for m in PHONE_PATTERN.findall(text)},
         "amount": set(AMOUNT_PATTERN.findall(text)),
     }
-
-
-def long_value_candidates(value, long_chars: int) -> list[str]:
-    """A short value as is; a long text (message body) as the typed values (URL, e-mail, IBAN) inside it."""
-    text = str(value)
-    if len(text) <= long_chars:
-        return [text]
-    candidates = extract_typed_candidates(text)
-    return sorted(candidates["url"] | candidates["email"] | candidates["iban"])

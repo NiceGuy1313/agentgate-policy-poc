@@ -17,7 +17,7 @@ from agentdojo.types import get_text_content_as_str
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.agents.factory import UsageMeter
-from agentgate.scenarios.pipeline import _serialize_message, build_pipeline
+from agentgate.scenarios.pipeline import build_pipeline, serialize_message
 
 
 def make_native_llm(model, meter: UsageMeter):
@@ -112,4 +112,4 @@ class NativeAdapter(FrameworkAdapter):
             steps=sum(1 for m in messages if m["role"] == "assistant"),
             usage={"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
                    "refusals": meter.refusals},
-            messages=[_serialize_message(m) for m in messages])
+            messages=[serialize_message(m) for m in messages])

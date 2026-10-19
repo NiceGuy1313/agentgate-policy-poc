@@ -9,13 +9,10 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.events import preview
-from agentgate.harness.tool_schema import arguments
-
-DASHBOARD_DIR = Path(__file__).resolve().parents[3] / "dashboard"
+from agentgate.harness.tool_schema import arguments, gated_callable
 
 
 def make_tools(bridge):
@@ -35,14 +32,13 @@ def make_tools(bridge):
             inputs[arg.name] = entry
 
         def forward(self, **kwargs):
-            args = {k: v for k, v in kwargs.items() if v is not None}
-            return self._bridge.invoke(self.name, args)
+            return self._invoke(kwargs)
 
         cls = type(f"AgentDojo_{spec['name']}", (Tool,), {
             "name": spec["name"], "description": spec["description"] or spec["name"], "inputs": inputs,
             "output_type": "string", "skip_forward_signature_validation": True, "forward": forward})
         tool = cls()
-        tool._bridge = bridge
+        tool._invoke = gated_callable(bridge, spec["name"])
         tools.append(tool)
     return tools
 
@@ -146,10 +142,6 @@ class SmolagentsAdapter(FrameworkAdapter):
         return {"type": "object", "properties": {
             "agent_type": {"type": "string", "title": "Agent type", "enum": ["tool_calling", "code"],
                            "default": "tool_calling"}}}
-
-    def architecture_html(self) -> Path | None:
-        path = DASHBOARD_DIR / "static" / "arch" / "smolagents.html"
-        return path if path.exists() else None
 
     def run(self, task, bridge, model, options, max_steps, sink):
         from smolagents import CodeAgent, ToolCallingAgent

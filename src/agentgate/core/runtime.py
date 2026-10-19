@@ -51,16 +51,19 @@ EscalationJudgeFn = Callable[[ToolCall, EngineResult, PolicyContext], dict]
 """Returns {"verdict": "ALLOW"|"BLOCK", ...} (the judge record stored in the trace)."""
 
 
-def _to_plain_data(value: Any) -> Any:
+def to_plain_data(value: Any) -> Any:
     if isinstance(value, FunctionCall):
-        return {"__call__": value.function, "args": _to_plain_data(dict(value.args))}
+        return {"__call__": value.function, "args": to_plain_data(dict(value.args))}
     if isinstance(value, Mapping):
-        return {k: _to_plain_data(item) for k, item in value.items()}
+        return {k: to_plain_data(item) for k, item in value.items()}
     if isinstance(value, (list, tuple)):
-        return [_to_plain_data(item) for item in value]
+        return [to_plain_data(item) for item in value]
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     return value
+
+
+_to_plain_data = to_plain_data   # former private name
 
 
 def compute_environment_hash(environment: TaskEnvironment | None) -> str | None:
@@ -178,7 +181,7 @@ class GatedRuntime(FunctionsRuntime):
     # ------------------------------------------------------------------ the gate
     def run_function(self, env, function: str, kwargs, raise_on_error: bool = False):
         step = len(self.trace)
-        args = _to_plain_data(dict(kwargs))
+        args = to_plain_data(dict(kwargs))
         event = TraceEvent(step=step, tool=function, args=args, phase=self.phase)
         if self.record_env_hash:
             event.env_hash_before = compute_environment_hash(env)
@@ -250,10 +253,6 @@ class GatedRuntime(FunctionsRuntime):
     def finalize_judgement(self, judgement: dict) -> dict:
         """Post-process the ESCALATE judge's answer. Default: unchanged."""
         return judgement
-
-    def _execute_nested_calls(self, env, kwargs):
-        # nested FunctionCall arguments are executed through run_function, so they are gated too
-        return super()._execute_nested_calls(env, kwargs)
 
     # ------------------------------------------------------------------ serialization
     def trace_records(self) -> list[dict]:

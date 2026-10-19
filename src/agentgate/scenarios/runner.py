@@ -99,10 +99,9 @@ def run_framework_one(job: dict, output_path: Path) -> str:
 
     어댑터는 `GateToolBridge` -> `Session.invoke`로만 툴을 실행한다. `agent == "scripted"`이면 API 키 없이 대본형 가짜
     LLM(`FakeLLMServer`)이 그 프레임워크의 실제 모델 경로를 구동한다. 상태는 ok / error / invalid / quota다."""
-    from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
     from agentgate.harness.models import ModelSpec
-    from agentgate.harness.runner import RunRequest, execute, run_scenario
-    from agentgate.harness.session import ScenarioConfig, Session
+    from agentgate.harness.runner import RunRequest, execute, run_scripted
+    from agentgate.harness.session import ScenarioConfig
 
     framework = job.get("framework", "native")
     config = ScenarioConfig(job["suite"], job["user_task"], job["injection_task"], condition=job["cond"],
@@ -111,13 +110,8 @@ def run_framework_one(job: dict, output_path: Path) -> str:
     options = json.loads(job.get("framework_options") or "{}")
     try:
         if job["agent"] == "scripted":
-            config.attack_model_name = "GPT-4"
-            session = Session(config)
-            plan = ScriptedPlan(session, on_block=job.get("on_block", "continue"))
-            with FakeLLMServer(plan) as server:
-                request = RunRequest(framework, ModelSpec("openai_compat", "scripted", base_url=server.base_url),
-                                     config, options, job.get("max_steps"))
-                record = run_scenario(request, session=session)
+            record = run_scripted(framework, config, options, on_block=job.get("on_block", "continue"),
+                                  max_steps=job.get("max_steps"))
         else:
             request = RunRequest(framework, ModelSpec(provider, model_name), config, options, job.get("max_steps"))
             record = execute(request)

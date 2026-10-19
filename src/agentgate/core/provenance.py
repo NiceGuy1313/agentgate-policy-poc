@@ -10,8 +10,6 @@ from typing import Any
 from agentgate.config import load_named_source_rules, sensitive_categories_for_tool
 from agentgate.core.normalization import (
     build_haystack,
-    classify_value_kind,
-    extract_typed_candidates,
     flatten_string_fields,
     haystack_contains,
     iterate_leaf_values,
@@ -97,12 +95,12 @@ def is_named_source_response(tool: str, args: dict, spec: TaskSpec, min_len: int
                 continue
             for named_source in spec.named_sources:
                 normalized_named = normalize_value(named_source)
-                if normalized_named and _names_match(normalized_named, normalized_argument, min_len):
+                if normalized_named and names_match(normalized_named, normalized_argument, min_len):
                     return True
     return False
 
 
-def _names_match(named: str, arg: str, min_len: int = 4) -> bool:
+def names_match(named: str, arg: str, min_len: int = 4) -> bool:
     """Named source `named` matches tool argument `arg` if one contains the other on token
     boundaries; the contained side must be at least `min_len` characters (so query "x" is not a match).
     config/gate.yaml runtime.named_match_min_len can lower min_len (3: "Bob" matches "Bob's inbox")."""
@@ -111,6 +109,9 @@ def _names_match(named: str, arg: str, min_len: int = 4) -> bool:
             return small == big
         return re.search(r"(?<![a-z0-9])" + re.escape(small) + r"(?![a-z0-9])", big) is not None
     return within(named, arg) or within(arg, named)
+
+
+_names_match = names_match   # former private name
 
 
 class ValueIndex:
@@ -192,9 +193,6 @@ class ValueIndex:
             return ProvenanceResult(Origin.OTHER_TOOL, first.step, first.tool, first.source_id)
         return ProvenanceResult(Origin.UNSEEN)
 
-    def named_source_responses(self) -> list[IndexedSource]:
-        return [s for s in self.sources if s.is_named]
-
     # ------------------------------------------------------------------ text overlap
     def find_overlapping_sources(self, sink_text: str, k: int,
                                  categories: list[str] | None = None) -> list[IndexedSource]:
@@ -213,38 +211,3 @@ class ValueIndex:
             if sink_hashes & source.kgram_hashes:
                 hits.append(source)
         return hits
-
-    def source_by_id(self, source_id: str | None) -> IndexedSource | None:
-        return next((s for s in self.sources if s.source_id == source_id), None)
-
-    def count_same_kind_candidates(self, value: Any, source_id: str | None) -> int:
-        """Number of same-kind candidate values in the source that contains `value` (judge input)."""
-        source = next((s for s in self.sources if s.source_id == source_id), None)
-        if source is None:
-            return 0
-        kind = classify_value_kind(str(value))
-        candidates = extract_typed_candidates(source.text)
-        return len(candidates.get(kind, set())) if kind in candidates else 0
-
-    def extract_context_snippets(self, value: Any, source_id: str | None, width: int) -> list[str]:
-        source = next((s for s in self.sources if s.source_id == source_id), None)
-        if source is None:
-            return []
-        lowered = source.text.lower()
-        key = normalize_text(str(value))
-        snippets, start = [], 0
-        while True:
-            i = lowered.find(key, start)
-            if i < 0 or len(snippets) >= 3:
-                break
-            snippets.append(source.text[max(0, i - width) : i + len(key) + width])
-            start = i + 1
-        return snippets
-
-
-def join_argument_text(args: dict, names: list[str]) -> str:
-    parts = []
-    for name in names:
-        for value in iterate_leaf_values(args.get(name)):
-            parts.append(str(value))
-    return "\n".join(parts)

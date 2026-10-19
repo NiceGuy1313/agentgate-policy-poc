@@ -1,7 +1,6 @@
 """정답(ground truth) 궤적을 게이트로 재생한다(RQ1). Gate 자체는 LLM을 부르지 않는다.
 
-어떤 Gate로 재생할지는 `runtime_factory`(보통 `agentgate.experiment.conditions.make_runtime`)가 정한다. 생략하면
-판정 없이 기록만 하는 `GatedRuntime`이다.
+어떤 Gate로 재생할지는 `runtime_factory`(보통 `agentgate.experiment.conditions.make_runtime`)가 정한다.
 """
 
 from __future__ import annotations
@@ -13,7 +12,6 @@ from agentdojo.attacks.attack_registry import load_attack
 from agentdojo.types import text_content_block_from_string
 
 from agentgate.config import load_effect_tools
-from agentgate.core.runtime import GatedRuntime
 from agentgate.core.task_spec import TaskSpec
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
 from agentgate.scenarios.suites import load_suite
@@ -47,19 +45,13 @@ def _ground_truth_model_output(*tasks) -> list:
     return [text_content_block_from_string(text)]
 
 
-def _make_runtime(runtime_factory, suite, prompt: str, spec: TaskSpec, mode: str, runtime_kw):
-    if runtime_factory is not None:
-        return runtime_factory(suite.tools, prompt=prompt, spec=spec, mode=mode, **(runtime_kw or {}))
-    return GatedRuntime(suite.tools, prompt=prompt, spec=spec, mode=mode, **(runtime_kw or {}))
-
-
-def replay_benign_task(suite_name: str, user_task_id: str, spec: TaskSpec, mode: str = "audit",
-                       runtime_kw: dict | None = None, runtime_factory=None) -> dict:
+def replay_benign_task(suite_name: str, user_task_id: str, spec: TaskSpec, mode: str = "audit", *,
+                       runtime_factory) -> dict:
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     environment = user_task.init_environment(suite.load_and_inject_default_environment({}))
     pre_environment = environment.model_copy(deep=True)
-    runtime = _make_runtime(runtime_factory, suite, user_task.PROMPT, spec, mode, runtime_kw)
+    runtime = runtime_factory(suite.tools, prompt=user_task.PROMPT, spec=spec, mode=mode)
     runtime.phase = "user"
     calls = user_task.ground_truth(pre_environment.model_copy(deep=True))
     for call in calls:
@@ -71,16 +63,15 @@ def replay_benign_task(suite_name: str, user_task_id: str, spec: TaskSpec, mode:
 
 
 def replay_attack_pair(suite_name: str, user_task_id: str, injection_task_id: str, spec: TaskSpec,
-                       mode: str = "audit", attack_name: str = "important_instructions",
-                       runtime_kw: dict | None = None,
-                       runtime_factory=None) -> dict:
+                       mode: str = "audit", attack_name: str = "important_instructions", *,
+                       runtime_factory) -> dict:
     suite = load_suite(suite_name)
     user_task = suite.get_user_task_by_id(user_task_id)
     injection_task = suite.get_injection_task_by_id(injection_task_id)
     injections = build_injections(suite_name, user_task, injection_task, attack_name)
     environment = user_task.init_environment(suite.load_and_inject_default_environment(injections))
     pre_environment = environment.model_copy(deep=True)
-    runtime = _make_runtime(runtime_factory, suite, user_task.PROMPT, spec, mode, runtime_kw)
+    runtime = runtime_factory(suite.tools, prompt=user_task.PROMPT, spec=spec, mode=mode)
     requested = []   # every call the (simulated) agent asked for, including blocked ones
     runtime.phase = "user"
     for call in user_task.ground_truth(pre_environment.model_copy(deep=True)):

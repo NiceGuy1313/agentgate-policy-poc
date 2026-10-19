@@ -11,13 +11,11 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 from agentgate.harness.events import preview
-from agentgate.harness.tool_schema import arguments
+from agentgate.harness.tool_schema import arguments, gated_callable
 
-DASHBOARD_DIR = Path(__file__).resolve().parents[3] / "dashboard"
 JSON_TO_PYTHON = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
 # browser-use's own scratch file system (a temp dir, not the AgentDojo environment). Its system prompt tells the model
 # to plan in todo.md with these actions, so they stay available; without them models keep calling write_file.
@@ -68,8 +66,10 @@ def make_tools(bridge):
 
 
 def _gated_action(bridge, name: str):
+    invoke = gated_callable(bridge, name)
+
     async def action(params):
-        return bridge.invoke(name, {k: v for k, v in params.model_dump().items() if v is not None})
+        return invoke(params.model_dump())
 
     action.__name__ = name
     return action
@@ -141,10 +141,6 @@ class BrowserUseAdapter(FrameworkAdapter):
     def options_schema(self) -> dict:
         return {"type": "object", "properties": {
             "max_actions_per_step": {"type": "integer", "title": "Max actions per step", "default": 5}}}
-
-    def architecture_html(self) -> Path | None:
-        path = DASHBOARD_DIR / "static" / "arch" / "browser-use.html"
-        return path if path.exists() else None
 
     def run(self, task, bridge, model, options, max_steps, sink):
         os.environ.setdefault("BROWSER_USE_SETUP_LOGGING", "false")
