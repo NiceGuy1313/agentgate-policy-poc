@@ -5,9 +5,10 @@ CLI는 `python -m agentgate.scenarios.run`이다(scripts/evaluation/live_evaluat
 읽는 스키마로 쓰고, `summarize`가 <out>/scenario_summary.json을 쓴다. 정책 Gate를 우회한 툴 실행이 있는 run은
 무효(`valid: false`)이고 점수는 요약에서 빠진다. LLM 캐시(TaskSpec, ToolSpec, 판정)는 data/cache/에 둔다.
 
-  framework native   GatedRuntime 위의 AgentDojo pipeline(`run_live_task`), 기준 경로
-  그 밖의 framework  agentgate.harness(`GateToolBridge` -> `Session.invoke` -> `PolicyGateRuntime.run_function`)
-모든 프레임워크는 모든 조건(`agentgate.experiment.conditions`)에서 돈다.
+native를 포함한 모든 프레임워크가 같은 필수 경로로 돈다: `agentgate.harness`의 `Session`(환경·TaskSpec·채점)과
+`GateToolBridge`가 어댑터에 툴을 내주고, 모든 툴 실행은 `Session.invoke` -> `PolicyGateRuntime.run_function`을 지난다
+(native 어댑터는 AgentDojo pipeline에 `BridgeRuntime`을 넘긴다). 모든 프레임워크는 모든 조건
+(`agentgate.experiment.conditions`)에서 돈다.
 """
 
 from __future__ import annotations
@@ -23,13 +24,10 @@ from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from agentgate.agents.factory import UsageMeter, make_llm, spec_provider
-from agentgate.agents.scripted_agent import ScriptedAgent
 from agentgate.config import load_dotenv
-from agentgate.experiment.conditions import CONDITIONS, get_condition, make_runtime
-from agentgate.harness.session import SCORE_KEYS, invalidate_if_ungated
-from agentgate.scenarios.pipeline import RecordingPipeline, build_pipeline, run_live_task
-from agentgate.scenarios.replay import REPLAY_PIPELINE_NAME, get_cached_attack
+from agentgate.experiment.conditions import CONDITIONS, get_condition
+from agentgate.harness.session import SCORE_KEYS
+from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
 from agentgate.scenarios.suites import load_suite, task_number
 
 SUMMARY_FILE = "scenario_summary.json"   # summary.json is scripts/analysis/summarize_live.py's
@@ -83,42 +81,6 @@ def select_pairs(suites: list[str], user_tasks: list[str] | None, injection_task
 
 
 # ---------------------------------------------------------------------------------------------- one run
-def run_framework_one(job: dict, output_path: Path) -> str:
-    """One pair through agentgate.harness (any registered framework); same record schema as run_one."""
-    from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
-    from agentgate.harness.models import ModelSpec
-    from agentgate.harness.runner import RunRequest, execute, run_scenario
-    from agentgate.harness.session import ScenarioConfig, Session
-
-    config = ScenarioConfig(job["suite"], job["user_task"], job["injection_task"], condition=job["cond"],
-                            spec=job["spec"], attack=job["attack"], attack_model_name=job["attack_model_name"])
-    provider, _, model_name = job["model"].partition(":")
-    options = json.loads(job.get("framework_options") or "{}")
-    try:
-        if job["agent"] == "scripted":
-            config.attack_model_name = "GPT-4"
-            session = Session(config)
-            with FakeLLMServer(ScriptedPlan(session)) as server:
-                request = RunRequest(job["framework"], ModelSpec("openai_compat", "scripted", base_url=server.base_url),
-                                     config, options, job.get("max_steps"))
-                record = run_scenario(request, session=session)
-        else:
-            request = RunRequest(job["framework"], ModelSpec(provider, model_name), config, options,
-                                 job.get("max_steps"))
-            record = execute(request)
-    except Exception as exc:  # keep going; record the failure
-        record = {"condition": job["cond"], "suite": job["suite"], "user_task": job["user_task"],
-                  "injection_task": job["injection_task"], "framework": job["framework"], "trace": [],
-                  "error": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-1500:]}"}
-    record["agent"] = job["agent"]
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(record, ensure_ascii=False, default=str))
-    if record.get("valid") is False:
-        print(f"INVALID {output_path}: {record.get('invalid_reason')}", flush=True)
-        return "invalid"
-    return "error" if record.get("error") else "ok"
-
-
 _QUOTA_EXHAUSTED = threading.Event()
 
 
@@ -132,72 +94,60 @@ def _is_quota_error(error: str | None) -> bool:
     return bool(error) and "429" in error and "usage" in error.lower()
 
 
-def run_one(job: dict) -> str:
-    load_dotenv()
-    if _QUOTA_EXHAUSTED.is_set():
-        return "quota"
-    condition, suite_name = job["cond"], job["suite"]
-    user_task_id, injection_task_id = job["user_task"], job["injection_task"]
-    output_path = record_path(job["out"], job)
-    if output_path.exists():
-        return "skip"
-    if job.get("framework", "native") != "native":
-        return run_framework_one(job, output_path)
-    suite = load_suite(suite_name)
-    user_task = suite.get_user_task_by_id(user_task_id)
-    injection_task = suite.get_injection_task_by_id(injection_task_id) if injection_task_id else None
-    meter = UsageMeter()
-    if job["agent"] == "scripted":
-        llm = ScriptedAgent(suite_name, user_task, injection_task, on_block=job["on_block"])
-        attack_model = "GPT-4"
-    else:
-        llm = make_llm(meter)
-        attack_model = job["attack_model_name"]
-    cond = get_condition(condition)
-    # every condition of a run (the no_gate baseline included) sees the same live-extracted spec
-    provider = spec_provider(job["spec"], suite_name, user_task_id)
-    stats: dict = {}
-    runtime = make_runtime(cond, suite.tools, suite_name=suite_name, prompt=user_task.PROMPT, stats=stats,
-                           record_env_hash=True)
-    pipeline = build_pipeline(llm, provider)
-    recording_pipeline = RecordingPipeline(pipeline)
-    injections = {}
-    if injection_task is not None:
-        attack = get_cached_attack(suite_name, job["attack"], REPLAY_PIPELINE_NAME)
-        attack.model_name = attack_model
-        injections = attack.attack(user_task, injection_task)
+def run_framework_one(job: dict, output_path: Path) -> str:
+    """쌍 하나를 `agentgate.harness`로 돌려 레코드를 쓴다. native를 포함해 등록된 모든 프레임워크의 경로다.
+
+    어댑터는 `GateToolBridge` -> `Session.invoke`로만 툴을 실행한다. `agent == "scripted"`이면 API 키 없이 대본형 가짜
+    LLM(`FakeLLMServer`)이 그 프레임워크의 실제 모델 경로를 구동한다. 상태는 ok / error / invalid / quota다."""
+    from agentgate.harness.fake_llm import FakeLLMServer, ScriptedPlan
+    from agentgate.harness.models import ModelSpec
+    from agentgate.harness.runner import RunRequest, execute, run_scenario
+    from agentgate.harness.session import ScenarioConfig, Session
+
+    framework = job.get("framework", "native")
+    config = ScenarioConfig(job["suite"], job["user_task"], job["injection_task"], condition=job["cond"],
+                            spec=job["spec"], attack=job["attack"], attack_model_name=job["attack_model_name"])
+    provider, _, model_name = job["model"].partition(":")
+    options = json.loads(job.get("framework_options") or "{}")
     try:
-        result = run_live_task(suite, recording_pipeline, user_task, injection_task, injections, runtime)
-        error = None
+        if job["agent"] == "scripted":
+            config.attack_model_name = "GPT-4"
+            session = Session(config)
+            plan = ScriptedPlan(session, on_block=job.get("on_block", "continue"))
+            with FakeLLMServer(plan) as server:
+                request = RunRequest(framework, ModelSpec("openai_compat", "scripted", base_url=server.base_url),
+                                     config, options, job.get("max_steps"))
+                record = run_scenario(request, session=session)
+        else:
+            request = RunRequest(framework, ModelSpec(provider, model_name), config, options, job.get("max_steps"))
+            record = execute(request)
     except Exception as exc:  # keep going; record the failure
-        result, error = {}, f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-1500:]}"
-    meter.collect()
-    record = {
-        "condition": condition, "suite": suite_name, "user_task": user_task_id, "injection_task": injection_task_id,
-        "agent": job["agent"], "agent_model": getattr(llm, "name", None),
-        "attack": job["attack"] if injection_task else None,
-        "spec_source": job["spec"], "spec_meta": runtime.spec_meta,
-        "spec": runtime.spec.model_dump() if runtime.spec is not None else None,
-        "error": error, **result,
-        "agent_tokens": {"input": meter.input_tokens, "output": meter.output_tokens, "calls": meter.calls,
-                         "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
-        "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
-        "judge": runtime.judge_stats() if cond.judge else None,
-        "toolspec": stats.get("toolspec") if cond.judge else None,
-        "trace": runtime.trace_records(),
-    }
-    invalidate_if_ungated(record, list(runtime.ungated_executions))
-    if _is_quota_error(error):
+        record = {"condition": job["cond"], "suite": job["suite"], "user_task": job["user_task"],
+                  "injection_task": job["injection_task"], "framework": framework, "trace": [],
+                  "error": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-1500:]}"}
+    record["agent"] = job["agent"]
+    if _is_quota_error(record.get("error")):
         # no record: the run did not happen, so a later invocation retries it instead of skipping it
         _QUOTA_EXHAUSTED.set()
-        print(f"usage limit reached, stopping: {error.splitlines()[0][:200]}", flush=True)
+        print(f"usage limit reached, stopping: {record['error'].splitlines()[0][:200]}", flush=True)
         return "quota"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, ensure_ascii=False, default=str))
-    if not record["valid"]:
-        print(f"INVALID {output_path}: {record['invalid_reason']}", flush=True)
+    if record.get("valid") is False:
+        print(f"INVALID {output_path}: {record.get('invalid_reason')}", flush=True)
         return "invalid"
-    return "error" if error else "ok"
+    return "error" if record.get("error") else "ok"
+
+
+def run_one(job: dict) -> str:
+    """작업 하나를 돌린다. 이미 레코드가 있으면 건너뛰고, 사용량 한도에 걸렸으면 돌리지 않는다."""
+    load_dotenv()
+    if _QUOTA_EXHAUSTED.is_set():
+        return "quota"
+    output_path = record_path(job["out"], job)
+    if output_path.exists():
+        return "skip"
+    return run_framework_one(job, output_path)
 
 
 def extract_specs_once(jobs: list[dict]) -> None:
@@ -282,12 +232,16 @@ def write_summary(out: str | Path) -> dict:
 
 
 def set_agent_model(model: str | None) -> tuple[str, str]:
-    """provider:model for every path: the native pipeline builds its agent from AGENTGATE_AGENT_* (make_llm)."""
+    """에이전트 (provider, model)을 정한다: `model`(provider:model), 없으면 AGENTGATE_AGENT_*, anthropic은 기본 모델.
+
+    `model`을 주면 AGENTGATE_AGENT_*에도 써서 판정 LLM의 기본값(`resolve_judge_settings`)이 에이전트를 따르게 한다."""
     provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
     agent_model = os.environ.get("AGENTGATE_AGENT_MODEL") or ""
     if model:
         provider, _, agent_model = model.partition(":")
         os.environ["AGENTGATE_AGENT_PROVIDER"], os.environ["AGENTGATE_AGENT_MODEL"] = provider, agent_model
+    if provider == "anthropic" and not agent_model:
+        agent_model = DEFAULT_ANTHROPIC_MODEL
     return provider, agent_model
 
 

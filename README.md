@@ -78,6 +78,7 @@ sequenceDiagram
 - 모든 툴 호출은 `GatedRuntime.run_function` 한 곳을 지난다. Gate를 거치지 않은 실행이 하나라도 있으면 그 run은 무효이고 점수는 집계에서 빠진다.
 - TaskSpec이 없거나, Gate에 닿지 못하거나, 판정에 실패하면 차단한다(fail-closed).
 - 판정기는 툴 응답 원문을 보지 않고 ToolSpec만 본다.
+- AgentDojo native도 같은 경로다. native Adapter가 pipeline에 `BridgeRuntime`을 넘기고, 시나리오 CLI와 대시보드는 native를 포함한 모든 프레임워크를 같은 `harness.runner`(`Session` + `GateToolBridge`)로 돌린다.
 
 구조와 집행 지점은 [`docs/architecture.md`](docs/architecture.md)에 있다.
 
@@ -138,6 +139,8 @@ python scripts/analysis/check_enforcement.py --run results/runs/<name>
 python scripts/analysis/summarize_live.py --run results/runs/<name>
 ```
 
+`--framework`의 기본값 `native`도 Adapter → `GateToolBridge` → `Session` 경로로 돈다. `--agent scripted`는 API 키 없이 가짜 LLM 서버가 프레임워크의 모델 경로를 구동한다.
+
 run마다 `<out>/<condition>/<suite>/<user_task>/<injection_task|none>.json`, 전체 요약은 `<out>/scenario_summary.json`이다. TaskSpec 출처 기본값은 LLM 추출(`--spec llm`)이다. 옵션 전체는 `python -m agentgate.scenarios.run --help`로 본다.
 
 ### 재생 평가와 재생 대조
@@ -183,14 +186,15 @@ dashboard/       대시보드 앱(app.py)과 정적 파일(static/)
 examples/        contract_wrapper/minimal_agent.py (contract v1 참조 Wrapper)
 tests/           core/ · policy_gate/ · frameworks/ · 공통 테스트
 data/            agentdojo/(벤치마크 추출, oracle TaskSpec, 층화 표본 쌍) · atr/(룰북 근거) · cache/(LLM 캐시, git 제외)
-results/         평가 결과(RESULTS.md, 원본 기록은 git 제외)
+results/         평가 결과(RESULTS.md는 생성물이라 실험 전에는 없다, 원본 기록은 git 제외)
 docs/            architecture.md · rulebook.md · integration_guide.md
 archive/         이전 버전 코드와 결과 문서
 ```
 
 ## 9. 결과와 보관본
 
-- 결과 문서는 `results/RESULTS.md`이며 [`scripts/analysis/summarize_results.py`](scripts/analysis/summarize_results.py)와 [`scripts/evaluation/replay_contrast.py`](scripts/evaluation/replay_contrast.py)가 생성한다. 손으로 고치지 않는다. 실행 원본 기록은 git에 올리지 않는다.
+- 결과 문서는 `results/RESULTS.md`이며 [`scripts/analysis/summarize_results.py`](scripts/analysis/summarize_results.py)와 [`scripts/evaluation/replay_contrast.py`](scripts/evaluation/replay_contrast.py)가 생성한다. 손으로 고치지 않는다. 두 스크립트가 실험 결과로 이 파일을 만들기 전에는 저장소에 없다(`results/`에는 `.gitkeep`만 있다). 실행 원본 기록은 git에 올리지 않는다.
+- 정책 Gate를 우회해 무효(`valid: false`)인 run은 `summarize_live.py`·`live_significance.py`·`analyze_live_utility.py`·`summarize_results.py` 모두에서 점수에 넣지 않고 건수(`n_invalid`)만 보고한다.
 - 이전 버전은 `archive/`에 보관한다. 현재 코드는 보관본을 import하지 않는다.
 
 | 위치 | 내용 |

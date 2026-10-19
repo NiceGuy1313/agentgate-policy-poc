@@ -6,6 +6,7 @@
 사용법: python scripts/analysis/analyze_live_utility.py --run results/live/<run> \
           --baseline results/live/<run> --condition gate_llm_judge
 run 폴더에 <condition>/가 없으면 runs.tar.gz를 임시 폴더에 풀어 읽는다. 출력: <run>/utility_analysis_<condition>.json
+정책 Gate를 우회해 무효(valid: false)인 run은 쌍에서 빼고 n_invalid로 센다.
 """
 
 from __future__ import annotations
@@ -22,17 +23,21 @@ from agentgate.config import PROJECT_ROOT
 from agentgate.scenarios.suites import load_suite
 
 
-def load_condition(run_dir: Path, condition: str, tmp: Path) -> dict:
+def load_condition(run_dir: Path, condition: str, tmp: Path) -> tuple[dict, int]:
+    """(조건의 run, 무효 run 수). 무효 run(Gate 우회)은 run에 넣지 않는다."""
     root = run_dir
     if not (run_dir / condition).exists():
         root = tmp / run_dir.name
         with tarfile.open(run_dir / "runs.tar.gz") as archive:
             archive.extractall(root, filter="data")
-    runs = {}
+    runs, n_invalid = {}, 0
     for path in (root / condition).glob("*/*/*.json"):
         run = json.loads(path.read_text())
+        if run.get("valid") is False:
+            n_invalid += 1
+            continue
         runs[(run["suite"], run["user_task"], run["injection_task"])] = run
-    return runs
+    return runs, n_invalid
 
 
 @lru_cache(maxsize=None)
@@ -86,13 +91,15 @@ def main():
     args = parser.parse_args()
     run_dir, baseline_dir = PROJECT_ROOT / args.run, PROJECT_ROOT / args.baseline
     with tempfile.TemporaryDirectory() as tmp:
-        runs = load_condition(run_dir, args.condition, Path(tmp))
-        baseline = load_condition(baseline_dir, "no_gate", Path(tmp) / "baseline")
-    result = {"run": args.run, "baseline": args.baseline, "condition": args.condition, **analyze(runs, baseline)}
+        runs, n_invalid = load_condition(run_dir, args.condition, Path(tmp))
+        baseline, baseline_invalid = load_condition(baseline_dir, "no_gate", Path(tmp) / "baseline")
+    result = {"run": args.run, "baseline": args.baseline, "condition": args.condition,
+              "n_invalid": {"condition": n_invalid, "baseline": baseline_invalid}, **analyze(runs, baseline)}
     (run_dir / f"utility_analysis_{args.condition}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     for kind in ("benign", "attack"):
         print(kind, result[kind]["pairing"])
         print("  blocked calls in lost runs", result[kind]["blocked_calls_in_lost_runs"])
+    print("invalid runs excluded:", result["n_invalid"])
 
 
 if __name__ == "__main__":

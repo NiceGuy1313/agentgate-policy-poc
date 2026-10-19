@@ -10,10 +10,10 @@
 
 에이전트
   --agent llm       실제 LLM 에이전트 (키는 .env; AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL)
-  --agent scripted  결정론적 ScriptedAgent (키 불필요) - 모델 행동이 아니라 통합을 확인한다
+  --agent scripted  결정론적 대본 에이전트(가짜 LLM 서버, 키 불필요) - 모델 행동이 아니라 통합을 확인한다
 
 프레임워크 (--framework, 기본값 native = AgentDojo pipeline)
-  agentgate.harness.registry에 등록된 이름.
+  agentgate.harness.registry에 등록된 이름. native도 Adapter -> GateToolBridge -> Session 경로로 돈다.
 
 실행 코드는 `agentgate.scenarios.runner`에 있고, 이 스크립트는 `python -m agentgate.scenarios.run`의 얇은 wrapper다.
 차이는 기본값 두 가지다. TaskSpec 캐시를 <out>/taskspec_cache에 새로 만들고(live 추출), --injection-tasks가 없으면

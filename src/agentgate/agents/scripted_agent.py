@@ -7,6 +7,7 @@ from agentdojo.functions_runtime import EmptyEnv
 from agentdojo.types import ChatAssistantMessage, get_text_content_as_str, text_content_block_from_string
 
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
+from agentgate.scenarios.replay import ATTACK_MARKER
 
 
 class ScriptedAgent(BasePipelineElement):
@@ -22,7 +23,7 @@ class ScriptedAgent(BasePipelineElement):
     name = "scripted-agent (gpt-4o-2024-05-13 persona for attack templating)"
 
     def __init__(self, suite_name: str, user_task, injection_task=None, on_block: str = "continue",
-                 marker: str = "<INFORMATION>"):
+                 marker: str = ATTACK_MARKER):
         self.suite_name, self.user_task, self.injection_task = suite_name, user_task, injection_task
         self.on_block, self.marker = on_block, marker
         self.reset()

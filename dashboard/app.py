@@ -239,7 +239,7 @@ lock = threading.Lock()
 
 def _execute(run: Run) -> None:
     try:
-        runner.set_agent_model(run.model)       # the native pipeline builds its agent from AGENTGATE_AGENT_*
+        runner.set_agent_model(run.model)       # the judge LLM's default model follows the agent (AGENTGATE_AGENT_*)
         runner.reset_quota_flag()               # a usage limit hit by an earlier run must not stop this one
         run.counts = runner.run_jobs(run.jobs, WORKERS)
         status = "finished"

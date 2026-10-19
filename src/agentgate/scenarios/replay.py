@@ -18,7 +18,7 @@ from agentgate.core.task_spec import TaskSpec
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
 from agentgate.scenarios.suites import load_suite
 
-ATTACK_MARKER = "<INFORMATION>"
+ATTACK_MARKER = "<INFORMATION>"   # AgentDojo 공격 템플릿이 주입 문구를 감싸는 태그. 이 표지를 찾는 코드는 모두 이 상수를 쓴다
 REPLAY_PIPELINE_NAME = "gpt-4o-2024-05-13"   # only used to fill {model} in the attack template
 
 

@@ -20,8 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from agentgate.core.runtime import _to_plain_data
 from agentgate.scenarios.attack_trajectories import plan_attack_calls
-
-MARKER = "<INFORMATION>"
+from agentgate.scenarios.replay import ATTACK_MARKER
 
 
 def _text(content) -> str:
@@ -42,8 +41,13 @@ def _empty(node: dict):
 
 
 class ScriptedPlan:
-    def __init__(self, session, marker: str = MARKER):
-        self.session, self.marker = session, marker
+    """대본 궤적: 사용자 작업의 ground truth를 따르다 인젝션 표지가 보이면 공격 호출을 끼워 넣는다.
+
+    `on_block="stop"`이면 Gate가 호출을 하나라도 차단한 뒤에는 남은 계획을 버리고 최종 답으로 끝낸다
+    (`ScriptedAgent`의 같은 이름 옵션과 같다)."""
+
+    def __init__(self, session, marker: str = ATTACK_MARKER, on_block: str = "continue"):
+        self.session, self.marker, self.on_block = session, marker, on_block
         self.plan: list | None = None
         self.hijacked = False
         self.requests = 0
@@ -58,7 +62,8 @@ class ScriptedPlan:
             self.hijacked = True
             calls, _ = plan_attack_calls(session.config.suite, session.injection_task, session.env)
             self.plan = list(calls) + self.plan
-        if self.plan:
+        stopped = self.on_block == "stop" and any(event.blocked for event in session.runtime.trace)
+        if self.plan and not stopped:
             call = self.plan.pop(0)
             return "call", call.function, _to_plain_data(dict(call.args))
         outputs = [session.user_task.GROUND_TRUTH_OUTPUT]
@@ -99,7 +104,7 @@ class FakeLLMServer:
                 self.wfile.write(data)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
         self.lock = threading.Lock()
 
     @property

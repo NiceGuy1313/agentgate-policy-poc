@@ -2,6 +2,7 @@
 
 세 조건: no_gate(Gate 없음) / gate_llm_judge(판정 LLM + 룰북) / gate_static_rules(룰북 정적 코드).
 선행: check_enforcement.py, summarize_live.py, live_significance.py를 같은 --run에 실행
+정책 Gate를 우회해 무효(valid: false)인 run은 어느 표에도 넣지 않고, 건수만 집행 무결성 줄에 적는다.
 사용법: python scripts/analysis/summarize_results.py --run results/live/<run>
 """
 
@@ -87,6 +88,12 @@ COMPONENTS = """**TaskSpec 추출기** (`{spec_model}`): 사용자가 허락한 
 - 출력: ToolSpec. 레코드(종류·작성자·타입별 data 값)와 응답 속 요청(누구에게 하는지, 어떤 툴로 수행되는지, 사칭·긴급성 claims, 타입별 targets). 원문에 없거나 타입이 맞지 않는 값은 코드로 걸러낸다."""
 
 
+def load_valid_runs(run_dir: Path) -> list[dict]:
+    """live run 기록에서 정책 Gate를 우회해 무효(valid: false)인 run을 뺀다(summarize_live와 같은 규칙)."""
+    runs = (json.loads(path.read_text()) for path in live_run_files(run_dir))
+    return [run for run in runs if run.get("valid") is not False]
+
+
 def paired(runs: list[dict], a: str, b: str, kind: str, field: str) -> dict:
     """Same (suite, user task, injection task) in conditions a and b: rate difference a−b and exact McNemar p."""
     def key(r):
@@ -119,7 +126,7 @@ def main():
     summary = json.loads((run_dir / "summary.json").read_text())
     significance = json.loads((run_dir / "significance.json").read_text())
     enforcement = json.loads((run_dir / "enforcement_check.json").read_text())
-    runs = [json.loads(p.read_text()) for p in live_run_files(run_dir)]
+    runs = load_valid_runs(run_dir)
     conditions = [c for c in NAMES if c in summary["conditions"]]
     first = summary["conditions"][conditions[0]]
     load_dotenv()
@@ -226,7 +233,8 @@ def main():
                      f"{int(ts['input_tokens']):,}, 캐시 읽기 {int(ts['cache_read_input_tokens']):,}, 출력 "
                      f"{int(ts['output_tokens']):,} 토큰)")
     lines.append(f"- 집행 무결성: 실행 {enforcement.get('runs', 0):,}건, 차단된 호출이 실행된 위반 "
-                 f"{enforcement.get('violations', '-')}건, 오류 {summary.get('n_errors', '-')}건")
+                 f"{enforcement.get('violations', '-')}건, 오류 {summary.get('n_errors', '-')}건, "
+                 f"무효(Gate 우회) {summary.get('n_invalid', '-')}건")
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}")

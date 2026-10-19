@@ -1,24 +1,21 @@
-"""live 평가용 평가 대상 에이전트 생성과 TaskSpec provider를 제공한다.
+"""평가 대상 에이전트의 사용량 집계(`UsageMeter`)와 TaskSpec provider를 제공한다.
 
-`make_llm`은 AGENTGATE_AGENT_PROVIDER / AGENTGATE_AGENT_MODEL(anthropic, ollama, openai)로 에이전트 LLM을 만들고,
-`UsageMeter`는 token 사용량을 수집하며, `spec_provider`는 `build_pipeline`에 넘길 TaskSpec 출처를 반환한다.
+에이전트 LLM은 `agentgate.adapters.native.make_native_llm`이 만든다(provider·모델은 `ModelSpec`). `UsageMeter`는 그
+LLM의 token 사용량을 수집하고, `spec_provider`는 `Session`이 쓰는 TaskSpec 출처(oracle 또는 LLM 추출기)를 반환한다.
 """
 
 from __future__ import annotations
 
-import os
 import time
 
-from agentgate.agents.ollama_agent import OllamaAgentLLM
 from agentgate.core.task_spec import TaskSpec
-from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.scenarios.suites import describe_tools, load_suite
 from agentgate.scenarios.task_specs import load_task_spec
 
 
 class UsageMeter:
-    """Agent LLM usage. ClaudeAgentLLM and OllamaAgentLLM count their own usage; OpenAI clients are wrapped."""
+    """에이전트 LLM의 사용량 집계. ClaudeAgentLLM·OllamaAgentLLM은 스스로 세고, OpenAI client는 감싸서 센다."""
 
     def __init__(self):
         self.input_tokens = self.output_tokens = self.calls = 0
@@ -42,40 +39,17 @@ class UsageMeter:
             response = original_create(*args, **kwargs)
             self.ms += (time.perf_counter() - started) * 1000
             self.calls += 1
-            self.input_tokens += response.usage.prompt_tokens or 0
-            self.output_tokens += response.usage.completion_tokens or 0
+            usage = getattr(response, "usage", None)   # 일부 OpenAI 호환 서버는 usage를 주지 않는다
+            self.input_tokens += (usage.prompt_tokens or 0) if usage else 0
+            self.output_tokens += (usage.completion_tokens or 0) if usage else 0
             return response
 
         client.chat.completions.create = create
         return client
 
 
-def make_llm(meter: UsageMeter):
-    provider = os.environ.get("AGENTGATE_AGENT_PROVIDER") or "anthropic"
-    model = os.environ.get("AGENTGATE_AGENT_MODEL") or (DEFAULT_ANTHROPIC_MODEL if provider == "anthropic" else "")
-    if not model:
-        raise RuntimeError("AGENTGATE_AGENT_MODEL is not set")
-    if provider == "anthropic":
-        import anthropic
-
-        from agentgate.agents.claude_agent import ClaudeAgentLLM
-        llm = ClaudeAgentLLM(anthropic.Anthropic(), model)
-        meter.llm = llm
-    elif provider == "ollama":
-        llm = OllamaAgentLLM(model)
-        meter.llm = llm
-    elif provider == "openai":
-        import openai
-        from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
-        llm = OpenAILLM(meter.wrap_openai(openai.OpenAI()), model, temperature=0.0)
-        llm.name = model
-    else:
-        raise ValueError(provider)
-    return llm
-
-
 def spec_provider(kind: str, suite_name: str, user_task_id: str):
-    """kind oracle (data/agentdojo/oracle_specs) | llm (TaskSpecExtractor, prompts/extract_taskspec.md)."""
+    """TaskSpec 출처: oracle(data/agentdojo/oracle_specs) 또는 llm(TaskSpecExtractor, prompts/extract_taskspec.md)."""
     def oracle(prompt):
         return (load_task_spec("oracle", suite_name, user_task_id),
                 {"source": "oracle", "cached": True, "latency_ms": 0.0})

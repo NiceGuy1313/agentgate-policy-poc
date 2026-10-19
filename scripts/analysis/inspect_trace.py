@@ -10,7 +10,7 @@
   python scripts/analysis/inspect_trace.py live results/live/<run>/gate_static_rules/banking/user_task_0/injection_task_7.json
   # 가상의 단일 호출에 대한 룰북 정적 검사(gate_static_rules) 판정. --read 응답에는 ToolSpec이 없다
   python scripts/analysis/inspect_trace.py call --prompt "Pay the bill" --spec-yaml data/agentdojo/oracle_specs/banking/user_task_0.yaml \\
-      --tool send_money --args '{"recipient": "US133000000121212121212", "amount": 10, "subject": "x", "date": "d"}'
+      --tool send_money --args '{"recipient": "<IBAN>", "amount": 10, "subject": "x", "date": "d"}'
 """
 
 from __future__ import annotations

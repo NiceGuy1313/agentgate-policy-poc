@@ -1,8 +1,9 @@
 """Gate 뒤의 AgentDojo 시나리오 하나(`Session`): 환경 + 인젝션 + PolicyGateRuntime + TaskSpec + 채점.
 
 모든 에이전트 프레임워크는 `GateToolBridge`를 거쳐 `Session`과 통신한다. 단계는
-`agentgate.scenarios.pipeline.run_live_task` / `agentgate.scenarios.runner.run_one`과 같지만 에이전트 루프는 호출자에게
-맡긴다. 프레임워크는 `invoke`로 툴을 부르고 `finish`로 최종 답을 넘긴다.
+`agentgate.scenarios.pipeline.run_live_task`(conformance 기준 경로)와 같지만 에이전트 루프는 어댑터에 맡긴다.
+프레임워크는 `invoke`로 툴을 부르고 `finish`로 최종 답을 넘긴다. 시나리오 CLI·대시보드는 native를 포함한 모든
+프레임워크를 이 Session으로 돌린다(`agentgate.scenarios.runner.run_framework_one`).
 """
 
 from __future__ import annotations
@@ -117,9 +118,12 @@ class Session:
             return text, record
 
     def decide(self, tool: str, args: dict) -> dict:
-        """Gate decision only (no execution, no state change), e.g. for a Wrapper's own native tools."""
+        """Gate 판정만 한다(실행·상태 변경 없음). Wrapper 자체 툴용이다. TaskSpec이 없으면 BLOCK한다(fail-closed)."""
         from agentgate.core.types import ToolCall
         with self.lock:
+            if self.runtime.index is None:   # `GatedRuntime.run_function`과 같다: TaskSpec 없이는 아무것도 허용하지 않는다
+                return {"verdict": "BLOCK", "decisions": [], "effective": "BLOCK", "judge": None,
+                        "note": "no TaskSpec configured (fail closed)"}
             call = ToolCall(tool, dict(args or {}))
             result = self.runtime.engine.decide(call, self.runtime.context)
             effective, judgement = self.runtime.resolve(call, result)

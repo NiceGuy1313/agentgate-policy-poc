@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from agentgate.harness import registry
+from agentgate.harness import bridge, registry
 from agentgate.harness.conformance import offline_toolspec
 from agentgate.scenarios import run, runner
 
@@ -66,6 +66,67 @@ def test_cli_runs_every_condition_for_a_framework(tmp_path, monkeypatch, framewo
     assert summary["conditions"]["no_gate"]["asr"] == 1.0
     assert json.loads((tmp_path / runner.SUMMARY_FILE).read_text()) == summary
     assert list(tmp_path.glob("run_*.json"))
+
+
+def test_native_runs_through_the_bridge_like_every_framework(tmp_path, monkeypatch):
+    """native도 Adapter -> GateToolBridge -> Session 경로다: 툴 실행마다 bridge를 지나고 레코드에 harness 필드가 있다."""
+    bridged = []
+    invoke_detail = bridge.GateToolBridge.invoke_detail
+
+    def counting(self, tool, args):
+        bridged.append(tool)
+        return invoke_detail(self, tool, args)
+
+    monkeypatch.setattr(bridge.GateToolBridge, "invoke_detail", counting)
+    run.main(["--framework", "native", "--agent", "scripted", "--spec", "oracle", "--condition", "gate_static_rules",
+              "--suite", "banking", "--user-task", "user_task_0", "--injection-task", "injection_task_0",
+              "--attack", "tool_knowledge", "--workers", "1", "--out", str(tmp_path)])
+    record = json.loads((tmp_path / "gate_static_rules" / "banking" / "user_task_0" / "injection_task_0.json")
+                        .read_text())
+    assert record["framework"] == "native" and record["manifest"]["framework"] == "native"
+    assert bridged and bridged == [e["tool"] for e in record["trace"]]
+    assert record["valid"] is True and not record["ungated_calls"]
+    # summarize_live / check_enforcement / 대시보드가 읽는 필드
+    assert {"utility", "security", "security_executed", "final_env_hash", "messages", "spec", "spec_meta", "judge",
+            "gate_ms", "agent", "agent_model"} <= set(record)
+    assert {"input", "output", "calls", "refusals", "llm_ms"} <= set(record["agent_tokens"])
+
+
+def test_scripted_on_block_stop_ends_the_run_after_a_block(tmp_path):
+    def blocked_run(on_block):
+        out = tmp_path / on_block
+        run.main(["--framework", "native", "--agent", "scripted", "--spec", "oracle", "--on-block", on_block,
+                  "--condition", "gate_static_rules", "--suite", "banking", "--user-task", "user_task_0",
+                  "--injection-task", "injection_task_0", "--attack", "tool_knowledge", "--workers", "1",
+                  "--out", str(out)])
+        record = json.loads((out / "gate_static_rules" / "banking" / "user_task_0" / "injection_task_0.json")
+                            .read_text())
+        return [(e["tool"], e["blocked"]) for e in record["trace"]]
+
+    keep_going, stopped = blocked_run("continue"), blocked_run("stop")
+    assert any(blocked for _, blocked in stopped) and len(stopped) < len(keep_going)
+    assert stopped == keep_going[:len(stopped)] and stopped[-1][1]   # 첫 차단에서 끝난다
+
+
+def test_usage_limit_leaves_no_record_and_stops_later_jobs(tmp_path, monkeypatch):
+    attempts = []
+
+    def limit(request, sink=None):
+        attempts.append(request)
+        raise RuntimeError("429 You used all included usage")
+
+    monkeypatch.setattr("agentgate.harness.runner.execute", limit)
+    runner.reset_quota_flag()
+    try:
+        jobs = runner.build_jobs(["no_gate"], [("banking", "user_task_0", None), ("banking", "user_task_2", None)],
+                                 agent="llm", spec="oracle", attack="tool_knowledge", attack_model_name="AI assistant",
+                                 on_block="continue", out=str(tmp_path), framework="native", framework_options="{}",
+                                 model="ollama:gpt-oss:120b", max_steps=None)
+        assert [runner.run_one(job) for job in jobs] == ["quota", "quota"]
+    finally:
+        runner.reset_quota_flag()
+    assert len(attempts) == 1                                  # 한도에 걸린 뒤의 작업은 시도하지 않는다
+    assert not list(tmp_path.glob("*/*/*/*.json"))             # 다음 실행이 다시 시도하도록 레코드를 남기지 않는다
 
 
 def test_user_task_without_injection_is_a_single_benign_run(tmp_path):

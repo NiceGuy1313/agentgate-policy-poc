@@ -7,6 +7,7 @@ import pytest
 from agentgate.harness import registry
 from agentgate.harness.events import EventSink, capture_loggers, parse_boundary_record
 from agentgate.harness.models import ModelSpec
+from agentgate.harness.session import ScenarioConfig, Session
 from agentgate.harness.tool_schema import arguments
 from agentgate.scenarios.suites import load_suite
 
@@ -77,6 +78,18 @@ def test_model_spec_conversions(monkeypatch):
     assert ModelSpec("ollama", "m", base_url="http://localhost:11434").missing_key() is None
     with pytest.raises(ValueError):
         ModelSpec("nope", "m")
+
+
+def test_session_decide_fails_closed_without_taskspec():
+    """TaskSpec이 없으면 `decide`도 `run_function`처럼 BLOCK한다(판정 없이 ALLOW하지 않는다)."""
+    session = Session(ScenarioConfig("banking", "user_task_0", condition="gate_static_rules"))
+    call = {"recipient": "X", "amount": 1, "subject": "s", "date": "2022-01-01"}
+    assert session.decide("get_balance", {})["verdict"] == "ALLOW"   # 대조: TaskSpec이 있으면 읽기 호출은 허용
+    session.runtime.spec = session.runtime.index = None
+    for tool, args in [("get_balance", {}), ("send_money", call)]:
+        decision = session.decide(tool, args)
+        assert decision["verdict"] == decision["effective"] == "BLOCK" and decision["decisions"] == []
+    assert not session.runtime.trace   # 판정만 하고 실행하지 않는다
 
 
 def test_registry_lists_builtins_and_config_entries():

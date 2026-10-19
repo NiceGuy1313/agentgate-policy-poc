@@ -7,7 +7,8 @@
 게이트 기인 실패(차단 호출이 있고 user task를 실패한 run, 그중 no_gate에서는 성공한 run)와 차단 정책도 집계한다.
 
 사용법: python scripts/analysis/live_significance.py --run results/live/<name>
-출력: <run>/significance.json. 오류가 난 run은 제외한다(대응 검정에서는 쌍 단위로 제외).
+출력: <run>/significance.json. 오류가 난 run과 정책 Gate를 우회해 무효(valid: false)인 run은 제외한다(대응 검정에서는
+쌍 단위로 제외). 무효 run 수는 n_invalid로 남긴다.
 """
 
 from __future__ import annotations
@@ -29,14 +30,18 @@ METRICS = {"asr": ("attack", "security"), "utility": ("benign", "utility"),
            "utility_under_attack": ("attack", "utility")}
 
 
-def load_runs(run_dir: Path) -> dict:
-    runs = {}
+def load_runs(run_dir: Path) -> tuple[dict, int]:
+    """(채점 대상 run, 무효 run 수). 무효 run(Gate 우회)과 오류 run은 채점 대상에서 뺀다."""
+    runs, n_invalid = {}, 0
     for path in live_run_files(run_dir):
         run = json.loads(path.read_text())
+        if run.get("valid") is False:
+            n_invalid += 1
+            continue
         if run.get("error"):
             continue
         runs[(run["condition"], run["suite"], run["user_task"], run["injection_task"])] = run
-    return runs
+    return runs, n_invalid
 
 
 def blocked_decisions(run: dict) -> list[list]:
@@ -75,11 +80,11 @@ def cluster_bootstrap_diff(pairs: list[tuple[tuple, int, int]], n_boot: int, see
 
 
 def analyse(run_dir: Path, n_boot: int = 2000, seed: int = 0) -> dict:
-    runs = load_runs(run_dir)
+    runs, n_invalid = load_runs(run_dir)
     conditions = sorted({key[0] for key in runs})
     result = {"run": str(run_dir.relative_to(PROJECT_ROOT)) if run_dir.is_relative_to(PROJECT_ROOT) else str(run_dir),
               "agent_model": next(iter(runs.values()))["agent_model"] if runs else None,
-              "n_boot": n_boot, "seed": seed, "conditions": {}}
+              "n_invalid": n_invalid, "n_boot": n_boot, "seed": seed, "conditions": {}}
     for condition in conditions:
         condition_metrics = {}
         for name, (kind, field) in METRICS.items():
@@ -151,6 +156,7 @@ def main():
         print(condition, "; ".join(cells),
               f"; gate failures benign {gate_failures['benign']['n']} attack {gate_failures['attack']['n']}")
     print("benign unblocked flips:", summary["benign_unblocked_condition_pairs"])
+    print("invalid runs excluded:", summary["n_invalid"])
 
 
 if __name__ == "__main__":

@@ -57,7 +57,7 @@ AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 �
 | registry | [`harness/registry.py`](../src/agentgate/harness/registry.py) | 내장 어댑터, `config/frameworks.yaml`, `agentgate.frameworks` entry point |
 | runner·worker | [`harness/runner.py`](../src/agentgate/harness/runner.py), [`harness/worker.py`](../src/agentgate/harness/worker.py) | 실행 하나를 돌리고 레코드를 만든다. `python:`이 지정된 프레임워크는 별도 인터프리터 worker에서 돈다 |
 
-native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을 넘기므로 같은 경로를 지난다.
+native 어댑터는 AgentDojo pipeline에 `BridgeRuntime`을 넘긴다. pipeline의 툴 실행은 `BridgeRuntime.run_function` → `GateToolBridge.invoke_detail` → `Session.invoke` → `PolicyGateRuntime.run_function`을 지나므로 다른 프레임워크와 같은 경로다. 시나리오 CLI와 대시보드도 native를 다른 프레임워크와 같은 `harness.runner`로 돌린다([`scenarios/runner.py`](../src/agentgate/scenarios/runner.py)의 `run_framework_one`). `GatedRuntime`을 pipeline에 직접 넘기는 `run_live_task`([`scenarios/pipeline.py`](../src/agentgate/scenarios/pipeline.py))는 실행 경로가 아니며 conformance의 기준 실행과 단위 테스트에서만 쓴다.
 
 ### contract 서비스
 
@@ -69,7 +69,7 @@ native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을
 
 | 프레임워크 | 툴을 넘기는 방식 | 이벤트 순서 |
 |---|---|---|
-| native | AgentDojo pipeline에 `BridgeRuntime` | 기준 경로 |
+| native | AgentDojo pipeline에 `BridgeRuntime`. `run_function`이 `bridge.invoke_detail`을 부른다 | 경계 로그 없음(`tool_start` 없음). 우회는 툴 함수 보호(`ungated_executions`)로 잡는다 |
 | smolagents | 툴마다 `Tool`, `forward`에서 `bridge.invoke` | `Tool.__call__`: tool_start → gate_decision → tool_end |
 | mini-swe-agent | 툴은 `bash` 하나. `GatedShell`이 명령 한 줄을 툴 호출 하나로 처리한다(실제 셸 실행 없음) | `execute_action`: tool_start(bash) → gate_decision(명령별) → tool_end(bash) |
 | browser-use | 브라우저 액션을 빼고 툴마다 커스텀 액션. 이름이 겹치면 AgentDojo 툴 우선. 별도 venv | `Registry.execute_action`: tool_start → gate_decision → tool_end |
@@ -84,13 +84,13 @@ native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을
 | 툴 함수 직접 호출 | 감싼 툴 함수가 `run_function` 밖 호출을 거부 | `GatedRuntime.ungated_executions` |
 | 프레임워크 내부 실행 | 경계 로그 `tool_start`와 Gate 판정 횟수 대조, 등록되지 않은 툴 이름 | `GateToolBridge.ungated_calls` |
 
-하나라도 있으면 레코드는 `valid: false`, `invalid_reason`을 갖고, 점수는 `excluded_scores`로 옮겨 집계에서 뺀다. 이벤트 `gate_bypass`(ERROR)를 낸다. `routes_tools_through_bridge = True`를 선언하지 않은 어댑터는 registry가 사용 불가로 표시하고 runner가 실행을 거부한다(`contract_problems`). 동작은 conformance 검사(`python -m agentgate.harness.conformance`)로 확인한다.
+하나라도 있으면 레코드는 `valid: false`, `invalid_reason`을 갖고, 점수는 `excluded_scores`로 옮겨 집계에서 뺀다. 이벤트 `gate_bypass`(ERROR)를 낸다. `routes_tools_through_bridge = True`를 선언하지 않은 어댑터는 registry가 사용 불가로 표시하고 runner가 실행을 거부한다(`contract_problems`). 동작은 conformance 검사(`python -m agentgate.harness.conformance`)로 확인한다. 요약·검정·분석 스크립트(`scripts/analysis/`)는 모두 `valid: false` run을 건너뛰고 `n_invalid`로 센다(`check_enforcement.py`만 위반을 찾으려고 무효 run도 읽는다).
 
 ## 5. fail-closed
 
 | 상황 | 처리 |
 |---|---|
-| TaskSpec이 없음 | 모든 호출 BLOCK(`no TaskSpec is configured`) |
+| TaskSpec이 없음 | 모든 호출 BLOCK(`no TaskSpec is configured`). 판정만 하는 `Session.decide`도 BLOCK |
 | enforce 모드인데 판정기가 없음 | `PolicyGateRuntime.resolve`가 예외 |
 | 정적 규칙 함수 예외 | 그 규칙의 BLOCK |
 | 판정 LLM 답을 해석할 수 없음 | BLOCK |
