@@ -1,6 +1,6 @@
 """버전과 무관한 Gate 공통부: 정책 primitive, 정책 엔진, 값 출처 인덱스, TaskSpec, `GatedRuntime`.
 
-정책 판정 코드에는 LLM 호출을 넣지 않는다. 버전별 정책은 `agentgate.v1`·`v2`·`v3`에 있다.
+정책 판정 코드에는 LLM 호출을 넣지 않는다. 버전별 정책은 `agentgate.v1`·`v3`에 있다.
 """
 
 from agentgate.gate.base import (

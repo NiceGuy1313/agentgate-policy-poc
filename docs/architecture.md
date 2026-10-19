@@ -9,7 +9,7 @@
 - 판정: `ALLOW`(실행) · `ESCALATE`(애매함, 설정에 따라 처리) · `BLOCK`(실행 안 함).
 - 정책 코드([`src/agentgate/gate/`](../src/agentgate/gate/), `v*/policies.py`)에는 LLM·네트워크 호출이 없다. LLM은 TaskSpec 추출과 C4의 ESCALATE 판정에만 쓴다.
 - AgentDojo 소스는 수정하지 않는다. `FunctionsRuntime` 서브클래스를 끼워 넣는다.
-- 공통 Gate(`gate/`) 위에 버전 패키지 `v1/`·`v2/`·`v3/`가 정책·판정 LLM·런타임 확장을 따로 둔다(9절).
+- 공통 Gate(`gate/`) 위에 버전 패키지 `v1/`·`v3/`가 정책·판정 LLM·런타임 확장을 따로 둔다(9절). v2는 `archive/v2.bak/`에 보관한다.
 
 ## 2. 실행 흐름
 
@@ -156,20 +156,19 @@ Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wra
 
 ```
 src/agentgate/
-  gate/        버전 공통 Gate: Policy·PolicyEngine·ValueIndex·TaskSpec·GatedRuntime, P0(user_policy.py)
+  gate/        버전 공통 Gate: Policy·PolicyEngine·ValueIndex·TaskSpec·GatedRuntime
   agentdojo/   AgentDojo 테스트: suite 로딩, live pipeline·채점, 재생, 공격 궤적, 지표, 층화 표본
   agents/      평가 대상 에이전트(Claude, Ollama, OpenAI, ScriptedAgent)와 외부 프레임워크 어댑터
   harness/     외부 프레임워크 연결(Wrapper 규약 v1, 대시보드 서비스)
   llm/         API client, TaskSpec 추출기(버전별 프롬프트), 판정 LLM 공용 입출력
   v1/          P1–P9, 판정 LLM v1(C4)
-  v2/          P10(모든 툴 호출을 Trusted LLM으로), 판별기(detector/), Trusted LLM v2, DetectorGatedRuntime
   v3/          정책 엔진 없음: ToolSpec 추출기, 판정 LLM v3, ToolSpecGatedRuntime(effect 호출 → 판정 LLM)
   conditions.py  실험 조건 C0–C9 → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
 ```
 
-설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v2,v3}/`, `prompts/{v1,v2,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
+설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v3}/`, `prompts/{v1,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
 
-- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v2 판별기 라벨, v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
-- v2는 규칙 정책 설정이 없다(`config/v2/`에는 사용자 허용 범위와 판별기 설정만 있다). v3는 정책 엔진이 없고 `config/v3/policy.yaml`은 판정 LLM이 읽는 정책 문서다.
-- TaskSpec 추출 프롬프트는 v1·v2가 `prompts/v1/extract_taskspec.md`, v3가 `prompts/v3/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
+- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
+- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없고 `config/v3/policy.yaml`은 판정 LLM이 읽는 정책 문서다.
+- TaskSpec 추출 프롬프트는 v1이 `prompts/v1/extract_taskspec.md`, v3가 `prompts/v3/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
 - 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.

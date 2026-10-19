@@ -1,11 +1,10 @@
 """live run에서 게이트 조건의 utility 손실 원인을 C0(방어 없음)와 짝지어 분해한다.
 
 같은 (suite, user task, injection task)에서 C0는 성공하고 대상 조건은 실패한 run을 "차단 있음 / 없음"으로 나누고,
-차단된 호출마다 원인(게이트 BLOCK 정책, 판정 LLM BLOCK·HUMAN, ④, P0)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
-판별기 오탐은 정상(주입 없음) run의 응답 중 flagged 비율로 본다.
+차단된 호출마다 원인(게이트 BLOCK 정책, 판정 LLM BLOCK·HUMAN)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
 
-사용법: python scripts/analysis/analyze_live_utility.py --run results/v2/live/strat3_tk_gpt-oss_120b \
-          --baseline results/v1/live/strat3_tk_gpt-oss_120b --condition C5
+사용법: python scripts/analysis/analyze_live_utility.py --run results/v3/live/<run> \
+          --baseline results/v3/live/<run> --condition C9
 run 폴더에 <condition>/가 없으면 runs.tar.gz를 임시 폴더에 풀어 읽는다. 출력: <run>/utility_analysis_<condition>.json
 """
 
@@ -13,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import tarfile
 import tempfile
 from collections import Counter
@@ -52,29 +50,14 @@ def block_cause(event: dict) -> str:
     if not judge:
         return "gate_block:" + "+".join(sorted({d["policy_id"] for d in event["decisions"] if d["verdict"] == "BLOCK"}))
     escalated = "+".join(sorted({d["policy_id"] for d in event["decisions"] if d["verdict"] == "ESCALATE"}))
-    if judge.get("by"):
-        return "p0_human"
-    if judge.get("rule4"):
-        return f"rule4_human[{escalated}]"
     return f"judge_{judge['final'].lower()}[{escalated}]"
-
-
-def p10_chunk(event: dict) -> str | None:
-    reason = next((d["reason"] for d in event["decisions"] if d["policy_id"] == "P10" and d["verdict"] != "ALLOW"),
-                  None)
-    if reason is None:
-        return None
-    match = re.search(r"value chunk ([0-9.]+)", reason)
-    if not match:
-        return "other_tool_suspicious_chunk"
-    return "clean_chunk" if float(match.group(1)) < 0.5 else "suspicious_chunk"
 
 
 def analyze(runs: dict, baseline: dict) -> dict:
     out: dict = {}
     for kind in ("benign", "attack"):
         keys = sorted(k for k in runs if (k[2] is None) == (kind == "benign") and k in baseline)
-        pairing, causes, causes_by_role, p10_chunks = Counter(), Counter(), Counter(), Counter()
+        pairing, causes, causes_by_role = Counter(), Counter(), Counter()
         for key in keys:
             run, base = runs[key], baseline[key]
             blocks = [e for e in run["trace"] if e["blocked"]]
@@ -90,27 +73,9 @@ def analyze(runs: dict, baseline: dict) -> dict:
                 cause = block_cause(event)
                 causes[cause] += 1
                 causes_by_role[f"{cause} | {role}"] += 1
-                chunk = p10_chunk(event)
-                if chunk and role == "user_task_tool":
-                    p10_chunks[chunk] += 1
-        involving_p10 = sum(v for c, v in causes.items() if "P10" in c)
         out[kind] = {"pairs": len(keys), "pairing": dict(sorted(pairing.items())),
                      "blocked_calls_in_lost_runs": sum(causes.values()),
-                     "blocked_calls_involving_p10": involving_p10,
-                     "causes": dict(causes.most_common()), "causes_by_role": dict(causes_by_role.most_common()),
-                     "p10_user_task_calls_by_value_chunk": dict(p10_chunks)}
-    flagged, total, by_tool = 0, 0, Counter()
-    for key, run in runs.items():
-        if key[2] is not None:
-            continue
-        for event in run["trace"]:
-            detection = event.get("detection")
-            if detection:
-                total += 1
-                flagged += detection["flagged"]
-                by_tool[f"{key[0]}/{event['tool']}"] += detection["flagged"]
-    out["detector_on_benign_runs"] = {"responses": total, "flagged": flagged,
-                                      "flagged_by_tool": dict(by_tool.most_common(12))}
+                     "causes": dict(causes.most_common()), "causes_by_role": dict(causes_by_role.most_common())}
     return out
 
 
@@ -118,7 +83,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
     parser.add_argument("--baseline", required=True, help="run directory holding C0 (same pairs)")
-    parser.add_argument("--condition", default="C5")
+    parser.add_argument("--condition", required=True, help="condition to analyse, e.g. C9")
     args = parser.parse_args()
     run_dir, baseline_dir = PROJECT_ROOT / args.run, PROJECT_ROOT / args.baseline
     with tempfile.TemporaryDirectory() as tmp:
@@ -128,11 +93,7 @@ def main():
     (run_dir / f"utility_analysis_{args.condition}.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     for kind in ("benign", "attack"):
         print(kind, result[kind]["pairing"])
-        print("  blocked calls in lost runs", result[kind]["blocked_calls_in_lost_runs"],
-              "involving P10", result[kind]["blocked_calls_involving_p10"],
-              "P10 user-task calls by chunk", result[kind]["p10_user_task_calls_by_value_chunk"])
-    detector = result["detector_on_benign_runs"]
-    print("detector on benign runs: flagged", detector["flagged"], "/", detector["responses"])
+        print("  blocked calls in lost runs", result[kind]["blocked_calls_in_lost_runs"])
 
 
 if __name__ == "__main__":

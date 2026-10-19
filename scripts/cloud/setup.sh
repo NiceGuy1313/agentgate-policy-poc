@@ -25,28 +25,11 @@ if ! $PY -c "import agentgate, agentdojo, fastapi" 2>/dev/null; then
   $PY -m pip install -q -e '.[dev,dashboard]' || echo "WARN: base install failed"
 fi
 
-# 2) 판별기 의존성. CPU torch는 download.pytorch.org가 허용 목록에 있어야 한다. 없으면 PyPI로 대체
-if ! $PY -c "import torch, transformers" 2>/dev/null; then
-  $PY -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu \
-    || { echo "WARN: CPU torch index unreachable, falling back to PyPI torch"; $PY -m pip install -q torch; }
-  $PY -m pip install -q -e '.[detector]' || echo "WARN: detector extra install failed"
-fi
-
-# 3) 판별기 모델 미리 받기(huggingface.co 허용 필요). 실패해도 세션은 시작한다
-export HF_HOME="${HF_HOME:-$ROOT/.hf_cache}"
-$PY - <<'EOF' || echo "WARN: model download failed (huggingface.co allowed?)"
-import yaml
-from huggingface_hub import snapshot_download
-for name, model in yaml.safe_load(open("config/v2/detector.yaml"))["models"].items():
-    print(name, snapshot_download(model["hf_id"], revision=model.get("revision")))
-EOF
-
-# 4) 이후 Bash 명령에서 venv와 HF 캐시를 쓰도록 세션 환경에 남긴다
+# 2) 이후 Bash 명령에서 venv를 쓰도록 세션 환경에 남긴다
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
     echo "export PATH=\"$ROOT/.venv/bin:\$PATH\""
     echo "export VIRTUAL_ENV=\"$ROOT/.venv\""
-    echo "export HF_HOME=\"$HF_HOME\""
   } >>"$CLAUDE_ENV_FILE"
 fi
 echo "=== done ==="

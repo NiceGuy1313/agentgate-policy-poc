@@ -74,7 +74,7 @@ def make_llm(meter: UsageMeter):
 
 
 def spec_provider(kind: str, suite_name: str, user_task_id: str, version: str = "v1"):
-    """kind oracle | llm. `version` is the gate version; it picks the TaskSpec extraction prompt (v1/v2: v1, v3: v3)."""
+    """kind oracle | llm. `version` is the gate version; it picks the TaskSpec extraction prompt (v1: v1, v3: v3)."""
     def oracle(prompt):
         return (load_task_spec("oracle", suite_name, user_task_id),
                 {"source": "oracle", "cached": True, "latency_ms": 0.0})

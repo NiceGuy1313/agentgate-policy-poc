@@ -1,6 +1,6 @@
 """공통 경로, YAML 설정 loader, `.env` loader를 제공한다.
 
-버전별 정책 설정은 각 버전 패키지(`agentgate.v1`·`v2`·`v3`)의 `load_config`가 읽는다. 여기에는 버전과
+버전별 정책 설정은 각 버전 패키지(`agentgate.v1`·`v3`)가 읽는다. 여기에는 버전과
 무관한 AgentDojo 툴 환경 설정(config/agentdojo/)만 둔다.
 """
 

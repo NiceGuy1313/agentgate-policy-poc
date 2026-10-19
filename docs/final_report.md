@@ -124,9 +124,9 @@ AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 �
 | `strat3_tk_gpt-oss_120b` | 1552 | 6164 | 454 | 0 | 18 |
 | `strat3_tk_mistral-large-3_675b` | 1552 | 7627 | 995 | 0 | 0 |
 
-## 6. v2·v3 (재실험 전)
+## 6. 버전 구성
 
-v2(판별기 + Trusted LLM)와 v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 설정을 버전별로 분리한 뒤 다시 실험한다. 이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, 그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.
+v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 [`archive/v2.bak/`](../archive/v2.bak/README.md)에 보관한다. v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)의 결과는 [`results/v3/RESULTS.md`](../results/v3/RESULTS.md)에 있다. 2026-10-17 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, 그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.
 
 | 조건 | 버전 | 구성 |
 |---|---|---|
@@ -135,10 +135,8 @@ v2(판별기 + Trusted LLM)와 v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)�
 | C1 | v1 | v1 Gate, ESCALATE→BLOCK |
 | C2 | v1 | v1 Gate, ESCALATE→ALLOW |
 | C4 | v1 | v1 Gate, ESCALATE→판정 LLM v1 |
-| C5 | v2 | v2 Gate(P0·P10, PIGuard), ESCALATE→Trusted LLM v2 |
-| C6 | v3 | v3 Gate(P11·P12, ToolSpec), ESCALATE→판정 LLM v3 |
-| C7 | v3 | v3.1 Gate, ESCALATE→판정 LLM v3 + 정책 문서 v3.1 |
-| C7n | v3 | v3.1 Gate, ESCALATE→판정 LLM v3(정책 문서 없음) |
+| C9n | v3 | Gate + 판정 LLM(정책 문서 없음) |
+| C9 | v3 | Gate + 판정 LLM + 정책 문서 |
 
 ## 7. 한계 (1–5절)
 

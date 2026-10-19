@@ -484,14 +484,15 @@ def reproduce_section(llm_replay_summaries, live_summaries) -> list[str]:
     lines += ["python scripts/reporting/build_report.py", "```"]
     return lines
 
-# ---------------------------------------------------------------------------------------------- v2·v3 (section 6)
+# ---------------------------------------------------------------------------------------------- 버전 구성 (section 6)
 def versions_section() -> list[str]:
-    """v2·v3는 재실험 전이라 결과가 없다. 구성과 조건만 적는다(조건 정의: src/agentgate/conditions.py)."""
+    """v1 외 버전은 이 보고서에 결과를 싣지 않는다. 구성과 조건만 적는다(조건 정의: src/agentgate/conditions.py)."""
     from agentgate.conditions import CONDITIONS
     rows = [[c.name, c.version, c.description] for c in CONDITIONS.values()]
-    return ["## 6. v2·v3 (재실험 전)", "",
-            "v2(판별기 + Trusted LLM)와 v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)은 설정을 버전별로 분리한 뒤 다시 실험한다. "
-            "이전 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, "
+    return ["## 6. 버전 구성", "",
+            "v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 [`archive/v2.bak/`](../archive/v2.bak/README.md)에 보관한다. "
+            "v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)의 결과는 [`results/v3/RESULTS.md`](../results/v3/RESULTS.md)에 있다. "
+            "2026-10-17 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, "
             "그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.", "",
             markdown_table(["조건", "버전", "구성"], rows), ""]
 

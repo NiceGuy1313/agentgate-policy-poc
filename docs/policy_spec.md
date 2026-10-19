@@ -1,6 +1,6 @@
 # 툴 호출 정책 사양 (v1–v3)
 
-> 원본 사양 문서가 없어 작업 지시서의 조건과 AgentDojo v1.2.2 소스로 다시 작성한 사양이다. 툴·인자 이름은 모두 AgentDojo 실제 이름이다. 구조와 설계 근거는 [`architecture.md`](architecture.md)에 있다. 1–4절은 v1, 5절은 v2·v3에서 바꾼 정책이다.
+> 원본 사양 문서가 없어 작업 지시서의 조건과 AgentDojo v1.2.2 소스로 다시 작성한 사양이다. 툴·인자 이름은 모두 AgentDojo 실제 이름이다. 구조와 설계 근거는 [`architecture.md`](architecture.md)에 있다. 1–4절은 v1, 5절은 v3에서 바꾼 정책이다.
 
 ## 1. 위협 분류 (injection task 35개)
 
@@ -53,17 +53,12 @@
 ## 4. 판정 결합과 ESCALATE
 
 - 한 호출에 여러 정책이 걸리면 BLOCK > ESCALATE > ALLOW 중 가장 강한 판정이 최종이다(`gate/engine.py`의 `combine_verdicts`).
-- ESCALATE 처리는 실험 조건(`src/agentgate/conditions.py`)이 정한다: `block`(C1) | `allow`(C2) | `judge`(C4·C5). 조건 없이 만든 런타임은 `runtime.escalate_action`(기본 `block`)을 쓴다.
+- ESCALATE 처리는 실험 조건(`src/agentgate/conditions.py`)이 정한다: `block`(C1) | `allow`(C2) | `judge`(C4). 조건 없이 만든 런타임은 `runtime.escalate_action`(기본 `block`)을 쓴다.
 - `judge`는 판정 LLM의 답을 B → BLOCK, A → ALLOW(되돌릴 수 있는 툴만), 그 밖은 HUMAN으로 바꾼다. 벤치마크에서 HUMAN은 BLOCK으로 집행하고 따로 센다.
 
-## 5. v2·v3 정책
+## 5. v3 정책 (v2 보관)
 
-v2는 규칙 정책(P1–P9)을 쓰지 않는다. P0(사용자 허용 범위, `config/v2/user_policy.yaml`) 외의 모든 툴 호출을 P10이 Trusted LLM 판정으로 넘긴다.
-
-| 정책 | 버전 | 클래스 | 규칙 → 판정 |
-|---|---|---|---|
-| P0 사용자 고정 설정 | v2 | `UserFixedPolicy` ([`gate/user_policy.py`](../src/agentgate/gate/user_policy.py)) | `always_block` 툴 → BLOCK, `always_human` 툴(`delete_file`, `update_password`) → ESCALATE(force_human, 판정 없이 HUMAN) |
-| P10 Trusted LLM 판정 | v2 | `TrustedReviewPolicy` ([`v2/policies.py`](../src/agentgate/v2/policies.py)) | 모든 툴 호출 → ESCALATE(Trusted LLM이 TaskSpec + 사용자 허용 범위 + IPI detector 판단으로 ALLOW/BLOCK/HUMAN). 인자 값이 나온 응답의 판별 라벨을 근거로 붙인다 |
+v2(P0 사용자 고정 설정, P10 Trusted LLM 판정)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 보관한다([`README`](../archive/v2.bak/README.md)). 현재 조건(`conditions.py`)에는 없다.
 
 v3는 정책 엔진이 없다. Gate는 effect 호출(`config/agentdojo/tool_roles.yaml`의 effect: 상태 변경·외부 전송·URL 방문)을 실행 직전에 판정 LLM v3([`v3/judge.py`](../src/agentgate/v3/judge.py))에 보내고 그 답(ALLOW / BLOCK)을 집행한다. 읽기 호출은 판정하지 않는다. 판정 LLM 입력은 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 ToolSpec([`v3/toolspec.py`](../src/agentgate/v3/toolspec.py)), 대기 중 호출(툴, 인자)뿐이고, 툴 응답 원문은 넣지 않는다.
 

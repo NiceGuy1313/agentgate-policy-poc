@@ -1,6 +1,6 @@
 """LLM 추출기로 user task 97개 전체의 TaskSpec을 추출해 재생 평가용으로 저장한다.
 
-입력은 사용자 프롬프트와 툴 목록뿐이다. 추출 프롬프트와 캐시는 버전이 정한다(v1·v2: prompts/v1, v3: prompts/v3).
+입력은 사용자 프롬프트와 툴 목록뿐이다. 추출 프롬프트와 캐시는 버전이 정한다(v1: prompts/v1, v3: prompts/v3).
 캐시(data/<version>/cache/taskspec/<model>/)를 live 실행과 같이 쓰므로, 재생과 live가 같은 추출 결과를 쓴다.
 
 사용법: python scripts/taskspec/extract_llm_specs.py --version v3 [--suites banking] [--workers 4]
@@ -22,7 +22,7 @@ from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", choices=["v1", "v3"], default="v1", help="TaskSpec prompt version (v2 uses v1)")
+    parser.add_argument("--version", choices=["v1", "v3"], default="v1", help="TaskSpec prompt version")
     parser.add_argument("--model", default=None, help="default AGENTGATE_LLM_MODEL")
     parser.add_argument("--suites", nargs="*", default=list(SUITES))
     parser.add_argument("--workers", type=int, default=4)

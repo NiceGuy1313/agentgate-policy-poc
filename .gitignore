@@ -49,8 +49,3 @@ data/v1/cache/*/*/
 # Stray logs from local runs
 *.log
 nohup.out
-
-# v2 detector score cache (regenerable)
-data/v2/cache/detector/
-# Hugging Face model downloads when HF_HOME points inside the repo
-.hf_cache/

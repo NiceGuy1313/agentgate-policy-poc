@@ -1,6 +1,6 @@
 """정책 엔진: 활성화된 정책을 툴 호출에 적용하고 판정을 결합한다.
 
-어떤 정책 클래스를 쓰는지는 버전 패키지가 정한다(`agentgate.v1`·`v2`·`v3`의 `make_engine`).
+어떤 정책 클래스를 쓰는지는 버전 패키지가 정한다(`agentgate.v1`의 `make_engine`).
 """
 
 from __future__ import annotations

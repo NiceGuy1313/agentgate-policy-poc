@@ -4,8 +4,8 @@
 `GroundTruthPipeline`(replay)은 모두 `runtime.run_function`으로만 툴을 실행하고, `TaskSuite.run_task_with_pipeline`은
 `runtime_class`를 받으므로, `run_function`을 override하면 agentdojo 소스를 건드리지 않고 모든 실행 경로를 덮는다.
 
-이 클래스는 v1 Gate다. v2(판별기 라벨)와 v3(ToolSpec 라벨)는 `label_response`·`finalize_judgement`·
-`index_class`를 override하는 서브클래스(`agentgate.v2.runtime`, `agentgate.v3.runtime`)로 확장한다.
+이 클래스는 v1 Gate다. v3(ToolSpec 라벨)는 `label_response`·`finalize_judgement`·`index_class`를 override하는
+서브클래스(`agentgate.v3.runtime`)로 확장한다.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class TraceEvent:
     phase: str = ""                   # replay bookkeeping: "user" | "injection" | "agent"
     decision: dict | None = None      # serialized EngineResult
     decide_ms: float = 0.0
-    labels: dict = field(default_factory=dict)   # version label summaries of this response (v2 detection, v3 toolspec)
+    labels: dict = field(default_factory=dict)   # version label summaries of this response (v3 toolspec)
     env_hash_before: str | None = None
 
 
@@ -199,10 +199,10 @@ class GatedRuntime(FunctionsRuntime):
         return Verdict.BLOCK, None
 
     def label_response(self, source, event: TraceEvent) -> None:
-        """Attach version labels to an executed response (v2 detector, v3 ToolSpec). v1: none."""
+        """Attach version labels to an executed response (v3 ToolSpec). v1: none."""
 
     def finalize_judgement(self, judgement: dict) -> dict:
-        """Post-process the ESCALATE judge's answer (v2 rule ④). v1: unchanged."""
+        """Post-process the ESCALATE judge's answer. Default: unchanged."""
         return judgement
 
     def _execute_nested_calls(self, env, kwargs):

@@ -23,7 +23,7 @@ class TaskSpec(BaseModel):
     egress_requested: bool = False
     """True if the user asks to send content derived from their data to someone."""
     delegated_sources: list[str] = Field(default_factory=list)
-    """v3 only (prompts/v3/extract_taskspec.md; empty in v1/v2 specs): sources whose instructions the user
+    """v3 only (prompts/v3/extract_taskspec.md; empty in v1 specs): sources whose instructions the user
     explicitly asks the assistant to carry out ("do what the e-mail from David says")."""
     notes: str | None = None
     status: str | None = None
@@ -41,12 +41,12 @@ class TaskSpec(BaseModel):
 
 
 def llm_spec_dir(model: str, version: str = "v1", root: Path | None = None) -> Path:
-    """Stored LLM TaskSpecs: data/<version>/specs/<model>/ (v1 and v2 share the v1 extraction prompt)."""
+    """Stored LLM TaskSpecs: data/<version>/specs/<model>/ (v1: prompts/v1, v3: prompts/v3)."""
     return (root or PROJECT_ROOT) / "data" / taskspec_version(version) / "specs" / model.replace("/", "_")
 
 
 def taskspec_version(version: str) -> str:
-    """TaskSpec extraction prompt per gate version: v1 and v2 use prompts/v1, v3 uses prompts/v3."""
+    """TaskSpec extraction prompt per gate version: v1 uses prompts/v1, v3 uses prompts/v3."""
     return "v3" if version.startswith("v3") else "v1"
 
 

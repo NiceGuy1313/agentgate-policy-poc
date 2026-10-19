@@ -19,7 +19,7 @@ def record(name: str, ok: bool, detail: str = "") -> None:
 
 def main() -> int:
     sys.path.insert(0, "src")
-    for module in ("agentgate", "agentdojo", "fastapi", "torch", "transformers"):
+    for module in ("agentgate", "agentdojo", "fastapi"):
         try:
             importlib.import_module(module)
             record(f"import {module}", True)
@@ -34,9 +34,7 @@ def main() -> int:
     except Exception as exc:
         record("AgentDojo suites", False, f"{type(exc).__name__}: {exc}")
 
-    for url in ("https://pypi.org/simple/", "https://huggingface.co/api/models/leolee99/PIGuard",
-                "https://download.pytorch.org/whl/cpu/", "https://ollama.com/api/tags",
-                "https://api.anthropic.com/"):
+    for url in ("https://pypi.org/simple/", "https://ollama.com/api/tags", "https://api.anthropic.com/"):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, method="GET"), timeout=10) as response:
                 record(f"net {url}", True, str(response.status))
@@ -45,7 +43,7 @@ def main() -> int:
         except Exception as exc:
             record(f"net {url}", False, f"{type(exc).__name__}: {exc}")
 
-    for key in ("ANTHROPIC_API_KEY", "OLLAMA_API_KEY", "HF_TOKEN"):
+    for key in ("ANTHROPIC_API_KEY", "OLLAMA_API_KEY"):
         record(f"env {key}", bool(os.environ.get(key)), "set" if os.environ.get(key) else "missing")
 
     width = max(len(name) for name, _, _ in CHECKS)

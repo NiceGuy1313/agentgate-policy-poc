@@ -7,12 +7,11 @@
 | C1  | v1 | P1–P9, ESCALATE→BLOCK |
 | C2  | v1 | P1–P9, ESCALATE→ALLOW |
 | C4  | v1 | P1–P9, ESCALATE→판정 LLM v1 |
-| C5  | v2 | P0+P1–P10, 판별기 horizon-base, ESCALATE→Trusted LLM v2 (HUMAN→BLOCK) |
-| C5p | v2 | C5와 같고 판별기만 PIGuard |
 | C9n | v3 | Gate + 판정 LLM(정책 엔진 없음): effect 호출마다 TaskSpec + ToolSpec + 대기 중 호출로 ALLOW / BLOCK |
 | C9  | v3 | C9n + 판정 LLM이 정책 문서(config/v3/policy.yaml)를 읽음 |
 
 C0·C3은 버전과 무관한 기준선이다. 버전을 비교할 때는 같은 실행(같은 짝·공격·모델·시점)에 C0을 함께 넣는다.
+v2(C5·C5p)는 중단되어 `archive/v2.bak/`에 있다.
 """
 
 from __future__ import annotations
@@ -23,14 +22,13 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Condition:
     name: str
-    version: str          # baseline | v1 | v2 | v3
+    version: str          # baseline | v1 | v3
     mode: str             # audit | enforce
     escalate: str         # block | allow | judge
     description: str
-    gate: str = "v1"      # policy configuration: v1 | v2 | v3
-    judge: str | None = None   # v1 | v2 | v3 | v3-norules (escalate == "judge")
+    gate: str = "v1"      # policy configuration: v1 | v3
+    judge: str | None = None   # v1 | v3 | v3-norules (escalate == "judge")
     defense: str | None = None  # AgentDojo pipeline defense (C3)
-    detector: str | None = None  # v2 detector model in config/v2/detector.yaml (None = its default)
 
     @property
     def gated(self) -> bool:
@@ -44,10 +42,6 @@ CONDITIONS: dict[str, Condition] = {c.name: c for c in [
     Condition("C1", "v1", "enforce", "block", "v1 Gate, ESCALATE→BLOCK"),
     Condition("C2", "v1", "enforce", "allow", "v1 Gate, ESCALATE→ALLOW"),
     Condition("C4", "v1", "enforce", "judge", "v1 Gate, ESCALATE→판정 LLM v1", judge="v1"),
-    Condition("C5", "v2", "enforce", "judge", "v2 Gate(P0·P10, horizon-base), ESCALATE→Trusted LLM v2", gate="v2",
-              judge="v2", detector="horizon-base"),
-    Condition("C5p", "v2", "enforce", "judge", "v2 Gate(P0·P10, PIGuard), ESCALATE→Trusted LLM v2", gate="v2",
-              judge="v2", detector="piguard"),
     Condition("C9n", "v3", "enforce", "judge", "Gate + 판정 LLM(정책 문서 없음)", gate="v3", judge="v3-norules"),
     Condition("C9", "v3", "enforce", "judge", "Gate + 판정 LLM + 정책 문서", gate="v3", judge="v3"),
 ]}
@@ -78,8 +72,6 @@ def make_runtime(condition: str | Condition, functions, *, suite_name: str, prom
         escalate = "block"
     if cond.gate == "v1":
         from agentgate.v1.experiment import build
-    elif cond.gate == "v2":
-        from agentgate.v2.experiment import build
     else:
         from agentgate.v3.experiment import build
     runtime_cls, kwargs = build(cond, suite_name=suite_name, prompt=prompt, escalate=escalate, disabled=disabled,

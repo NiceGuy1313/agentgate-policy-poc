@@ -1,10 +1,6 @@
 """재생 평가의 지표, ablation, 실패 분석을 계산해 <run>/summary.json에 쓴다.
 
 사용법: python scripts/analysis/summarize_replay.py --run results/v1/replay/oracle [--compare results/v1/replay/llm_<model>]
-
-v2 실행(판별기 라벨이나 Trusted LLM v2 판정이 trace에 있음)이면 summary.json에 "v2" 절을 더한다:
-v1 misses·escalate_only_pairs가 v2에서 어떻게 끝났는지, 정상 태스크의 차단 증가분(원인별), 판정 LLM·판별기 지연.
-기준 v1 결과는 --baseline(기본 results/v1/replay/oracle).
 """
 
 from __future__ import annotations
@@ -196,130 +192,16 @@ def summarize(run_dir: Path) -> dict:
     return summary
 
 
-def _enforce_outcome(events: list[dict]) -> str:
-    """How the enforce run ended for a set of calls: the first blocking cause, or ALLOW."""
-    for event in events:
-        if event.get("effective") != "BLOCK":
-            continue
-        judge = event.get("judge") or {}
-        if not judge:
-            return "BLOCK(gate)" if event.get("verdict") == "BLOCK" else "BLOCK(escalate)"
-        if judge.get("final") == "HUMAN":
-            return "HUMAN(P0)" if judge.get("by") else ("HUMAN(rule4)" if judge.get("rule4") else "HUMAN(judge)")
-        return "BLOCK(judge)"
-    return "ALLOW"
-
-
-def _audit_outcome(events: list[dict]) -> str:
-    verdicts = {e.get("verdict") for e in events}
-    return next((v for v in ("BLOCK", "ESCALATE") if v in verdicts), "ALLOW")
-
-
-def _is_v2_run(runs: list[dict]) -> bool:
-    return any("detection" in e or (e.get("judge") or {}).get("judge") == "v2" for r in runs for e in r["trace"])
-
-
-def summarize_v2(run_dir: Path, baseline_dir: Path) -> dict:
-    baseline = json.loads((baseline_dir / "summary.json").read_text())
-    attack_audit = {run_key(r): r for r in read_jsonl(run_dir / "attack_audit.jsonl")}
-    attack_enforce = {run_key(r): r for r in read_jsonl(run_dir / "attack_enforce.jsonl")}
-    benign_audit = {run_key(r): r for r in read_jsonl(run_dir / "benign_audit.jsonl")}
-    benign_enforce = {run_key(r): r for r in read_jsonl(run_dir / "benign_enforce.jsonl")}
-    v1_benign_enforce = {run_key(r): r for r in read_jsonl(baseline_dir / "benign_enforce.jsonl")}
-    out: dict = {"baseline": str(baseline_dir.relative_to(PROJECT_ROOT)) if baseline_dir.is_relative_to(PROJECT_ROOT)
-                 else str(baseline_dir)}
-
-    def pair_outcomes(pair_keys) -> dict:
-        rows, audit_counts, enforce_counts = [], Counter(), Counter()
-        for key in pair_keys:
-            audit_run, enforce_run = attack_audit.get(key), attack_enforce.get(key)
-            if audit_run is None or enforce_run is None:
-                continue
-            audit = _audit_outcome(effect_calls(audit_run))
-            enforce = _enforce_outcome([e for e in enforce_run["trace"] if e.get("role") == "effect"])
-            audit_counts[audit] += 1
-            enforce_counts[enforce] += 1
-            rows.append({"pair": "/".join(key), "audit": audit, "enforce": enforce,
-                         "security": enforce_run["security"], "security_executed": enforce_run["security_executed"]})
-        return {"n": len(rows), "audit": dict(audit_counts), "enforce": dict(enforce_counts),
-                "attack_success_enforce": sum(r["security"] for r in rows),
-                "attack_success_executed_only": sum(r["security_executed"] for r in rows), "pairs": rows}
-
-    miss_keys = [(k.split("/")[0], m["user_task"], k.split("/")[1]) for k, ms in baseline["misses"].items() for m in ms]
-    out["v1_misses"] = pair_outcomes(miss_keys)
-    out["v1_misses_by_injection_task"] = {}
-    for task in sorted(baseline["misses"]):
-        subset = [k for k in miss_keys if f"{k[0]}/{k[2]}" == task]
-        result = pair_outcomes(subset)
-        out["v1_misses_by_injection_task"][task] = {k: result[k] for k in ("n", "audit", "enforce",
-                                                                         "attack_success_enforce")}
-    v1_audit = {run_key(r): r for r in read_jsonl(baseline_dir / "attack_audit.jsonl")}
-    escalate_only_keys = [k for k, r in v1_audit.items() if r["reached"] and effect_calls(r)
-                          and _audit_outcome(effect_calls(r)) == "ESCALATE"]
-    escalate_only = pair_outcomes(escalate_only_keys)
-    escalate_only.pop("pairs")
-    out["v1_escalate_only"] = escalate_only
-
-    # Normal tasks: blocked calls in enforce by cause, and utility against v1 enforce.
-    causes, p10_audit, utility_lost = Counter(), Counter(), []
-    for key, run in benign_enforce.items():
-        for event in run["trace"]:
-            outcome = _enforce_outcome([event])
-            if outcome != "ALLOW":
-                causes[outcome] += 1
-        audit_run = benign_audit.get(key, run)
-        for event in audit_run["trace"]:
-            if any(d["policy_id"] == "P10" and d["verdict"] != "ALLOW" for d in event["decisions"]):
-                p10_audit["calls"] += 1
-        if any(any(d["policy_id"] == "P10" and d["verdict"] != "ALLOW" for d in e["decisions"])
-               for e in audit_run["trace"]):
-            p10_audit["tasks"] += 1
-        if v1_benign_enforce.get(key, {}).get("utility") and not run["utility"]:
-            utility_lost.append("/".join(k for k in key if k))
-    flagged_responses = Counter()
-    for run in benign_audit.values():
-        for event in run["trace"]:
-            if event.get("detection"):
-                flagged_responses["responses"] += 1
-                flagged_responses["flagged"] += bool(event["detection"]["flagged"])
-    out["benign"] = {"tasks": len(benign_enforce), "utility_enforce": sum(r["utility"] for r in benign_enforce.values()),
-                     "utility_enforce_v1": sum(r["utility"] for r in v1_benign_enforce.values()),
-                     "utility_lost_vs_v1": sorted(utility_lost), "blocked_calls_by_cause": dict(causes),
-                     "p10_flags_audit": dict(p10_audit), "detector_responses": dict(flagged_responses)}
-
-    # Trusted LLM v2 and detector cost.
-    judge_events = [e["judge"] for r in list(attack_enforce.values()) + list(benign_enforce.values())
-                    for e in r["trace"] if (e.get("judge") or {}).get("judge") == "v2"]
-    llm_events = [j for j in judge_events if j.get("answer")]
-    out["judge"] = {"events": len(judge_events), "llm_answers": dict(Counter(j["answer"] for j in llm_events)),
-                    "final": dict(Counter(j["final"] for j in judge_events)),
-                    "rule4": sum(bool(j.get("rule4")) for j in judge_events),
-                    "p0_human": sum(bool(j.get("by")) for j in judge_events),
-                    "api_calls": sum(not j.get("cached") for j in llm_events),
-                    "input_tokens": sum(j.get("input_tokens", 0) for j in llm_events),
-                    "output_tokens": sum(j.get("output_tokens", 0) for j in llm_events),
-                    "api_latency_ms_mean": (sum(j["latency_ms"] for j in llm_events if not j.get("cached"))
-                                            / max(1, sum(not j.get("cached") for j in llm_events)))}
-    latencies = sorted(e["detection"]["latency_ms"] for r in list(attack_audit.values()) + list(benign_audit.values())
-                       for e in r["trace"] if e.get("detection") and not e["detection"]["cached"])
-    out["detector_latency_ms"] = ({"n_uncached": len(latencies), "mean": sum(latencies) / len(latencies),
-                                   "p95": latencies[int(len(latencies) * .95)]} if latencies else {"n_uncached": 0})
-    return out
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", default="results/v1/replay/oracle")
     parser.add_argument("--compare", default=None)
-    parser.add_argument("--baseline", default="results/v1/replay/oracle", help="v1 run for the v2 comparison")
     args = parser.parse_args()
     run_dir = PROJECT_ROOT / args.run
     summary = summarize(run_dir)
     if args.compare and (PROJECT_ROOT / args.compare / "attack_audit.jsonl").exists():
         summary["llm"] = summarize(PROJECT_ROOT / args.compare)
         summary["oracle_vs_llm_diff"] = compare_runs(run_dir, PROJECT_ROOT / args.compare)
-    if _is_v2_run(read_jsonl(run_dir / "benign_audit.jsonl") + read_jsonl(run_dir / "benign_enforce.jsonl")):
-        summary["v2"] = summarize_v2(run_dir, PROJECT_ROOT / args.baseline)
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False, default=str))
     overall = summary["overall"]
     print("strict", format_percentage(overall["strict"], overall["eval"]),
@@ -331,14 +213,6 @@ def main():
     print("benign tasks with BLOCK", format_percentage(benign["tasks_block"], benign["tasks"]),
           "calls BLOCK", format_percentage(benign["calls_block"], benign["calls"]),
           "ESCALATE", format_percentage(benign["calls_escalate"], benign["calls"]))
-    if "v2" in summary:
-        v2 = summary["v2"]
-        print("v1 misses", v2["v1_misses"]["n"], "audit", v2["v1_misses"]["audit"], "enforce", v2["v1_misses"]["enforce"],
-              "attack success", v2["v1_misses"]["attack_success_enforce"])
-        print("v1 escalate-only", v2["v1_escalate_only"]["n"], "enforce", v2["v1_escalate_only"]["enforce"])
-        print("benign utility enforce", v2["benign"]["utility_enforce"], "(v1", v2["benign"]["utility_enforce_v1"], ")",
-              "blocked calls", v2["benign"]["blocked_calls_by_cause"])
-        print("judge", {k: v2["judge"][k] for k in ("events", "llm_answers", "final", "rule4", "api_calls")})
 
 
 if __name__ == "__main__":

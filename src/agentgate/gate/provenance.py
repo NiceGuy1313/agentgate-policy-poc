@@ -48,7 +48,7 @@ class IndexedSource:
     kgram_hashes: set[int] | None = None                  # computed lazily by find_overlapping_sources
     record_texts: list[str] | None = None                 # per-record strings for list-shaped responses (P3)
     exact_values: set[str] = field(default_factory=set)   # normalized exact string fields (short IDs)
-    labels: dict[str, Any] = field(default_factory=dict)  # version labels (v2 detector, v3 ToolSpec)
+    labels: dict[str, Any] = field(default_factory=dict)  # version labels (v3 ToolSpec)
 
 
 @dataclass

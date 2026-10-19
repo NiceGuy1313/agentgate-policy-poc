@@ -5,10 +5,9 @@
   python scripts/evaluation/replay_evaluation.py --condition C9 --spec llm:claude-haiku-5-5 --attack tool_knowledge \\
       --mode enforce --out results/v3/replay/c7_llmspec_tool_knowledge
 
-조건은 `agentgate.conditions`(C1·C2·C4 v1, C5 v2, C9·C9n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
+조건은 `agentgate.conditions`(C1·C2·C4 v1, C9·C9n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
 않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C4 --escalate block).
-`--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1·v2는 v1 프롬프트, v3는 v3 프롬프트).
-v2 판별기: AGENTGATE_V2_DETECTOR=<config/v2/detector.yaml 모델>[:mode], 비우면 기본(horizon-base:windows), none = 끔
+`--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1은 v1 프롬프트, v3는 v3 프롬프트).
 
 출력: <out>/benign_<mode>.jsonl, <out>/attack_<mode>.jsonl, <out>/meta.json
 """
@@ -19,7 +18,6 @@ import argparse
 import functools
 import json
 import multiprocessing as mp
-import os
 import platform
 import subprocess
 import time
@@ -59,12 +57,6 @@ def _run_job(job):
 
 def _init_worker():
     load_dotenv()
-    if os.environ.get("AGENTGATE_V2_DETECTOR", "").split(":")[0] != "none":
-        try:
-            import torch
-            torch.set_num_threads(1)
-        except ImportError:
-            pass
 
 
 def main():
@@ -123,13 +115,14 @@ def main():
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True).strip()
     except Exception:
         commit = None
-    from agentgate import v1, v2, v3
-    config_version = {"v1": v1.load_config, "v2": v2.load_config}.get(cond.gate, lambda: v3.load_config(cond.gate))()
+    from agentgate import v1, v3
+    # v1 has a rule engine config; v3 has no engine config, only the rulebook the judge reads (C9).
+    policy_config = ({"policy_config_version": v1.load_config()["version"]} if cond.gate == "v1"
+                     else {"policy_config_version": v3.VERSION, "rulebook": f"config/{v3.POLICY_FILE}"})
     meta = {"benchmark_version": BENCHMARK_VERSION, "condition": args.condition, "version": cond.version,
             "gate": cond.gate, "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
             "modes": args.mode, "disabled": list(disabled), "attack": args.attack,
-            "policy_config_version": config_version["version"], "pairs": args.pairs,
-            "v2_detector": (os.environ.get("AGENTGATE_V2_DETECTOR") or "default") if cond.gate == "v2" else None,
+            **policy_config, "pairs": args.pairs,
             "git_commit": commit, "python": platform.python_version(), "elapsed_s": round(time.time() - started, 1)}
     (output_dir / "meta.json").write_text(json.dumps(meta, indent=1))
 

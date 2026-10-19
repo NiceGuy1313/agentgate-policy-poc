@@ -31,12 +31,12 @@ python scripts/reporting/build_report.py
 python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task_0 --mode enforce
 ```
 
-## 버전 구조 (v1·v2·v3)
+## 버전 구조 (v1·v3)
 
-- 코드는 `src/agentgate/gate/`(공통 Gate), `agentdojo/`(AgentDojo 테스트), `agents/`(평가 대상 에이전트), `v1/`·`v2/`·`v3/`(버전별 정책·판정 LLM·런타임 확장)로 나뉜다. 실험 조건은 `src/agentgate/conditions.py`(C0–C7n)다.
+- 코드는 `src/agentgate/gate/`(공통 Gate), `agentdojo/`(AgentDojo 테스트), `agents/`(평가 대상 에이전트), `v1/`·`v3/`(버전별 정책·판정 LLM·런타임 확장)로 나뉜다. 실험 조건은 `src/agentgate/conditions.py`(C0–C9n)다.
 - 버전별 차이는 해당 버전 패키지와 `config/<version>/`, `prompts/<version>/`에만 둔다. 공통 Gate나 v1 클래스에 다른 버전 분기를 넣지 않고 hook·서브클래스로 바꾼다.
 - 한 버전의 설정·프롬프트를 고칠 때 다른 버전 파일을 함께 고치지 않는다. 공유해야 하면 공통 위치(`gate/`, `config/agentdojo/`)로 옮기고 모든 버전의 회귀를 다시 확인한다.
-- 판별기 코드는 `src/agentgate/v2/detector/`, 설정은 `config/v2/detector.yaml`이다. 판별기는 툴 응답에만 돌리고, 정책 코드에는 그 결과(라벨)만 넘긴다.
+- v2(IPI detector + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 보관한다. 현재 코드·테스트·조건(C5·C5p)에서 v2를 import하거나 되살리지 않는다.
 - 결과는 `results/<version>/`, LLM 캐시는 `data/<version>/cache/`에 둔다. 버전 비교는 같은 실행 안의 기준선 C0과 한다.
 - 오래 걸리는 평가(재생 전체, live)는 백그라운드로 돌리고 로그를 `logs/`에 남긴다.
 - 클라우드 세션은 SessionStart hook(`scripts/cloud/setup.sh`)이 `.venv`를 준비한다. 시작하면 `python scripts/cloud/check_env.py`부터 돌리고, 실패 항목이 있으면 진행 전에 보고한다.

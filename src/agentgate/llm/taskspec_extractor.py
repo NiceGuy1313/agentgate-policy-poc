@@ -20,7 +20,6 @@ from agentgate.gate.task_spec import TaskSpec
 from agentgate.llm.client import DEFAULT_ANTHROPIC_MODEL, LLMClient, extract_first_json_object
 
 VERSION_PROMPTS = {"v1": PROJECT_ROOT / "prompts" / "v1" / "extract_taskspec.md",
-                   "v2": PROJECT_ROOT / "prompts" / "v1" / "extract_taskspec.md",   # v2 reuses the v1 prompt
                    "v3": PROJECT_ROOT / "prompts" / "v3" / "extract_taskspec.md"}
 PROMPT_TEMPLATE_PATH = VERSION_PROMPTS["v1"]
 

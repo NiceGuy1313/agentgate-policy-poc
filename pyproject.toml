@@ -19,8 +19,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "matplotlib>=3.8", "ruff>=0.6", "httpx>=0.27"]
 report = ["matplotlib>=3.8"]
-# v2 tool-response injection detectors (src/agentgate/v2/detector/; ModernBERT needs transformers>=4.48). Install CPU torch first in the cloud (scripts/cloud/setup.sh)
-detector = ["torch>=2.2", "transformers>=4.48", "sentencepiece>=0.2", "protobuf>=4", "huggingface_hub>=0.24"]
 # dashboard + Wrapper contract v1 service (dashboard/app.py, agentgate.harness.service)
 dashboard = ["fastapi>=0.110", "uvicorn>=0.30"]
 # agent frameworks under test: the NiceGuy1313 forks carry the boundary logs the dashboard reads
