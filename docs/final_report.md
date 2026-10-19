@@ -126,7 +126,7 @@ AgentDojo `AgentPipeline`에 게이트(`GatedRuntime`)와 `TaskSpecElement`를 �
 
 ## 6. 버전 구성
 
-v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 [`archive/v2.bak/`](../archive/v2.bak/README.md)에 보관한다. v3·v3.1(ToolSpec + 정책 문서 + 판정 LLM)의 결과는 [`results/v3/RESULTS.md`](../results/v3/RESULTS.md)에 있다. 2026-10-17 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, 그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.
+v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 [`archive/v2.bak/`](../archive/v2.bak/README.md)에 보관한다. v3(표준 ToolSpec + 룰북, 방식 A 판정 LLM·방식 B 정적 코드)의 결과는 `results/v3/RESULTS.md`에 둔다(아직 없음). 이전 C9·C9n(Sonnet 판정 LLM) 결과는 [`archive/v3_sonnet_2026-10-18/`](../archive/v3_sonnet_2026-10-18/RESULTS.md)에 있다. 2026-10-17 결과 문서는 [`archive/v2_v3_results_2026-10-17/`](../archive/v2_v3_results_2026-10-17/README.md)에 있고, 그 수치는 이 보고서에 쓰지 않는다. 버전을 비교할 때는 같은 실행에 기준선 C0을 함께 넣는다.
 
 | 조건 | 버전 | 구성 |
 |---|---|---|
@@ -135,8 +135,8 @@ v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 [`arc
 | C1 | v1 | v1 Gate, ESCALATE→BLOCK |
 | C2 | v1 | v1 Gate, ESCALATE→ALLOW |
 | C4 | v1 | v1 Gate, ESCALATE→판정 LLM v1 |
-| C9n | v3 | Gate + 판정 LLM(정책 문서 없음) |
-| C9 | v3 | Gate + 판정 LLM + 정책 문서 |
+| C10a | v3 | 방식 A: 판정 LLM + 룰북 |
+| C10b | v3 | 방식 B: 룰북 정적 코드 |
 
 ## 7. 한계 (1–5절)
 

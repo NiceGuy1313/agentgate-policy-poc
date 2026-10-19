@@ -2,10 +2,10 @@
 
 사용법:
   python scripts/evaluation/replay_evaluation.py --condition C1 --spec oracle --out results/v1/replay/oracle
-  python scripts/evaluation/replay_evaluation.py --condition C9 --spec llm:claude-haiku-5-5 --attack tool_knowledge \\
+  python scripts/evaluation/replay_evaluation.py --condition C10b --spec llm:claude-haiku-5-5 --attack tool_knowledge \\
       --mode enforce --out results/v3/replay/c7_llmspec_tool_knowledge
 
-조건은 `agentgate.conditions`(C1·C2·C4 v1, C9·C9n v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
+조건은 `agentgate.conditions`(C1·C2·C4 v1, C10a·C10b v3)다. audit 모드는 판정만 기록하고 판정 LLM을 부르지
 않는다(ESCALATE→block으로 기록). `--escalate`로 조건의 ESCALATE 처리를 바꿀 수 있다(예: C4 --escalate block).
 `--spec llm:<model>`은 data/<v1|v3>/specs/<model>/의 저장된 TaskSpec을 읽는다(v1은 v1 프롬프트, v3는 v3 프롬프트).
 
@@ -116,9 +116,10 @@ def main():
     except Exception:
         commit = None
     from agentgate import v1, v3
-    # v1 has a rule engine config; v3 has no engine config, only the rulebook the judge reads (C9).
+    # v1 has a rule engine config; v3 has no engine config, only the rulebook (C10a judge LLM, C10b static checker).
     policy_config = ({"policy_config_version": v1.load_config()["version"]} if cond.gate == "v1"
-                     else {"policy_config_version": v3.VERSION, "rulebook": f"config/{v3.POLICY_FILE}"})
+                     else {"policy_config_version": v3.VERSION, "rulebook": f"config/{v3.RULEBOOK_FILE}",
+                        "tool_args": f"config/{v3.TOOL_ARGS_FILE}"})
     meta = {"benchmark_version": BENCHMARK_VERSION, "condition": args.condition, "version": cond.version,
             "gate": cond.gate, "escalate": args.escalate or cond.escalate, "spec": args.spec, "suites": args.suites,
             "modes": args.mode, "disabled": list(disabled), "attack": args.attack,

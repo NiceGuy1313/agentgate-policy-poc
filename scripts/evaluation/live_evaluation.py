@@ -1,6 +1,6 @@
 """live 평가(RQ2): 한 실행 안에서 여러 조건으로 에이전트를 AgentDojo에 돌리고 전 과정을 기록한다.
 
-조건(`agentgate.conditions`): C0·C3 기준선, C1·C2·C4 v1, C9·C9n v3. 버전을 비교하려면 같은 실행에
+조건(`agentgate.conditions`): C0·C3 기준선, C1·C2·C4 v1, C10a·C10b v3. 버전을 비교하려면 같은 실행에
 기준선 C0을 함께 넣는다(같은 짝·공격·모델·시점). 다른 실행의 C0과 섞어 비교하지 않는다.
 
 규모
@@ -18,7 +18,7 @@
 사용법
   python scripts/evaluation/live_evaluation.py --agent scripted --conditions C0 C1 C2 --out results/v1/live/scripted
   python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C1 C4 --out results/v1/live/<run>
-  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C9n C9 --attack important_instructions \
+  python scripts/evaluation/live_evaluation.py --agent llm --conditions C0 C10a C10b --attack important_instructions \
       --out results/v3/live/<run>
 완료된 (condition, suite, user, injection) run은 건너뛰므로 중단된 실행을 이어서 할 수 있다.
 """
@@ -160,7 +160,7 @@ def run_one(job: dict) -> str:
                          "llm_ms": round(meter.ms, 1), "refusals": meter.refusals},
         "gate_ms": round(sum(e.decide_ms for e in runtime.trace), 3),
         "judge": (stats["judge_object"].stats if "judge_object" in stats
-                  else _judge_stats(runtime) if cond.judge in ("v3", "v3-norules") else None),
+                  else _judge_stats(runtime) if cond.judge in ("v3", "rules") else None),
         "toolspec": stats.get("toolspec") if cond.gate == "v3" else None,
         "trace": runtime.trace_records(),
     }
@@ -242,7 +242,7 @@ def main():
     for condition in conditions:
         get_condition(condition)
     if args.framework != "native" and not set(args.conditions) <= {"C0", "C1", "C2", "C4"}:
-        parser.error("--framework supports C0 C1 C2 C4 only (C3 is an AgentDojo pipeline defense, C9·C9n native only)")
+        parser.error("--framework supports C0 C1 C2 C4 only (C3 is an AgentDojo pipeline defense, C10a·C10b native only)")
     attack_model = args.attack_model_name or {"anthropic": "Claude", "openai": "GPT-4"}.get(
         provider, re.split(r"[-:_]", agent_model)[0].upper() or "AI assistant")
     framework_fields = {"framework": args.framework, "framework_options": args.framework_options,

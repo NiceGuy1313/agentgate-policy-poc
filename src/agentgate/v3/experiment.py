@@ -1,4 +1,5 @@
-"""v3 실험 조건(C9, C9n) 런타임 조립. ToolSpec 추출기는 suite마다 하나를 스레드 사이에 공유한다."""
+"""v3 실험 조건(C10a 방식 A 판정 LLM, C10b 방식 B 정적 룰북 코드) 런타임 조립. ToolSpec 추출기는 suite마다 하나를
+스레드 사이에 공유한다."""
 
 from __future__ import annotations
 
@@ -40,7 +41,10 @@ def build(cond, *, suite_name: str, prompt: str, escalate: str, disabled=None, s
         return result.spec
 
     kwargs = {"toolspec": toolspec}
-    if escalate == "judge":
+    if escalate == "judge" and cond.judge == "rules":
+        from agentgate.v3.rules import RuleChecker
+        kwargs["judge"] = RuleChecker()
+    elif escalate == "judge":
         from agentgate.v3.judge import TrustedJudgeV3, as_runtime_judge
         judge = TrustedJudgeV3(use_rules=cond.judge == "v3")
         kwargs["judge"] = as_runtime_judge(judge, prompt)

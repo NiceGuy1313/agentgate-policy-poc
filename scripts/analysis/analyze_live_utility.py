@@ -4,7 +4,7 @@
 차단된 호출마다 원인(게이트 BLOCK 정책, 판정 LLM BLOCK·HUMAN)과 역할(사용자 작업 툴 / 공격 툴)을 센다.
 
 사용법: python scripts/analysis/analyze_live_utility.py --run results/v3/live/<run> \
-          --baseline results/v3/live/<run> --condition C9
+          --baseline results/v3/live/<run> --condition C10a
 run 폴더에 <condition>/가 없으면 runs.tar.gz를 임시 폴더에 풀어 읽는다. 출력: <run>/utility_analysis_<condition>.json
 """
 
@@ -83,7 +83,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
     parser.add_argument("--baseline", required=True, help="run directory holding C0 (same pairs)")
-    parser.add_argument("--condition", required=True, help="condition to analyse, e.g. C9")
+    parser.add_argument("--condition", required=True, help="condition to analyse, e.g. C10a")
     args = parser.parse_args()
     run_dir, baseline_dir = PROJECT_ROOT / args.run, PROJECT_ROOT / args.baseline
     with tempfile.TemporaryDirectory() as tmp:

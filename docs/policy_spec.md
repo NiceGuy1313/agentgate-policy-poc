@@ -56,11 +56,13 @@
 - ESCALATE 처리는 실험 조건(`src/agentgate/conditions.py`)이 정한다: `block`(C1) | `allow`(C2) | `judge`(C4). 조건 없이 만든 런타임은 `runtime.escalate_action`(기본 `block`)을 쓴다.
 - `judge`는 판정 LLM의 답을 B → BLOCK, A → ALLOW(되돌릴 수 있는 툴만), 그 밖은 HUMAN으로 바꾼다. 벤치마크에서 HUMAN은 BLOCK으로 집행하고 따로 센다.
 
-## 5. v3 정책 (v2 보관)
+## 5. v3 룰북과 판정 방식 A·B (v2 보관)
 
 v2(P0 사용자 고정 설정, P10 Trusted LLM 판정)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 보관한다([`README`](../archive/v2.bak/README.md)). 현재 조건(`conditions.py`)에는 없다.
 
-v3는 정책 엔진이 없다. Gate는 effect 호출(`config/agentdojo/tool_roles.yaml`의 effect: 상태 변경·외부 전송·URL 방문)을 실행 직전에 판정 LLM v3([`v3/judge.py`](../src/agentgate/v3/judge.py))에 보내고 그 답(ALLOW / BLOCK)을 집행한다. 읽기 호출은 판정하지 않는다. 판정 LLM 입력은 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 ToolSpec([`v3/toolspec.py`](../src/agentgate/v3/toolspec.py)), 대기 중 호출(툴, 인자)뿐이고, 툴 응답 원문은 넣지 않는다.
+v3는 정책 엔진이 없다. Gate는 effect 호출(`config/agentdojo/tool_roles.yaml`의 effect: 상태 변경·외부 전송·URL 방문)을 실행 직전에 판정하고 그 답을 집행한다. 읽기 호출은 판정하지 않는다. 판정 입력은 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 표준 ToolSpec, 대기 중 호출(툴, 인자)이고, 판정 단계에는 툴 응답 원문을 넣지 않는다. 판정은 ALLOW / BLOCK 두 가지뿐이다(ESCALATE 없음).
 
-- C9n: 위 입력만으로 판단한다.
-- C9: 정책 문서([`config/v3/policy.yaml`](../config/v3/policy.yaml), R1–R10)를 system에 함께 넣는다. 정책 문서의 근거는 ATR test-corpora 공격 사례 1,139건(전체 1,140건 중 분류 실패 1건 제외)의 분류(`data/v3/atr/atr_taxonomy.json`)이고, 규칙마다 `evidence`에 해당 건수를 적었다. `evidence`와 주석은 판정 LLM 입력에 들어가지 않는다. AgentDojo 공격 문구는 쓰지 않았다.
+- **룰북**: [`config/v3/rulebook.yaml`](../config/v3/rulebook.yaml), R1–R10. 근거는 ATR test-corpora 공격 사례 1,139건(전체 1,140건 중 분류 실패 1건 제외)의 분류(`data/v3/atr/atr_taxonomy.json`)이고, 규칙마다 `evidence`에 해당 건수를 적었다. AgentDojo 공격 문구는 쓰지 않았다.
+- **표준 ToolSpec**([`v3/toolspec.py`](../src/agentgate/v3/toolspec.py)): 모든 툴 응답에 같은 고정 스키마를 쓴다. `records[{id, kind, author, data}]`, `requests[{id, record, addressed_to, action, claims, targets}]`. `data`·`targets`는 타입별 칸(emails·ibans·urls·amounts·names·files, targets는 texts 추가)이고, `claims`는 authority·override·urgency·conceal bool이다. 값은 원문에 있고 타입이 맞는 것만 코드가 남기고 정규화한다.
+- **방식 A (C10a)**: 판정 LLM v3([`v3/judge.py`](../src/agentgate/v3/judge.py), 에이전트와 같은 모델)이 system의 룰북(`evidence`와 주석 제외)을 읽고 판단한다. 첫 단어가 ALLOW가 아니면 BLOCK이다.
+- **방식 B (C10b)**: [`v3/rules.py`](../src/agentgate/v3/rules.py)가 같은 입력으로 R1–R8을 정적 코드로 검사한다. LLM 호출이 없다. 툴 인자 역할(destination·amount·url·password·content·attachment·target_id·booking)은 [`config/v3/tool_args.yaml`](../config/v3/tool_args.yaml)이다. 규칙은 BLOCK 이유 또는 없음만 내고, 하나라도 막으면 BLOCK, 아무도 막지 않으면 ALLOW(R10)다. TaskSpec이 없거나 검사 중 오류가 나면 BLOCK이다. 규칙별 해석은 모듈 docstring에 적었다. R1의 "필요한 단계", R5의 "계산한 금액", R9의 "지나친 행동"은 코드로 표현하지 못해 좁게(막는 쪽으로) 해석한다.

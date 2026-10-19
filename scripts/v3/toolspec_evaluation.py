@@ -82,7 +82,7 @@ def collect(attacks: list[str]) -> list[dict]:
 def request_keys(spec: dict | None, addressees=("assistant", "unclear")) -> set:
     if not spec:
         return set()
-    return {(r["action"], tuple(sorted(t.lower() for t in r["targets"])))
+    return {(r["action"], tuple(sorted(str(v).lower() for values in r["targets"].values() for v in values)))
             for r in spec["requests"] if r["addressed_to"] in addressees}
 
 

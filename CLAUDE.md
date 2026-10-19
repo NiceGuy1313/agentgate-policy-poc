@@ -33,7 +33,7 @@ python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task
 
 ## 버전 구조 (v1·v3)
 
-- 코드는 `src/agentgate/gate/`(공통 Gate), `agentdojo/`(AgentDojo 테스트), `agents/`(평가 대상 에이전트), `v1/`·`v3/`(버전별 정책·판정 LLM·런타임 확장)로 나뉜다. 실험 조건은 `src/agentgate/conditions.py`(C0–C9n)다.
+- 코드는 `src/agentgate/gate/`(공통 Gate), `agentdojo/`(AgentDojo 테스트), `agents/`(평가 대상 에이전트), `v1/`·`v3/`(버전별 정책·판정 LLM·런타임 확장)로 나뉜다. 실험 조건은 `src/agentgate/conditions.py`(C0–C10b)다.
 - 버전별 차이는 해당 버전 패키지와 `config/<version>/`, `prompts/<version>/`에만 둔다. 공통 Gate나 v1 클래스에 다른 버전 분기를 넣지 않고 hook·서브클래스로 바꾼다.
 - 한 버전의 설정·프롬프트를 고칠 때 다른 버전 파일을 함께 고치지 않는다. 공유해야 하면 공통 위치(`gate/`, `config/agentdojo/`)로 옮기고 모든 버전의 회귀를 다시 확인한다.
 - v2(IPI detector + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 보관한다. 현재 코드·테스트·조건(C5·C5p)에서 v2를 import하거나 되살리지 않는다.

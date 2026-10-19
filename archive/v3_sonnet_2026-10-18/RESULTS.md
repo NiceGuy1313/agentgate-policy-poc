@@ -1,3 +1,5 @@
+> 이전 실험(C9/C9n, 판정 LLM `claude-sonnet-5-5`, 2026-10-18) 결과다. 현재 v3 조건(C10a/C10b)과 비교 대상이 아니다.
+
 # v3 결과: Gate 없음 / Gate + 판정 LLM / Gate + 판정 LLM + 정책 문서
 
 > "분석" 절과 "구성 요소"의 예시는 손으로 넣었다(예시는 실제 실행 출력). "재생 대조" 절은 `scripts/v3/replay_contrast.py`, 나머지는 `scripts/v3/summarize_v3.py`가 생성했다. 실행 기록(json)은 요약 후 지웠다.

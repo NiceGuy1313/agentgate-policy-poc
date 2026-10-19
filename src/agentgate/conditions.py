@@ -7,8 +7,8 @@
 | C1  | v1 | P1–P9, ESCALATE→BLOCK |
 | C2  | v1 | P1–P9, ESCALATE→ALLOW |
 | C4  | v1 | P1–P9, ESCALATE→판정 LLM v1 |
-| C9n | v3 | Gate + 판정 LLM(정책 엔진 없음): effect 호출마다 TaskSpec + ToolSpec + 대기 중 호출로 ALLOW / BLOCK |
-| C9  | v3 | C9n + 판정 LLM이 정책 문서(config/v3/policy.yaml)를 읽음 |
+| C10a | v3 | 방식 A: effect 호출마다 판정 LLM(에이전트와 같은 모델)이 룰북(config/v3/rulebook.yaml)과 TaskSpec + ToolSpec + 대기 중 호출로 ALLOW / BLOCK |
+| C10b | v3 | 방식 B: 같은 입력을 룰북 정적 코드(agentgate.v3.rules)가 ALLOW / BLOCK. LLM 호출 없음 |
 
 C0·C3은 버전과 무관한 기준선이다. 버전을 비교할 때는 같은 실행(같은 짝·공격·모델·시점)에 C0을 함께 넣는다.
 v2(C5·C5p)는 중단되어 `archive/v2.bak/`에 있다.
@@ -27,7 +27,7 @@ class Condition:
     escalate: str         # block | allow | judge
     description: str
     gate: str = "v1"      # policy configuration: v1 | v3
-    judge: str | None = None   # v1 | v3 | v3-norules (escalate == "judge")
+    judge: str | None = None   # v1 | v3 (판정 LLM) | rules (정적 룰북 코드) (escalate == "judge")
     defense: str | None = None  # AgentDojo pipeline defense (C3)
 
     @property
@@ -42,8 +42,8 @@ CONDITIONS: dict[str, Condition] = {c.name: c for c in [
     Condition("C1", "v1", "enforce", "block", "v1 Gate, ESCALATE→BLOCK"),
     Condition("C2", "v1", "enforce", "allow", "v1 Gate, ESCALATE→ALLOW"),
     Condition("C4", "v1", "enforce", "judge", "v1 Gate, ESCALATE→판정 LLM v1", judge="v1"),
-    Condition("C9n", "v3", "enforce", "judge", "Gate + 판정 LLM(정책 문서 없음)", gate="v3", judge="v3-norules"),
-    Condition("C9", "v3", "enforce", "judge", "Gate + 판정 LLM + 정책 문서", gate="v3", judge="v3"),
+    Condition("C10a", "v3", "enforce", "judge", "방식 A: 판정 LLM + 룰북", gate="v3", judge="v3"),
+    Condition("C10b", "v3", "enforce", "judge", "방식 B: 룰북 정적 코드", gate="v3", judge="rules"),
 ]}
 
 

@@ -1,4 +1,5 @@
-# v3 정책 문서: C9에서 판정 LLM이 읽는 규칙. 정책 엔진은 없다.
+# v3 룰북: 공격 시나리오에서 나온 규칙 R1–R10. 정책 엔진은 없다.
+# 방식 A(C10a)는 판정 LLM이 이 룰북을 읽고, 방식 B(C10b)는 src/agentgate/v3/rules.py가 같은 규칙을 정적 코드로 검사한다.
 # 근거: ATR test-corpora 공격 사례 1,139건 분류(data/v3/atr/atr_taxonomy.json)
 version: v3
 

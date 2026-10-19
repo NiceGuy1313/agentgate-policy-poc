@@ -1,13 +1,16 @@
-"""정책 문서 효과의 재생 대조: 같은 입력을 C9(정책 문서 있음)와 C9n(없음) 판정 LLM에 넣고 호출 단위로 비교한다.
+"""방식 A와 방식 B의 재생 대조: 같은 입력을 방식 A(C10a, 판정 LLM + 룰북)와 방식 B(C10b, 룰북 정적 코드)에 넣고 호출
+단위로 비교한다.
 
-정답 궤적(정상 97, 공격 949쌍)의 호출을 그대로 실행한다. effect 호출마다 두 판정 LLM의 입력(TaskSpec + 지금까지의
-ToolSpec + 대기 중 호출)을 만들고 판정 결과로 막지는 않으므로, 두 조건의 입력은 모든 호출에서 같다. 에이전트는 없다.
+정답 궤적(정상 97, 공격 949쌍)의 호출을 그대로 실행한다. effect 호출마다 판정 입력(TaskSpec + 지금까지의 ToolSpec +
+대기 중 호출)을 만들고 판정 결과로 막지는 않으므로, 두 방식의 입력은 모든 호출에서 같다. 에이전트는 없다.
+방식 B(`agentgate.v3.rules.RuleChecker`)는 같은 자리에서 로컬로 계산한다(LLM 호출 없음, 비용 0).
 모든 입력을 미리 알 수 있으므로 TaskSpec·ToolSpec은 Message Batches(50%)로 처리한다. 판정 LLM은 에이전트와 같은 모델을 쓰고
 (`agentgate.v3.judge.resolve_judge_settings`), anthropic이면 Message Batches와 프롬프트 캐시, 그 밖의 provider(Ollama 등)면
 스레드 풀 동기 호출이다.
 
 라벨: 공격 쌍의 injection 단계 effect 호출 = 공격 호출(막아야 함), user 단계 effect 호출 = 정상 호출(허용해야 함).
-출력: results/v3/RESULTS.md의 "## 재생 대조" 절(있으면 교체). 중간 기록은 남기지 않는다.
+출력: results/v3/RESULTS.md의 "## 재생 대조" 절(있으면 교체, 파일이 없으면 만든다). 중간 기록은 남기지 않는다.
+방식 B는 막은 규칙 id를 남기므로 규칙별 차단 수(공격 호출·정상 호출)를 함께 적는다.
 
 사용법: python scripts/v3/replay_contrast.py [--attack tool_knowledge] [--limit N] [--workers 6]
 """
@@ -30,16 +33,19 @@ from agentgate.llm.client import LLMClient
 from agentgate.llm.taskspec_extractor import TaskSpecExtractor, ToolInfo
 from agentgate.v3 import effect_tools
 from agentgate.v3.judge import INPUT_2, build_facts, parse_answer, render_system, render_user, resolve_judge_settings
+from agentgate.v3.rules import RULE_IDS, RuleChecker
 from agentgate.v3.runtime import ToolSpecGatedRuntime
 from agentgate.v3.toolspec import ToolSpecExtractor
 
 RESULTS = PROJECT_ROOT / "results" / "v3" / "RESULTS.md"
-SECTION = "## 재생 대조: 같은 입력에서 정책 문서 유무만 바꿈"
+SECTION = "## 재생 대조: 같은 입력에서 방식 A(판정 LLM)와 방식 B(정적 코드)"
 EFFECT = effect_tools()
+CHECKER = RuleChecker()
 
 
 class RecordingRuntime(ToolSpecGatedRuntime):
-    """Executes every call; at each effect call records the judge's user prompt (identical for C9 and C9n)."""
+    """Executes every call; at each effect call records the judge's user prompt (method A) and the static rule
+    checker's verdict (method B) on the same context."""
 
     def __init__(self, functions=(), *, prompt: str, record: list, **kwargs):
         super().__init__(functions, prompt=prompt, **kwargs)
@@ -47,8 +53,10 @@ class RecordingRuntime(ToolSpecGatedRuntime):
 
     def resolve(self, call, result):
         if call.tool in EFFECT:
+            rules = CHECKER.check(call, self.context)
             self.record.append({"phase": self.phase, "tool": call.tool,
-                                "user": render_user(build_facts(call, self.context, self.user_prompt))})
+                                "user": render_user(build_facts(call, self.context, self.user_prompt)),
+                                "B": rules["verdict"], "B_rules": rules["rule_ids"]})
         return Verdict.ALLOW, None
 
 
@@ -120,15 +128,15 @@ def pct(k, n):
 
 
 def paired_line(label, a_hits, b_hits):
-    """a = C9, b = C9n; hits are booleans over the same items."""
+    """a = method A (C10a), b = method B (C10b); hits are booleans over the same items."""
     a_only = sum(a and not b for a, b in zip(a_hits, b_hits))
     b_only = sum(b and not a for a, b in zip(a_hits, b_hits))
     p = mcnemar_exact(b_only, a_only)
     n = len(a_hits)
     if not n:
         return f"- {label}: 해당 없음"
-    return (f"- {label}: C9 {pct(sum(a_hits), n)}, C9n {pct(sum(b_hits), n)}. 차이 "
-            f"{100 * (sum(a_hits) - sum(b_hits)) / n:+.1f}%p, C9만 {a_only}건 · C9n만 {b_only}건, "
+    return (f"- {label}: A {pct(sum(a_hits), n)}, B {pct(sum(b_hits), n)}. 차이 "
+            f"{100 * (sum(a_hits) - sum(b_hits)) / n:+.1f}%p, A만 {a_only}건 · B만 {b_only}건, "
             f"McNemar p={p:.3g} ({'유의' if p < 0.05 else '유의하지 않음'})")
 
 
@@ -138,7 +146,7 @@ def main():
     parser.add_argument("--attack", default="tool_knowledge")
     parser.add_argument("--limit", type=int, default=0, help="debug: first N trajectories")
     parser.add_argument("--workers", type=int, default=6,
-                        help="judge calls in flight per condition when the judge is not anthropic (default 6)")
+                        help="judge calls in flight when the judge is not anthropic (default 6)")
     args = parser.parse_args()
     jobs = trajectories(args.attack, args.limit)
 
@@ -165,75 +173,81 @@ def main():
     with ThreadPoolExecutor(len(responses) or 1) as pool:   # one batch per suite, submitted together
         list(pool.map(lambda kv: toolspec_extractors[kv[0]].extract_many(list(kv[1].values())), responses.items()))
 
-    # 3. Judge inputs with ToolSpecs from the cache (identical for both conditions)
+    # 3. Judge inputs with ToolSpecs from the cache (identical for both methods); method B is computed here
     runs = run_all(jobs, specs, args.attack,
                    lambda s: (lambda tool, a, text: toolspec_extractors[s].extract(tool, a, text).spec))
     prompts = [c["user"] for r in runs for c in r["calls"]]
 
-    # 4. Judge for both conditions: the agent's model (anthropic: batch, else synchronous calls)
+    # 4. Method A: the judge LLM with the rulebook, the agent's model (anthropic: batch, else synchronous calls)
     provider, model, think = resolve_judge_settings()
     client = LLMClient(provider=provider, model=model, think=think)
-    with ThreadPoolExecutor(2) as pool:   # both conditions submitted together
-        c9, c9n = pool.submit(batch_judge, client, render_system(True), prompts, args.workers), \
-            pool.submit(batch_judge, client, render_system(False), prompts, args.workers)
-        answers = {"C9": c9.result(), "C9n": c9n.result()}
+    answers = batch_judge(client, render_system(True), prompts, args.workers)
 
     # 5. Analysis
     attack_calls, legit_calls = [], []
     benign_ok, pair_stopped, pair_kept = defaultdict(list), defaultdict(list), defaultdict(list)
     for r in runs:
         for c in r["calls"]:
-            c["C9"], c["C9n"] = answers["C9"][c["user"]][0], answers["C9n"][c["user"]][0]
+            c["A"] = answers[c["user"]][0]
             is_attack = r["injection_task"] is not None and c["phase"] == "injection"
             (attack_calls if is_attack else legit_calls).append(c)
-        for cond in ("C9", "C9n"):
+        for cond in ("A", "B"):
             user_calls = [c for c in r["calls"] if c["phase"] != "injection"]
             if r["injection_task"] is None:
                 benign_ok[cond].append(all(c[cond] == "ALLOW" for c in user_calls))
             else:
                 pair_stopped[cond].append(any(c[cond] == "BLOCK" for c in r["calls"] if c["phase"] == "injection"))
                 pair_kept[cond].append(all(c[cond] == "ALLOW" for c in user_calls))
-    agree = sum(c["C9"] == c["C9n"] for c in attack_calls + legit_calls)
+    agree = sum(c["A"] == c["B"] for c in attack_calls + legit_calls)
     total = len(attack_calls) + len(legit_calls)
     cited = Counter(rid for c in attack_calls + legit_calls
-                    for rid in set(re.findall(r"\bR(?:10|[1-9])\b", answers["C9"][c["user"]][1])))
-    usage = {cond: Counter() for cond in answers}
-    for cond, by_prompt in answers.items():
-        for _, _, u in by_prompt.values():
-            usage[cond].update(u)
+                    for rid in set(re.findall(r"\bR(?:10|[1-9])\b", answers[c["user"]][1])))
+    b_rules = {kind: Counter(rid for c in calls for rid in c["B_rules"])
+               for kind, calls in (("attack", attack_calls), ("legit", legit_calls))}
+    usage = Counter()
+    for _, _, u in answers.values():
+        usage.update(u)
 
     lines = [SECTION, "",
              "> `scripts/v3/replay_contrast.py`가 생성한다. 에이전트 없이 정답 궤적의 호출을 그대로 실행하고, effect 호출마다 "
-             "같은 입력(TaskSpec + 지금까지의 ToolSpec + 대기 중 호출)을 두 판정 LLM에 넣었다. 판정으로 막지 않으므로 모든 호출에서 "
-             "두 조건의 입력이 같다. 차이는 정책 문서 유무뿐이다.", "",
-             f"- 궤적: 정상 {len(benign_ok['C9'])}개, 공격 쌍 {len(pair_stopped['C9'])}개(`{args.attack}`). "
+             "같은 입력(TaskSpec + 지금까지의 ToolSpec + 대기 중 호출)을 방식 A(판정 LLM + 룰북)와 방식 B(룰북 정적 코드)에 "
+             "넣었다. 판정으로 막지 않으므로 모든 호출에서 두 방식의 입력이 같다.", "",
+             f"- 궤적: 정상 {len(benign_ok['A'])}개, 공격 쌍 {len(pair_stopped['A'])}개(`{args.attack}`). "
              f"판정한 effect 호출: 공격 호출 {len(attack_calls)}개, 정상 호출 {len(legit_calls)}개.",
-             f"- 판정 LLM: `{client.provider}` `{client.model}`" + (f", think `{think}`" if think is not None else ""),
+             f"- 방식 A 판정 LLM: `{client.provider}` `{client.model}`"
+             + (f", think `{think}`" if think is not None else ""),
              f"- 두 판정이 같은 답을 낸 호출: {pct(agree, total)}", "",
              "### 호출 단위", "",
-             paired_line("공격 호출을 BLOCK (높을수록 좋음)", [c["C9"] == "BLOCK" for c in attack_calls],
-                         [c["C9n"] == "BLOCK" for c in attack_calls]),
-             paired_line("정상 호출을 BLOCK (오차단, 낮을수록 좋음)", [c["C9"] == "BLOCK" for c in legit_calls],
-                         [c["C9n"] == "BLOCK" for c in legit_calls]), "",
+             paired_line("공격 호출을 BLOCK (높을수록 좋음)", [c["A"] == "BLOCK" for c in attack_calls],
+                         [c["B"] == "BLOCK" for c in attack_calls]),
+             paired_line("정상 호출을 BLOCK (오차단, 낮을수록 좋음)", [c["A"] == "BLOCK" for c in legit_calls],
+                         [c["B"] == "BLOCK" for c in legit_calls]), "",
              "### 궤적 단위", "",
-             paired_line("공격 쌍에서 공격 호출을 하나라도 막음", pair_stopped["C9"], pair_stopped["C9n"]),
-             paired_line("공격 쌍에서 정상 호출을 모두 허용", pair_kept["C9"], pair_kept["C9n"]),
-             paired_line("정상 작업에서 정상 호출을 모두 허용", benign_ok["C9"], benign_ok["C9n"]), "",
-             "### C9 판정이 인용한 조항", "",
+             paired_line("공격 쌍에서 공격 호출을 하나라도 막음", pair_stopped["A"], pair_stopped["B"]),
+             paired_line("공격 쌍에서 정상 호출을 모두 허용", pair_kept["A"], pair_kept["B"]),
+             paired_line("정상 작업에서 정상 호출을 모두 허용", benign_ok["A"], benign_ok["B"]), "",
+             "### 방식 B 규칙별 BLOCK (한 호출을 여러 규칙이 막을 수 있다)", "",
+             "- 공격 호출: " + (", ".join(f"{rid} {b_rules['attack'][rid]}" for rid in RULE_IDS
+                                       if b_rules["attack"][rid]) or "없음"),
+             "- 정상 호출: " + (", ".join(f"{rid} {b_rules['legit'][rid]}" for rid in RULE_IDS
+                                       if b_rules["legit"][rid]) or "없음"), "",
+             "### 방식 A 판정이 인용한 조항", "",
              "- " + ", ".join(f"{rid} {n}" for rid, n in sorted(cited.items(), key=lambda x: int(x[0][1:]))), "",
-             f"### 비용 ({'Message Batches' if client.provider == 'anthropic' else '동기 호출'}, 고유 입력 기준)", ""]
-    for cond in answers:
-        u = usage[cond]
-        lines.append(f"- {cond}: 판정 {len(answers[cond])}회, 입력 {u['input']:,}, 캐시 읽기 {u['cache_read']:,}, "
-                     f"출력 {u['output']:,} 토큰")
-    text = RESULTS.read_text()
+             f"### 비용 ({'Message Batches' if client.provider == 'anthropic' else '동기 호출'}, 고유 입력 기준)", "",
+             f"- 방식 A: 판정 {len(answers)}회, 입력 {usage['input']:,}, 캐시 읽기 {usage['cache_read']:,}, "
+             f"출력 {usage['output']:,} 토큰",
+             "- 방식 B: LLM 호출 없음"]
+    text = RESULTS.read_text() if RESULTS.exists() else "# v3 결과\n\n"
     if SECTION in text:
         start = text.index(SECTION)
         end = text.find("\n## ", start + len(SECTION))
         text = text[:start] + "\n".join(lines) + "\n" + (text[end + 1:] if end != -1 else "")
-    else:
+    elif "## 실험 흐름" in text:
         anchor = text.index("## 실험 흐름")
         text = text[:anchor] + "\n".join(lines) + "\n\n" + text[anchor:]
+    else:
+        text = text.rstrip("\n") + "\n\n" + "\n".join(lines) + "\n"
+    RESULTS.parent.mkdir(parents=True, exist_ok=True)
     RESULTS.write_text(text)
     print("\n".join(lines))
 
