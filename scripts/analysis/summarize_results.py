@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -151,7 +152,7 @@ def main():
 
     lines = ["# 결과: Gate 없음 / 판정 LLM + 룰북 / 룰북 정적 코드", "",
              "> `scripts/analysis/summarize_results.py`가 live 실행 기록에서 생성한다. 손으로 고치지 않는다. "
-             "실행 기록(json)은 요약 후 지웠다.", "",
+             "실행 기록(json)은 요약 후 지웠고, 집계 JSON은 `results/summary/`에 남겼다.", "",
              "## 한눈에 보기", "",
              f"- 공격 성공률(ASR): Gate 없음 {rate(BASELINE, 'ASR')}, 판정 LLM {rate(LLM_JUDGE, 'ASR')}, "
              f"룰북 정적 코드 {rate(STATIC_RULES, 'ASR')}.",
@@ -173,6 +174,14 @@ def main():
     for c in conditions:
         cells = [f"{100 * sig(c, m)['rate']:.1f}% ({sig(c, m)['k']}/{sig(c, m)['n']})" for m in METRICS]
         lines.append(f"| {c} {NAMES[c]} | " + " | ".join(cells) + " |")
+    figures = [("main_metrics.png", "조건별 핵심 지표(95% Wilson 신뢰구간)"), ("tradeoff.png", "보안-유용성 trade-off"),
+               ("by_suite.png", "suite별 ASR·정상 Utility"), ("rules.png", "판정 규칙별 BLOCK 수(공격 실행·정상 실행)"),
+               ("replay_contrast.png", "재생 대조: 같은 입력에서 호출 단위 차단률")]
+    shown = [(name, title) for name, title in figures if (RESULTS_DIR / "figures" / name).exists()]
+    if shown:
+        lines += ["", "그림은 `scripts/analysis/make_figures.py`가 같은 실행 기록에서 만든다.", ""]
+        for name, title in shown:
+            lines += [f"**{title}**", "", f"![{title}](figures/{name})", ""]
     lines += ["", "같은 (사용자 작업, 공격) 짝끼리 비교했다. 차이는 앞 조건 − 뒤 조건, p는 exact McNemar다.", ""]
     for c in conditions[1:]:
         lines.append(f"**{c} − {BASELINE}** ({NAMES[c]} 대 Gate 없음)")
@@ -187,9 +196,10 @@ def main():
     for c in conditions[1:]:
         judges = [j for r in runs if r["condition"] == c for e in r["trace"] if (j := e.get("judge"))]
         finals = Counter(j["final"] for j in judges)
-        rules = Counter(rid for j in judges for rid in j.get("rule_ids") or [])
+        rules = Counter(rid for j in judges if j.get("final") == "BLOCK"
+                        for rid in (j.get("rule_ids") or sorted(set(re.findall(r"\bR(?:10|[1-9])\b", j.get("text") or "")))))
         lines.append(f"- **{c}**: effect 호출 {len(judges)}회 판정, ALLOW {finals.get('ALLOW', 0)}, "
-                     f"BLOCK {finals.get('BLOCK', 0)}" + ("; 규칙별 BLOCK " + ", ".join(
+                     f"BLOCK {finals.get('BLOCK', 0)}" + ("; BLOCK 근거 규칙 " + ", ".join(
                          f"{rid} {n}" for rid, n in sorted(rules.items())) if rules else ""))
     lines += ["", "### 정상 작업이 실패한 이유", "", "공격 없는 실행 중 실패한 것을 나눴다. "
               "\"차단 없이 실패\"는 에이전트가 스스로 작업을 끝내지 못한 경우다.", ""]
@@ -235,8 +245,27 @@ def main():
     lines.append(f"- 집행 무결성: 실행 {enforcement.get('runs', 0):,}건, 차단된 호출이 실행된 위반 "
                  f"{enforcement.get('violations', '-')}건, 오류 {summary.get('n_errors', '-')}건, "
                  f"무효(Gate 우회) {summary.get('n_invalid', '-')}건")
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text("\n".join(lines) + "\n")
+    out_path = Path(args.out)
+    # sections written elsewhere survive regeneration: "## 분석" (hand-written from these numbers) goes after the
+    # summary, "## 재생 대조" (scripts/evaluation/replay_contrast.py) stays at the end
+    old = out_path.read_text() if out_path.exists() else ""
+
+    def section(title: str) -> str:
+        marker = "\n" + title
+        if marker not in old:
+            return ""
+        start = old.index(marker) + 1
+        end = old.find("\n## ", start + len(title))
+        return (old[start:] if end == -1 else old[start:end + 1]).rstrip() + "\n"
+    analysis, contrast = section("## 분석"), section("## 재생 대조")
+    text = "\n".join(lines) + "\n"
+    if analysis:
+        anchor = "## 실험 흐름"
+        text = text.replace(anchor, analysis + "\n" + anchor, 1)
+    if contrast:
+        text += "\n" + contrast
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(text)
     print(f"wrote {args.out}")
 
 

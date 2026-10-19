@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from agentgate import SUITES
 from agentgate.config import PROJECT_ROOT, load_dotenv
@@ -157,6 +159,7 @@ def main():
     parser.add_argument("--limit", type=int, default=0, help="debug: first N trajectories")
     parser.add_argument("--workers", type=int, default=6,
                         help="judge calls in flight when the judge is not anthropic (default 6)")
+    parser.add_argument("--json", default=None, help="also write per-call block counts as JSON (for make_figures.py)")
     args = parser.parse_args()
     jobs = trajectories(args.attack, args.limit)
 
@@ -218,6 +221,18 @@ def main():
     for _, _, u, _ in answers.values():
         usage.update(u)
     unparsed = Counter(reason for _, _, _, reason in answers.values() if reason)
+
+    if args.json:   # counts for scripts/analysis/make_figures.py ("llm" = A, "rules" = B)
+        def block_count(calls, key):
+            return [sum(c[key] == "BLOCK" for c in calls), len(calls)]
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps({
+            "attack": args.attack, "judge_model": f"{client.provider}:{client.model}",
+            "llm": {"attack_block": block_count(attack_calls, "A"), "legit_block": block_count(legit_calls, "A")},
+            "rules": {"attack_block": block_count(attack_calls, "B"), "legit_block": block_count(legit_calls, "B")},
+            "agree": [agree, total], "unparsed": sum(unparsed.values()),
+            "rules_attack": dict(b_rules["attack"]), "rules_legit": dict(b_rules["legit"]),
+            "llm_cited": dict(cited)}, indent=1))
 
     lines = [SECTION, "",
              "> `scripts/evaluation/replay_contrast.py`가 생성한다. 에이전트 없이 정답 궤적의 호출을 그대로 실행하고, effect 호출마다 "

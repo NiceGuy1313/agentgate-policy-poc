@@ -47,3 +47,4 @@ data/cache/
 # Stray logs from local runs
 *.log
 nohup.out
+results/runs/

@@ -1,0 +1,39 @@
+{
+ "args": {
+  "framework": "native",
+  "conditions": [
+   "no_gate",
+   "gate_static_rules",
+   "gate_llm_judge"
+  ],
+  "model": "ollama:gpt-oss:120b",
+  "agent": "llm",
+  "suites": [
+   "workspace",
+   "travel",
+   "banking",
+   "slack"
+  ],
+  "user_tasks": null,
+  "injection_tasks": null,
+  "attack": "tool_knowledge",
+  "attack_model_name": null,
+  "spec": "llm",
+  "on_block": "continue",
+  "no_benign": false,
+  "pilot": false,
+  "sample": 0,
+  "seed": 0,
+  "pairs": null,
+  "framework_options": "{}",
+  "max_steps": null,
+  "spec_cache_dir": null,
+  "workers": 8,
+  "out": "results/runs/full"
+ },
+ "jobs": 3138,
+ "status": {
+  "ok": 3138
+ },
+ "elapsed_s": 7600.1
+}
