@@ -1,4 +1,4 @@
-"""Harness pieces without a framework: tool schema flattening, boundary-log parsing, model specs, registry."""
+"""프레임워크 없는 harness 부품 테스트: 툴 schema 평면화, 경계 로그 해석, 모델 지정, registry."""
 
 import logging
 

@@ -1,4 +1,4 @@
-"""TaskSpec: 사용자가 실제로 요청한 범위를 표현한다(docs/policy_spec.md 3절)."""
+"""TaskSpec: 사용자가 실제로 요청한 범위를 표현한다(docs/rulebook.md 3절)."""
 
 from __future__ import annotations
 

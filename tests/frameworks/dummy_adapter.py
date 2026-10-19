@@ -1,4 +1,4 @@
-"""A minimal third-party-style adapter used by the registry and conformance tests."""
+"""registry·conformance 테스트용 최소 외부 어댑터(제3자 패키지 형태)."""
 
 from agentgate.adapters.base import FrameworkAdapter, FrameworkResult
 

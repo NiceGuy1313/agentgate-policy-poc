@@ -1,17 +1,16 @@
-"""Conformance kit: does a framework adapter / Wrapper put every tool call through the gate correctly?
+"""적합성 검사(conformance kit): 프레임워크 어댑터나 Wrapper가 모든 툴 호출을 Gate에 올바르게 통과시키는지 확인한다.
 
-LLM-free and network-free: the ToolSpec extractor is replaced by an empty one (`offline_toolspec`), and each framework
-is driven by the scripted fake LLM (`fake_llm.FakeLLMServer`) through its real model path; the reference is the native
-AgentDojo pipeline with `ScriptedAgent` (`run_live_task`). For each pair and condition the check requires:
-  - the adapter declares the mandatory gate (`FrameworkAdapter.contract_problems` is empty);
-  - same gate trace as the reference (tool, effective verdict, blocked) and same utility / security;
-  - no blocked call executed, environment unchanged across blocked calls (check_enforcement.check_run);
-  - a valid run: no ungated tool executions (boundary-log audit and the runtime's refused executions); event order
-    tool_start -> gate_decision -> tool_end where tool_start is logged (or the decisions sit inside a
-    framework-internal dispatcher such as mini-swe-agent's `bash`).
+LLM·네트워크 없이 돈다. ToolSpec 추출기는 빈 것으로 바꾸고(`offline_toolspec`), 각 프레임워크는 실제 모델 경로로
+대본형 가짜 LLM(`fake_llm.FakeLLMServer`)에 붙여 구동한다. 기준은 `ScriptedAgent`를 쓴 native AgentDojo
+pipeline(`run_live_task`)이다. 쌍·조건마다 다음을 요구한다.
+  - 어댑터가 의무 Gate를 선언한다(`FrameworkAdapter.contract_problems`가 비어 있음).
+  - Gate trace(툴, 최종 판정, 차단 여부)와 utility·security가 기준과 같다.
+  - 차단된 호출이 실행되지 않고 차단 전후 환경이 같다(check_enforcement.check_run).
+  - 유효한 run이다: Gate 밖 툴 실행이 없다(경계 로그 감사, 런타임이 거부한 실행). tool_start가 기록되면 이벤트 순서가
+    tool_start -> gate_decision -> tool_end이다(mini-swe-agent `bash` 같은 프레임워크 내부 dispatcher 안의 판정은 예외).
 
   python -m agentgate.harness.conformance --framework smolagents --condition gate_static_rules
-  python -m agentgate.harness.conformance --entry "python path/to/wrapper.py"     # an unregistered Wrapper
+  python -m agentgate.harness.conformance --entry "python path/to/wrapper.py"     # 등록하지 않은 Wrapper
 """
 
 from __future__ import annotations

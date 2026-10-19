@@ -1,6 +1,6 @@
-"""Any Wrapper that follows contract v1: launched as a process, talks to the gate over HTTP.
+"""contract v1 Wrapper 어댑터: Wrapper를 프로세스로 실행하고 Gate와 HTTP로 통신하게 한다.
 
-Registered in config/frameworks.yaml with a `contract:` entry; no Python adapter needed.
+config/frameworks.yaml의 `contract:` 항목으로 등록하며 Python 어댑터가 필요 없다.
 """
 
 from __future__ import annotations

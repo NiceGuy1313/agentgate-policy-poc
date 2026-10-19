@@ -1,4 +1,8 @@
-"""The only door an agent framework uses to reach AgentDojo tools: every call goes through the gate."""
+"""에이전트 프레임워크가 AgentDojo 툴에 닿는 유일한 문(`GateToolBridge`): 모든 호출이 Gate를 지난다.
+
+입력은 툴 이름과 인자, 출력은 에이전트가 받을 문자열(차단되면 차단 메시지)이다. 판정은 `gate_decision` 이벤트로
+남기고, 프레임워크 경계 로그와 대조해 Gate를 거치지 않은 실행(`ungated_calls`)을 찾는다.
+"""
 
 from __future__ import annotations
 

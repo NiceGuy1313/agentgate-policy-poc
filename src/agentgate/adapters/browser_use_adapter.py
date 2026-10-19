@@ -1,12 +1,10 @@
-"""browser-use (NiceGuy1313 fork with boundary logs): AgentDojo tools as browser-use custom actions.
+"""browser-use 어댑터(NiceGuy1313 fork, 경계 로그 포함): AgentDojo 툴을 browser-use 커스텀 액션으로 등록한다.
 
-The browser actions are excluded (AgentDojo tasks never need the web); only `done` stays. Each AgentDojo tool is
-registered as an action whose function calls `GateToolBridge.invoke`, so the fork's `Registry.execute_action`
-boundary log wraps the gate decision: tool_start -> gate_decision -> tool_end. The Agent still needs a
-BrowserSession; it runs a headless Chrome on about:blank. Step results come from the `on_step_end` hook.
-
-browser-use pins `anthropic`/`openai` versions that conflict with agentgate's, so it runs in its own venv
-(`python:` in config/frameworks.yaml; see README).
+브라우저 액션은 빼고 `done`과 browser-use 자체 파일 동작(`FILE_ACTIONS`)만 남긴다. 각 액션 함수는
+`GateToolBridge.invoke`를 부르므로 fork의 `Registry.execute_action` 경계 로그가 tool_start -> gate_decision -> tool_end
+순서로 Gate 판정을 감싼다. Agent에 BrowserSession이 필요해 headless Chrome(about:blank)을 띄운다. 단계 결과는
+`on_step_end` hook에서 얻는다. browser-use는 `anthropic`·`openai` 버전이 agentgate와 충돌하므로 별도 venv에서
+돈다(config/frameworks.yaml의 `python:`, README 참조).
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Every registered framework must gate every tool call like the native pipeline does (LLM-free, no network)."""
+"""등록된 모든 프레임워크가 native pipeline과 같이 모든 툴 호출을 Gate에 통과시키는지 검사한다(LLM·네트워크 없음)."""
 
 import pytest
 

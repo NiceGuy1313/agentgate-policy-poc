@@ -1,14 +1,13 @@
-"""AgentDojo scenario runs: (condition, suite, user task, injection task) jobs with any registered framework.
+"""AgentDojo 시나리오 실행기: (조건, suite, 사용자 작업, injection task) 작업을 등록된 프레임워크로 실행한다.
 
-The CLI is `python -m agentgate.scenarios.run` (scripts/evaluation/live_evaluation.py is a thin wrapper of it).
-One record per run: <out>/<condition>/<suite>/<user_task>/<injection_task|none>.json, in the schema check_enforcement /
-summarize_live read; `summarize` writes <out>/scenario_summary.json. A run whose tools bypassed the policy gate is
-invalid (`valid: false`) and its scores are excluded from the summary. LLM caches (TaskSpec, ToolSpec, judge) stay
-under data/cache/.
+CLI는 `python -m agentgate.scenarios.run`이다(scripts/evaluation/live_evaluation.py는 그 얇은 wrapper다). run마다
+레코드 하나(<out>/<condition>/<suite>/<user_task>/<injection_task|none>.json)를 check_enforcement / summarize_live가
+읽는 스키마로 쓰고, `summarize`가 <out>/scenario_summary.json을 쓴다. 정책 Gate를 우회한 툴 실행이 있는 run은
+무효(`valid: false`)이고 점수는 요약에서 빠진다. LLM 캐시(TaskSpec, ToolSpec, 판정)는 data/cache/에 둔다.
 
-  framework native  AgentDojo's pipeline on a GatedRuntime (`run_live_task`), the reference path
-  other frameworks  agentgate.harness (`GateToolBridge` -> `Session.invoke` -> `PolicyGateRuntime.run_function`)
-Every framework runs under every condition (`agentgate.experiment.conditions`).
+  framework native   GatedRuntime 위의 AgentDojo pipeline(`run_live_task`), 기준 경로
+  그 밖의 framework  agentgate.harness(`GateToolBridge` -> `Session.invoke` -> `PolicyGateRuntime.run_function`)
+모든 프레임워크는 모든 조건(`agentgate.experiment.conditions`)에서 돈다.
 """
 
 from __future__ import annotations
@@ -121,6 +120,11 @@ def run_framework_one(job: dict, output_path: Path) -> str:
 
 
 _QUOTA_EXHAUSTED = threading.Event()
+
+
+def reset_quota_flag() -> None:
+    """사용량 한도 표시를 지운다. 앞선 실행에서 걸린 한도가 다음 실행(대시보드)을 막지 않게 한다."""
+    _QUOTA_EXHAUSTED.clear()
 
 
 def _is_quota_error(error: str | None) -> bool:

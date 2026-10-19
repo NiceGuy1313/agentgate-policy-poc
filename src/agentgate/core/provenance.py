@@ -46,7 +46,7 @@ class IndexedSource:
     is_trusted: bool = False
     sensitive_categories: list[str] = field(default_factory=list)
     kgram_hashes: set[int] | None = None                  # computed lazily by find_overlapping_sources
-    record_texts: list[str] | None = None                 # per-record strings for list-shaped responses (P3)
+    record_texts: list[str] | None = None                 # per-record strings for list-shaped responses (R4 bulk egress)
     exact_values: set[str] = field(default_factory=set)   # normalized exact string fields (short IDs)
     labels: dict[str, Any] = field(default_factory=dict)  # labels (ToolSpec)
 
@@ -172,7 +172,7 @@ class ValueIndex:
         """PROMPT > ALLOWED_DEST > SELF > TRUSTED_TOOL > NAMED_SOURCE > OTHER_TOOL > UNSEEN.
 
         A value is judged by its most trusted occurrence; the evidence step is the first
-        occurrence of that category (docs/architecture.md, section 5).
+        occurrence of that category (docs/architecture.md, section 8).
         """
         normalized_value = normalize_value(value)
         if normalized_value in self.self_identifiers:

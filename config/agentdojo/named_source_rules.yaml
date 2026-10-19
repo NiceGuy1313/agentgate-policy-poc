@@ -22,8 +22,8 @@ by_argument:
   get_flight_information: [departure_city, arrival_city]
 
 # Directory-style tools describing the user's own account or address book. Values found here
-# get origin TRUSTED_TOOL (treated like PROMPT by P1). This is an addition to the 4 origin
-# categories; see docs/architecture.md section 3. Every entry must be verified not to
+# get origin TRUSTED_TOOL (a grounded origin like PROMPT, rulebook R3). This is an addition to the 4 origin
+# categories; see docs/rulebook.md section 6. Every entry must be verified not to
 # carry injection vectors (tests/test_config_consistency.py checks this with canary
 # injections). get_channels was removed for that reason: slack channel names are an
 # injection vector (prompt_injection_channel).

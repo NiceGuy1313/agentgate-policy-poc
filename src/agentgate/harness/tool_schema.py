@@ -1,4 +1,4 @@
-"""AgentDojo tool parameters (pydantic JSON schema) -> flat per-argument descriptions, shared by adapters."""
+"""AgentDojo 툴 인자(pydantic JSON schema)를 인자별 평면 설명으로 바꾼다. 어댑터들이 함께 쓴다."""
 
 from __future__ import annotations
 

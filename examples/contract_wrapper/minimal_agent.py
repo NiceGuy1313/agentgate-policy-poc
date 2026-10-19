@@ -1,11 +1,11 @@
-"""Reference Wrapper for agentgate contract v1: a minimal OpenAI-compatible tool-calling agent.
+"""contract v1 참조 Wrapper: 표준 라이브러리만 쓰는 최소 OpenAI 호환 tool-calling 에이전트.
 
-Standard library only. Shows the five contract points a framework Wrapper implements:
-  1. tool injection   gate.tools() -> the agent's tool list
-  2. execution hook   gate.invoke(name, args) at the tool execution point (block message comes back as the result)
-  3. model            AGENTGATE_MODEL (OpenAI-compatible base_url + key), no hard-coded provider
-  4. entry point      started by agentgate with AGENTGATE_* environment variables
-  5. events           gate.event(...) mirrors the boundary logs (llm_query, llm_response, tool_start, tool_end)
+Wrapper가 구현할 규약 다섯 가지를 보여 준다.
+  1. 툴 주입     gate.tools() -> 에이전트 툴 목록
+  2. 실행 hook   툴 실행 지점에서 gate.invoke(name, args) (차단 메시지도 툴 결과로 돌아온다)
+  3. 모델        AGENTGATE_MODEL(OpenAI 호환 base_url + 키), 제공자를 고정하지 않는다
+  4. 진입점      agentgate가 AGENTGATE_* 환경 변수로 실행한다
+  5. 이벤트      gate.event(...)로 경계 로그(llm_query, llm_response, tool_start, tool_end)를 보낸다
 """
 
 from __future__ import annotations

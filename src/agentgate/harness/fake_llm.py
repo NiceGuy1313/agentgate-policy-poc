@@ -1,14 +1,13 @@
-"""LLM-free OpenAI-compatible chat endpoint that drives any framework with a scripted trajectory.
+"""LLM 없는 OpenAI 호환 chat endpoint: 대본 궤적으로 임의의 프레임워크를 구동한다(conformance용).
 
-It plays the same role as `agentgate.agents.scripted_agent.ScriptedAgent`, but at the model API, so the
-framework's real model path (LiteLLM, OpenAI SDK, a Wrapper's own client) is exercised:
-  - follows the user task's ground truth, one tool call per response;
-  - once a tool result in the conversation contains the injection marker, inserts the injection task's calls
-    (planned on the session's current environment, `plan_attack_calls`), then resumes;
-  - continues after a policy block; finally answers with the ground-truth output(s).
-If the request offers a `final_answer` tool (smolagents), the answer is given as that tool call. A request whose only
-tool is `bash` (mini-swe-agent) gets gated-shell commands; one with an AgentOutput JSON schema (browser-use) gets
-the actions as structured JSON content.
+`agentgate.agents.scripted_agent.ScriptedAgent`와 같은 역할을 모델 API 수준에서 해, 프레임워크의 실제 모델 경로
+(LiteLLM, OpenAI SDK, Wrapper 자체 client)를 지나게 한다.
+  - 사용자 작업의 ground truth를 따르고 응답마다 툴 호출 하나를 낸다.
+  - 대화 속 툴 결과에 인젝션 표지가 나오면 injection task의 호출(session의 현재 환경으로 계획, `plan_attack_calls`)을
+    끼워 넣은 뒤 이어 간다.
+  - 정책 차단 뒤에도 계속하고, 끝에 ground truth 출력으로 답한다.
+요청에 `final_answer` 툴이 있으면(smolagents) 그 툴 호출로 답한다. 툴이 `bash` 하나뿐인 요청(mini-swe-agent)에는 gated
+shell 명령을, AgentOutput JSON schema가 있는 요청(browser-use)에는 액션을 구조화 JSON content로 준다.
 """
 
 from __future__ import annotations

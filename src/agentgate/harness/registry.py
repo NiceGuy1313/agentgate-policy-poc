@@ -1,14 +1,14 @@
-"""Framework adapter registry: built-ins, `config/frameworks.yaml`, and `agentgate.frameworks` entry points.
+"""프레임워크 어댑터 등록부: 내장 어댑터, `config/frameworks.yaml`, `agentgate.frameworks` entry point를 모은다.
 
 config/frameworks.yaml
   frameworks:
     <name>:
-      adapter: package.module:Class          # a Python adapter, or
-      contract:                              # a Wrapper that follows contract v1 (docs/architecture.md)
+      adapter: package.module:Class          # Python 어댑터, 또는
+      contract:                              # 규약 v1을 따르는 Wrapper(docs/integration_guide.md)
         command: [python, path/to/wrapper.py]
-        cwd: path                            # optional
-      python: /path/to/venv/bin/python       # optional: run in a subprocess worker with this interpreter
-      display_name / description            # optional
+        cwd: path                            # 선택
+      python: /path/to/venv/bin/python       # 선택: 이 인터프리터의 subprocess worker에서 실행
+      display_name / description            # 선택
 """
 
 from __future__ import annotations

@@ -1,16 +1,14 @@
-"""agentgate dashboard: choose an agent framework, a model and a verification method, press run, read the result.
+"""agentgate 대시보드: 에이전트 프레임워크·모델·검증 방식을 골라 실행하고 결과를 본다.
 
-There is no scenario selection. A run executes the fixed pilot set of `agentgate.scenarios.runner` (`PILOT`: banking,
-4 user tasks x 3 injection tasks plus the 4 benign runs, attack `tool_knowledge`) under each chosen condition, with
-`runner.run_jobs` in a background thread. The page polls `GET /api/runs/{id}` for progress (n/total), then shows the
-aggregate (`runner.summarize`: utility, ASR, utility under attack, blocked calls) and a per-scenario table whose rows
-expand to the per-call gate verdicts.
+시나리오 선택은 없다. `agentgate.scenarios.runner`의 고정 파일럿 세트(`PILOT`: banking, 사용자 작업 4 x injection task 3과
+공격 없는 run 4개, 공격 `tool_knowledge`)를 고른 조건마다 `runner.run_jobs`로 background thread에서 돌린다. 페이지는
+`GET /api/runs/{id}`로 진행(n/total)을 polling한 뒤 집계(`runner.summarize`: utility, ASR, 공격 하 utility, 차단 호출)와
+시나리오별 표(행을 펼치면 호출별 Gate 판정)를 보여 준다.
 
     uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
 
-Each run writes `dashboard/runs/<id>/` (git-ignored): meta.json, scenario_summary.json and one record per scenario in
-the runner's layout (<condition>/<suite>/<user_task>/<injection_task|none>.json). Runs are for inspection only; report
-numbers come from scripts/evaluation/live_evaluation.py.
+실행마다 `dashboard/runs/<id>/`(git 제외)에 meta.json, scenario_summary.json, 시나리오별 레코드(runner와 같은 배치)를
+쓴다. 실행 기록은 확인용이며 보고서 수치는 scripts/evaluation/live_evaluation.py 출력에서만 가져온다.
 """
 
 from __future__ import annotations
@@ -242,9 +240,7 @@ lock = threading.Lock()
 def _execute(run: Run) -> None:
     try:
         runner.set_agent_model(run.model)       # the native pipeline builds its agent from AGENTGATE_AGENT_*
-        quota = getattr(runner, "_QUOTA_EXHAUSTED", None)
-        if quota is not None:
-            quota.clear()                       # a usage limit hit by an earlier run must not stop this one
+        runner.reset_quota_flag()               # a usage limit hit by an earlier run must not stop this one
         run.counts = runner.run_jobs(run.jobs, WORKERS)
         status = "finished"
     except Exception as error:

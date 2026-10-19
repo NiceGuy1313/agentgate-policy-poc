@@ -1,10 +1,9 @@
-"""mini-swe-agent (NiceGuy1313 fork with boundary logs): AgentDojo tools as commands of a gated shell.
+"""mini-swe-agent 어댑터(NiceGuy1313 fork, 경계 로그 포함): AgentDojo 툴을 gated shell의 명령으로 바꾼다.
 
-mini-swe-agent has one tool, `bash`. The adapter keeps that interface and swaps the environment: `GatedShell`
-runs no real shell; each command line is an AgentDojo tool call (`send_money '{"recipient": "...", ...}'`) that
-goes through `GateToolBridge.invoke`, and `submit <answer>` ends the task. The fork's `DefaultAgent.execute_action`
-boundary log wraps every command: tool_start(bash) -> gate_decision(s) -> tool_end(bash).
-Step results come from `add_messages`, as in the fork's dashboard (examples/agent_dashboard/app.py).
+mini-swe-agent의 툴은 `bash` 하나이므로 인터페이스는 두고 환경만 바꾼다. `GatedShell`은 실제 셸을 실행하지 않고,
+명령 한 줄(`send_money '{"recipient": "...", ...}'`)을 AgentDojo 툴 호출 하나로 보아 `GateToolBridge.invoke`로 보낸다.
+`submit <answer>`로 작업을 끝낸다. fork의 `DefaultAgent.execute_action` 경계 로그가 명령마다
+tool_start(bash) -> gate_decision(들) -> tool_end(bash)로 감싼다. 단계 결과는 `add_messages`에서 얻는다.
 """
 
 from __future__ import annotations

@@ -1,184 +1,145 @@
-# 게이트 구조와 설계 결정
+# 구조와 집행 지점
 
-게이트가 무엇을 근거로 어떻게 판정하는지 요약한다. 정책 규칙 자체는 [`policy_spec.md`](policy_spec.md), 수치는 [`final_report.md`](final_report.md)에 있다.
+AgentGate가 툴 호출을 어디에서 가로채고 어떻게 집행하는지 정리한다. 판정 규칙은 [`rulebook.md`](rulebook.md), 프레임워크 연결 절차는 [`integration_guide.md`](integration_guide.md)에 있다.
 
 ## 1. 요약
 
-- 에이전트의 모든 툴 호출을 **실행 직전에** 결정론 규칙 P1–P9로 검사한다.
-- 핵심 질문: 이 호출의 대상·내용이 **사용자 요청**에서 왔는가, **툴 응답**(공격자가 글을 심을 수 있는 곳)에서 왔는가.
-- 판정: `ALLOW`(실행) · `ESCALATE`(애매함, 설정에 따라 처리) · `BLOCK`(실행 안 함).
-- 정책 코드([`src/agentgate/core/`](../src/agentgate/core/), `v*/policies.py`)에는 LLM·네트워크 호출이 없다. LLM은 TaskSpec 추출과 C4의 ESCALATE 판정에만 쓴다.
+- 에이전트의 모든 AgentDojo 툴 호출은 `GatedRuntime.run_function` 한 곳을 지난다. 이곳이 유일한 집행 지점이다.
+- 판정은 `PolicyGateRuntime`이 한다. effect 호출만 판정기(판정 LLM 또는 정적 규칙)에 보내고, 답(ALLOW / BLOCK)을 집행한다.
+- 프레임워크는 `Adapter → GateToolBridge → Session → PolicyGateRuntime` 경로로만 툴을 실행한다. Gate를 거치지 않은 실행이 있으면 그 run은 무효다.
+- 정해지지 않은 상황(TaskSpec 없음, Gate 연결 실패, 규칙 오류)은 모두 차단한다(fail-closed).
 - AgentDojo 소스는 수정하지 않는다. `FunctionsRuntime` 서브클래스를 끼워 넣는다.
-- 공통 Gate(`gate/`) 위에 버전 패키지 `v1/`·`v3/`가 정책·판정 LLM·런타임 확장을 따로 둔다(9절). v2는 `archive/v2.bak/`에 보관한다.
 
-## 2. 실행 흐름
+## 2. 단일 집행 지점: `GatedRuntime.run_function`
 
-```mermaid
-flowchart LR
-    U[사용자 프롬프트] --> S[TaskSpecElement<br/>TaskSpec 생성·로드]
-    S --> L[에이전트 LLM]
-    L -->|툴 호출| G{GatedRuntime.run_function}
-    G --> E[PolicyEngine P1–P9]
-    E -->|ALLOW| X[툴 실행]
-    E -->|ESCALATE| J[block / allow / judge]
-    E -->|BLOCK| B[차단 메시지 반환]
-    X -->|응답을 ValueIndex에 등록| L
-    B --> L
-```
+[`core/runtime.py`](../src/agentgate/core/runtime.py). AgentDojo의 `ToolsExecutor`(LLM 에이전트)와 `GroundTruthPipeline`(재생)은 모두 `runtime.run_function`으로만 툴을 실행한다. 그래서 이 메서드를 재정의하면 모든 실행 경로가 덮인다.
 
-호출 한 건의 처리 순서 ([`runtime.py`](../src/agentgate/core/runtime.py) `GatedRuntime.run_function`):
+호출 한 건의 처리 순서:
 
-1. `PolicyEngine.decide`가 해당 툴에 걸리는 정책만 평가한다.
-2. `combine_verdicts`가 BLOCK > ESCALATE > ALLOW 순으로 가장 강한 판정을 고른다.
-3. ESCALATE는 `escalate_action`에 따라 BLOCK(C1) / ALLOW(C2) / 판정 LLM(C4)으로 바뀐다.
-4. enforce 모드에서 BLOCK이면 실행하지 않고 `Tool call blocked by security policy P<n>: <이유>`를 툴 결과로 돌려준다.
-5. 실행된 호출의 응답은 `ValueIndex`에 출처 정보와 함께 등록하고, `SessionState`(누적 송금액, 보낸 메일 ID)를 갱신한다.
-6. 판정·근거·실행 여부·소요 시간을 trace에 남긴다.
+1. TaskSpec이 없으면 BLOCK한다.
+2. `resolve`가 최종 판정을 정한다(`PolicyGateRuntime`이 재정의).
+3. enforce 모드에서 BLOCK이면 실행하지 않고 차단 메시지를 툴 결과로 돌려준다.
+4. ALLOW면 실행한다. 응답은 `ValueIndex`에 출처 정보와 함께 등록하고, `label_response`가 ToolSpec을 붙이며, `SessionState`(보낸 메시지 등)를 갱신한다.
+5. 판정·근거·실행 여부·소요 시간을 trace에 남긴다.
 
-TaskSpec이 설정되지 않은 런타임은 모든 호출을 BLOCK한다(fail closed).
+`GatedRuntime`은 생성 시 툴 함수를 모두 감싼다. 감싼 함수는 `run_function` 안에서만 실행되고, 밖에서 부르면 실행하지 않고 `UngatedExecutionError`를 내며 `ungated_executions`에 기록한다.
 
-## 3. 판정 입력
+### `PolicyGateRuntime`
 
-### TaskSpec — 사용자가 요청한 것 ([`task_spec.py`](../src/agentgate/core/task_spec.py))
+[`policy_gate/runtime.py`](../src/agentgate/policy_gate/runtime.py). `GatedRuntime`의 hook만 바꾼다.
 
-| 필드 | 뜻 |
+| hook | 동작 |
 |---|---|
-| `requested_ops` | 사용자가 요청한 상태 변경·외부 전송 툴 |
-| `named_sources` | 사용자가 직접 가리킨 자료(파일명, URL, 채널, `tool:<이름>`) |
-| `allowed_dest` | 프롬프트에 적힌 목적지(이메일, IBAN, URL, 사용자 이름) |
-| `amount_cap` | 1회 송금 상한 |
-| `egress_requested` | 사용자 데이터를 밖으로 보내라는 요청인가 |
+| `resolve` | 읽기 호출은 ALLOW. effect 호출은 판정기에 보내 그 답을 쓴다. enforce 모드인데 판정기가 없으면 예외를 낸다 |
+| `label_response` | 실행된 응답마다 ToolSpec 추출기를 불러 `labels["toolspec"]`에 붙인다 |
+| `block_message` | `Tool call blocked by policy gate (R2, R3): <이유>`(이유 240자 이내). 판정 기록 전체는 trace에만 남는다 |
 
-- oracle spec: 사람이 프롬프트만 보고 작성 ([`data/agentdojo/oracle_specs/`](../data/agentdojo/oracle_specs/)).
-- LLM spec: [`llm/taskspec_extractor.py`](../src/agentgate/llm/taskspec_extractor.py). 입력은 프롬프트와 툴 목록뿐이다.
+판정기 조립은 [`policy_gate/assembly.py`](../src/agentgate/policy_gate/assembly.py), 조건 정의는 [`experiment/conditions.py`](../src/agentgate/experiment/conditions.py)다.
 
-### 출처(origin) 판정 ([`provenance.py`](../src/agentgate/core/provenance.py) `ValueIndex.origin_of`)
-
-값이 나타난 곳 중 **가장 신뢰도 높은 범주**로 판정한다.
-
-| Origin | 뜻 | 취급 |
-|---|---|---|
-| `PROMPT`, `ALLOWED_DEST`, `SELF` | 프롬프트·허용 목적지·사용자 본인 | 신뢰 |
-| `TRUSTED_TOOL` | 주소록·계정 정보 툴 응답 | 신뢰 |
-| `NAMED_SOURCE` | 사용자가 지목한 자료의 응답 | 애매 → 주로 ESCALATE |
-| `OTHER_TOOL` | 지목하지 않은 툴 응답에만 있음 | 불신 → BLOCK |
-| `UNSEEN` | 어디에도 없음 | 불신 → BLOCK |
-
-- 비교는 정규화(이메일·URL·IBAN 규칙, [`normalization.py`](../src/agentgate/core/normalization.py)) 후 포함 여부로 한다.
-- 지목 자료 판정 규칙과 신뢰 툴 목록은 [`config/agentdojo/named_source_rules.yaml`](../config/agentdojo/named_source_rules.yaml)에 있다. 신뢰 툴은 인젝션 벡터가 없어야 하며 [`tests/test_config_consistency.py`](../tests/test_config_consistency.py)가 확인한다.
-- P2·P3의 반출 판정은 외부로 나가는 내용과 민감 읽기 응답이 16자 이상 겹치는지 k-gram으로 본다. 프롬프트 문장과의 겹침은 제외한다.
-
-## 4. ESCALATE와 판정 LLM (C4)
-
-[`llm/escalation_judge.py`](../src/agentgate/v1/judge.py), 프롬프트 [`prompts/v1/judge.md`](../prompts/v1/judge.md).
-
-- 입력은 구조화된 사실뿐이다: 프롬프트, 툴, 되돌림 가능 여부, 정책과 이유, 문제 값과 출처, 값 주변 문맥(최대 3개, `<data>`로 감쌈). 툴 응답 전문은 넣지 않는다.
-- 답 매핑: B → BLOCK · A → 되돌릴 수 있는 툴이면 ALLOW, 아니면 HUMAN · C → HUMAN. 벤치마크에서는 HUMAN을 BLOCK으로 집행하고 따로 센다.
-- 같은 입력은 캐시([`data/v1/cache/judge/`](../data/v1/cache/judge/))를 재사용하므로 재실행 결과가 같다.
-
-## 5. 주요 설계 결정
-
-| 주제 | 결정 | 이유 |
-|---|---|---|
-| 가로채기 지점 | `FunctionsRuntime.run_function` 재정의 | LLM 에이전트(`ToolsExecutor`)와 정답 재생(`GroundTruthPipeline`)이 모두 이 메서드로만 툴을 실행한다. 우회 경로가 없음은 `tests/test_runtime.py`가 확인한다 |
-| 출처 우선순위 | 가장 신뢰도 높은 출현 위치 기준 | "최초 출현" 기준이면 공격자가 같은 값을 먼저 심어 정당한 값을 OTHER_TOOL로 떨어뜨릴 수 있다 |
-| P1 대상 | 외부 목적지만 | slack 내부 DM·채널 메시지의 위험은 내용 전파(P7)로 다룬다 |
-| P4 금액 | 상한·지목 자료 모두 없으면 프롬프트에 없는 금액은 ESCALATE | 사양에 없던 경우의 보수적 처리 |
-| executed-only security | 실행된 호출만으로 공격 성공을 다시 판정 | AgentDojo의 일부 판정은 차단된 시도도 성공으로 센다 |
-| 참조 공격 궤적 | 정답이 없는 workspace injection 6–13은 직접 작성 ([`evaluation/attack_trajectories.py`](../src/agentgate/scenarios/attack_trajectories.py)) | 재생 평가에 공격 호출이 필요하다 |
-| LLM 호출 설정 | `temperature` 대신 `output_config.effort`, 재현성은 디스크 캐시로 확보 | 현행 Claude 모델은 sampling 파라미터를 거부한다 |
-| 평가 대상 에이전트 | 서버 측 fallback 미사용, 거부 횟수 기록 | 다른 모델이 대신 답하면 ASR이 섞인다 |
-
-## 6. 검증 단계
-
-| 단계 | 명령 | 확인하는 것 |
-|---|---|---|
-| 단위 테스트 | `python -m pytest -q` | 정책별 합성 trace, 게이트 우회 없음, 설정 일관성 |
-| 정답 궤적 재생 (RQ1) | [`scripts/evaluation/replay_evaluation.py`](../scripts/evaluation/replay_evaluation.py) | LLM 없이 전체 공격 쌍·정상 태스크의 탐지율과 오탐 |
-| 실제 에이전트 실행 (RQ2) | [`scripts/evaluation/live_evaluation.py`](../scripts/evaluation/live_evaluation.py) | 조건 C0–C4별 ASR·Utility |
-| 집행 무결성 | [`scripts/analysis/check_enforcement.py`](../scripts/analysis/check_enforcement.py) | 차단된 호출이 실행·환경 변경을 일으키지 않았는지 |
-| 판정 LLM 단독 | [`scripts/evaluation/judge_evaluation.py`](../scripts/evaluation/judge_evaluation.py) | ESCALATE 호출에 대한 A/B/C 정확도 |
-| ToolSpec 추출 품질 (v3) | [`scripts/analysis/toolspec_evaluation.py`](../scripts/analysis/toolspec_evaluation.py) | 정상·주입 툴 응답에서 '독자에게 하는 요청'을 뽑는 정확도 |
-| 정상 작업 손실 분해 (v3) | [`scripts/analysis/analyze_live_utility.py`](../scripts/analysis/analyze_live_utility.py) | 같은 짝의 C0와 비교해 실패가 차단 때문인지, 차단 원인은 무엇인지 |
-
-## 7. 한계
-
-- **지목 자료 안의 인젝션**: 사용자가 지목한 웹페이지·파일에 심은 값은 NAMED_SOURCE가 되어 ALLOW나 ESCALATE에 머문다. v3에서는 판정 LLM이 ToolSpec 속 *요청*의 대상으로 그 값을 볼 수 있지만, 지시 없이 데이터만 바꿔치기한 값은 구분하지 못한다.
-- **요청된 툴의 인자 오염**: 요청된 일정·예약 툴에 공격 값이 섞이면 P8·P9의 툴 단위 검사로는 구분하지 못한다.
-- **툴 호출 없는 공격**(유형 H): 답변 문장만 바꾸는 공격은 범위 밖이다.
-- **TaskSpec 품질 의존**: `requested_ops`·`named_sources`가 틀리면 판정도 틀린다.
-
-## 8. 외부 에이전트 프레임워크 연결
-
-AgentDojo 파이프라인 대신 다른 에이전트 프레임워크(smolagents, mini-swe-agent, browser-use 등)가 같은 시나리오를 수행할 때에도 모든 툴 호출이 같은 `GatedRuntime`을 지나게 한다. 구현은 [`src/agentgate/harness/`](../src/agentgate/harness/)와 [`src/agentgate/adapters/`](../src/agentgate/adapters/)에 있다.
+## 3. 프레임워크 연결 계층
 
 ```
-대시보드 / live_evaluation.py --framework
+대시보드 / 시나리오 CLI (agentgate.scenarios.run)
         │ RunRequest(framework, ModelSpec, ScenarioConfig)
-   harness.runner ── Session: AgentDojo env + 인젝션 + GatedRuntime + TaskSpec + 채점
+   harness.runner ── Session: AgentDojo 환경 + 인젝션 + PolicyGateRuntime + TaskSpec + 채점
         │ GateToolBridge.tool_specs() / invoke(name, args)
-   어댑터(프레임워크별 번역) 또는 계약 v1 Wrapper(HTTP)
+   Adapter(프로세스 내) 또는 contract v1 Wrapper(HTTP, harness.service)
         │
    프레임워크 agent loop ── 모델(ModelSpec: ollama·anthropic·openai·OpenAI 호환)
 ```
 
-- **역할 분리**: 어댑터는 AgentDojo 툴을 프레임워크 툴로 바꾸고 실행부에서 `bridge.invoke`만 부른다. 판정·채점·기록은 코어(`Session`)가 맡는다. 결과 레코드 형식은 `live_evaluation.py`와 같아 기존 분석 스크립트를 그대로 쓴다.
-- **등록**: 내장 어댑터, [`config/frameworks.yaml`](../config/frameworks.yaml), `agentgate.frameworks` entry point 중 하나로 등록하면 대시보드·배치 평가·적합성 테스트에 나타난다. 서버·UI는 수정하지 않는다.
-- **이벤트**: 팀원 fork의 경계 로그(`[LLM_QUERY]`, `[TOOL_EXECUTION_START]` …)를 `key=%s` 형식에서 바로 읽어 정규화 이벤트로 바꾸고, 툴 실행 사이에 `gate_decision`을 넣는다. 동시 실행은 `contextvars`로 실행별로 분리한다.
-- **우회 탐지**: 프레임워크가 남긴 `tool_start` 중 Gate 판정이 없는 실행을 `ungated_calls`로 기록하고 그 실행을 무효(`valid: false`)로 표시한다.
-- **적합성 검사**: [`harness/conformance.py`](../src/agentgate/harness/conformance.py)가 LLM 없이 OpenAI 호환 가짜 모델(`fake_llm.py`)로 프레임워크를 구동한다. 정답 궤적과 공격 궤적을 따르게 한 뒤 trace·utility·security가 네이티브 `ScriptedAgent` 결과와 같은지, 차단된 호출이 실행되지 않았는지 확인한다.
-- **의존성 격리**: `frameworks.yaml`에 `python:`을 주면 그 인터프리터의 worker 프로세스에서 시나리오 전체를 실행하고 이벤트를 JSON lines로 받는다.
-- C3(AgentDojo 방어 요소)는 네이티브 파이프라인에서만 지원한다.
-
-연결된 프레임워크는 다음과 같다. 세 fork 모두 NiceGuy1313 fork이며 경계 로그를 담고 있다.
-
-| 프레임워크 | AgentDojo 툴을 넘기는 방식 | Gate 위치 (이벤트 순서) |
+| 구성 요소 | 파일 | 역할 |
 |---|---|---|
-| smolagents | 툴마다 smolagents `Tool` 하나, `forward`에서 `bridge.invoke` | `Tool.__call__`: tool_start → gate_decision → tool_end |
-| mini-swe-agent | 프레임워크 툴은 `bash` 하나다. 환경을 `GatedShell`로 바꿔 명령 한 줄을 툴 호출 하나로 처리한다(`tool '{json}'`, `submit '답'`). 실제 셸은 실행하지 않는다. | `execute_action`: tool_start(bash) → gate_decision(명령별) → tool_end(bash). `bash`는 내부 dispatcher로 선언한다. |
-| browser-use | 브라우저 액션을 제외하고 `done`과 browser-use 자체 파일 동작(`write_file`·`replace_file`·`read_file`, 임시 폴더만 다룸)만 남긴 뒤 툴마다 커스텀 액션을 등록한다. 이름이 겹치면(banking `read_file`) AgentDojo 툴이 우선한다. Agent에 BrowserSession이 필요해 headless Chrome(about:blank)을 띄운다. | `Registry.execute_action`: tool_start → gate_decision → tool_end |
+| `FrameworkAdapter` | [`adapters/base.py`](../src/agentgate/adapters/base.py) | 프레임워크 번역만 한다. 툴 본문을 `bridge.invoke`로 바꾸고 `routes_tools_through_bridge = True`를 선언한다 |
+| `GateToolBridge` | [`harness/bridge.py`](../src/agentgate/harness/bridge.py) | 프레임워크가 툴에 닿는 유일한 문. `invoke` → `Session.invoke`. `gate_decision` 이벤트를 남긴다 |
+| `Session` | [`harness/session.py`](../src/agentgate/harness/session.py) | 시나리오 하나: 환경, 인젝션, `PolicyGateRuntime`, TaskSpec, 채점(`finish`) |
+| contract 서비스 | [`harness/service.py`](../src/agentgate/harness/service.py) | 외부 프로세스 Wrapper용 HTTP 규약 v1(`/v1/sessions/...`). 대시보드가 mount한다 |
+| registry | [`harness/registry.py`](../src/agentgate/harness/registry.py) | 내장 어댑터, `config/frameworks.yaml`, `agentgate.frameworks` entry point |
+| runner·worker | [`harness/runner.py`](../src/agentgate/harness/runner.py), [`harness/worker.py`](../src/agentgate/harness/worker.py) | 실행 하나를 돌리고 레코드를 만든다. `python:`이 지정된 프레임워크는 별도 인터프리터 worker에서 돈다 |
 
-browser-use fork는 `anthropic`·`openai`를 agentgate가 요구하는 버전보다 낮게 고정한다. 그래서 별도 venv(`.venv-browser-use`)에 설치하고 `frameworks.yaml`의 `python:`으로 worker에서 실행한다. 대시보드는 그 인터프리터에서 import가 되는지 확인해 사용 가능 여부를 표시한다.
+native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을 넘기므로 같은 경로를 지난다.
 
-### 정책 Gate 의무 경로
+### contract 서비스
 
-모든 어댑터는 AgentDojo 툴을 `GateToolBridge.invoke` → `Session.invoke` → `PolicyGateRuntime.run_function`으로만 실행한다.
-- 어댑터는 `routes_tools_through_bridge = True`로 이를 선언한다. 선언이 없으면 registry가 사용 불가로 표시하고 runner가 실행을 거부한다(`FrameworkAdapter.contract_problems`). native 어댑터도 AgentDojo pipeline에 bridge를 거치는 `BridgeRuntime`을 넘긴다.
-- `GatedRuntime`은 툴 함수를 감싸 `run_function` 밖에서의 호출을 실행하지 않고 거부하며 기록한다(`ungated_executions`). 프레임워크 경계 로그에서 Gate 판정 없이 실행된 툴(`bridge.ungated_calls`)도 함께 센다. 하나라도 있으면 run은 무효(`valid: false`, `invalid_reason`)이고 점수는 `excluded_scores`로 옮겨 집계에서 뺀다. 이벤트 `gate_bypass`(ERROR)를 낸다.
-- 적합성 검사: `python -m agentgate.harness.conformance --framework X --condition gate_static_rules`(LLM 없음, ToolSpec은 빈 stub). 기준 trace와 같고, 차단 호출이 실행되지 않고, 무효 run이 없어야 통과한다.
-- 차단되면 에이전트는 판정 기록의 규칙 id와 이유를 한 줄로 받는다(`Tool call blocked by policy gate (R2, R3): <이유>`, 240자 이내). 판정 기록 전체는 trace에만 남는다.
+- `127.0.0.1`에만 바인딩하고 session마다 bearer token을 요구한다.
+- AgentDojo 툴은 `/invoke`로만 실행한다. `/decide`는 Wrapper 자체 툴의 판정만 하며 AgentDojo 툴을 넣으면 400이다.
+- Wrapper는 `gate_decision`·`gate_bypass`·`result` 이벤트를 보낼 수 없다(무시한다).
 
-### Wrapper 연결 규약 v1
+### 연결된 프레임워크
 
-Wrapper를 만드는 쪽은 아래 다섯 가지만 지키면 된다. 지킨 Wrapper는 `config/frameworks.yaml`에 `contract:` 항목 한 줄로 연결되며 Python 어댑터가 필요 없다. 참조 구현은 [`examples/contract_wrapper/minimal_agent.py`](../examples/contract_wrapper/minimal_agent.py), 클라이언트는 표준 라이브러리만 쓰는 [`agentgate_client.py`](../src/agentgate/harness/agentgate_client.py)(복사해 사용)이다.
+| 프레임워크 | 툴을 넘기는 방식 | 이벤트 순서 |
+|---|---|---|
+| native | AgentDojo pipeline에 `BridgeRuntime` | 기준 경로 |
+| smolagents | 툴마다 `Tool`, `forward`에서 `bridge.invoke` | `Tool.__call__`: tool_start → gate_decision → tool_end |
+| mini-swe-agent | 툴은 `bash` 하나. `GatedShell`이 명령 한 줄을 툴 호출 하나로 처리한다(실제 셸 실행 없음) | `execute_action`: tool_start(bash) → gate_decision(명령별) → tool_end(bash) |
+| browser-use | 브라우저 액션을 빼고 툴마다 커스텀 액션. 이름이 겹치면 AgentDojo 툴 우선. 별도 venv | `Registry.execute_action`: tool_start → gate_decision → tool_end |
+| contract Wrapper | HTTP `/invoke` | Wrapper가 보낸 tool_start → gate_decision → tool_end |
 
-1. **툴 주입**: `GET /v1/sessions/{id}/tools`의 AgentDojo 툴(JSON schema)을 에이전트 툴로 등록한다.
-2. **실행 hook**: 툴 실행 지점에서 실제 실행 대신 `POST /v1/sessions/{id}/invoke`를 부르고, 돌아온 문자열(차단 메시지 포함)을 툴 결과로 쓴다. 예외로 루프를 끊지 않는다. Gate에 닿지 못하면 차단으로 처리한다(fail closed). Wrapper 자체 툴은 `decide`로 판정만 받을 수 있다.
-3. **모델 지정**: `AGENTGATE_MODEL`(OpenAI 호환 `base_url`·키, LiteLLM 인자)을 따른다. 특정 제공자를 고정하지 않는다.
-4. **실행 진입점**: `AGENTGATE_URL`·`AGENTGATE_SESSION`·`AGENTGATE_TOKEN`·`AGENTGATE_MAX_STEPS`·`AGENTGATE_OPTIONS` 환경 변수로 시작하고 끝에 `POST .../finish`로 최종 답을 보낸다. 스스로 시작하는 Wrapper는 `POST /v1/sessions`로 세션을 연다.
-5. **이벤트**: 경계 로그를 `POST .../events`로도 보내면 대시보드에 표시된다(선택).
+## 4. 우회 감지와 무효 처리
 
-서비스는 fail closed다. AgentDojo 툴 실행은 `invoke`로만 하고, TaskSpec이 없는 세션은 모든 호출을 막는다. `decide`에 AgentDojo 툴을 넣으면 400을 돌려준다. Wrapper는 `gate_decision`·`gate_bypass`·`result` 이벤트를 보낼 수 없고, Wrapper가 보낸 `tool_start` 중 Gate 판정이 없는 실행이 있으면 run은 무효다.
+우회는 두 경로로 잡는다.
 
-서비스는 `127.0.0.1`에만 바인딩하고 세션마다 bearer 토큰을 요구한다. Wrapper는 `python -m agentgate.harness.conformance --entry "<command>"`로 규약 적합성을 스스로 확인할 수 있다. MCP 노출은 아직 구현하지 않았다.
+| 경로 | 감지 방법 | 기록 |
+|---|---|---|
+| 툴 함수 직접 호출 | 감싼 툴 함수가 `run_function` 밖 호출을 거부 | `GatedRuntime.ungated_executions` |
+| 프레임워크 내부 실행 | 경계 로그 `tool_start`와 Gate 판정 횟수 대조, 등록되지 않은 툴 이름 | `GateToolBridge.ungated_calls` |
 
-## 9. 코드 구조와 버전 분리
+하나라도 있으면 레코드는 `valid: false`, `invalid_reason`을 갖고, 점수는 `excluded_scores`로 옮겨 집계에서 뺀다. 이벤트 `gate_bypass`(ERROR)를 낸다. `routes_tools_through_bridge = True`를 선언하지 않은 어댑터는 registry가 사용 불가로 표시하고 runner가 실행을 거부한다(`contract_problems`). 동작은 conformance 검사(`python -m agentgate.harness.conformance`)로 확인한다.
 
+## 5. fail-closed
+
+| 상황 | 처리 |
+|---|---|
+| TaskSpec이 없음 | 모든 호출 BLOCK(`no TaskSpec is configured`) |
+| enforce 모드인데 판정기가 없음 | `PolicyGateRuntime.resolve`가 예외 |
+| 정적 규칙 함수 예외 | 그 규칙의 BLOCK |
+| 판정 LLM 답을 해석할 수 없음 | BLOCK |
+| Wrapper가 Gate에 닿지 못함 | client가 차단 메시지를 돌려주고 실행하지 않음 |
+| Gate 밖 툴 실행 | 실행 거부, run 무효 |
+
+## 6. 데이터 흐름
+
+```mermaid
+flowchart LR
+    U[사용자 프롬프트 + 툴 목록] --> T[TaskSpec 추출기]
+    T --> S[TaskSpec]
+    A[에이전트] -->|툴 호출| G{PolicyGateRuntime}
+    S --> G
+    G -->|읽기 호출| X[AgentDojo 툴 실행]
+    G -->|effect 호출| J[판정기: LLM judge 또는 정적 규칙]
+    J -->|ALLOW| X
+    J -->|BLOCK| B[차단 메시지]
+    X --> R[툴 응답] --> P[ToolSpec 추출기] --> K[ToolSpec]
+    K --> J
+    R --> A
+    B --> A
 ```
-src/agentgate/
-  gate/        버전 공통 Gate: Policy·PolicyEngine·ValueIndex·TaskSpec·GatedRuntime
-  agentdojo/   AgentDojo 테스트: suite 로딩, live pipeline·채점, 재생, 공격 궤적, 지표, 층화 표본
-  agents/      평가 대상 에이전트(Claude, Ollama, OpenAI, ScriptedAgent)와 외부 프레임워크 어댑터
-  harness/     외부 프레임워크 연결(Wrapper 규약 v1, 대시보드 서비스)
-  llm/         API client, TaskSpec 추출기(버전별 프롬프트), 판정 LLM 공용 입출력
-  v1/          P1–P9, 판정 LLM v1(C4)
-  v3/          정책 엔진 없음: ToolSpec 추출기, 판정 LLM v3, PolicyGateRuntime(effect 호출 → 판정 LLM)
-  conditions.py  실험 조건 C0–C10b → 버전·모드·ESCALATE 처리. 런타임은 v*/experiment.py가 조립
-```
 
-설정·프롬프트·데이터·결과도 같은 단위로 나눈다: `config/{agentdojo,v1,v3}/`, `prompts/{v1,v3}/`, `data/agentdojo/`(벤치마크 추출, oracle TaskSpec, 층화 표본), `data/<version>/{specs,cache}/`, `results/<version>/{replay,live,...}/`.
+- TaskSpec 추출기의 입력은 사용자 프롬프트와 툴 목록(이름·설명)뿐이다.
+- ToolSpec 추출기는 툴 응답을 읽지만 고정 스키마 JSON만 낸다. 판정기는 툴 응답 원문을 보지 않는다.
+- LLM 캐시: TaskSpec `data/cache/taskspec/`, ToolSpec `data/cache/toolspec/`, 판정 `data/cache/judge/`(모두 git 제외).
 
-- 버전 패키지는 공통 Gate의 hook만 바꾼다: 정책 목록(`POLICY_CLASSES`), `GatedRuntime.label_response`(v3 ToolSpec), `resolve`(v3: effect 호출을 판정 LLM에 보냄).
-- v2(판별기 + Trusted LLM)는 2026-10-19 미팅 결정으로 중단하고 `archive/v2.bak/`에 저장소 루트 기준 경로 그대로 보관한다. v3는 정책 엔진이 없다. `config/rulebook.yaml`(룰북)을 방식 A는 판정 LLM이 읽고, 방식 B는 `src/agentgate/policy_gate/rule_checker.py`가 정적 코드로 검사한다(인자 역할: `config/agentdojo/tool_args.yaml`).
-- TaskSpec 추출 프롬프트는 v1이 `prompts/v1/extract_taskspec.md`, v3가 `prompts/extract_taskspec.md`(`delegated_sources` 추가)를 쓴다. LLM 캐시는 버전별 경로에 두고 키에 프롬프트 전문을 넣는다.
-- 버전 비교는 같은 실행 안의 기준선 C0과 한다. 다른 실행의 C0과 섞지 않는다.
+## 7. 설정 파일
+
+| 파일 | 내용 |
+|---|---|
+| [`config/gate.yaml`](../config/gate.yaml) | `GatedRuntime` 공통 설정(사용자 식별자, ValueIndex 길이) |
+| [`config/rulebook.yaml`](../config/rulebook.yaml) | 룰북 R1–R10 |
+| [`config/frameworks.yaml`](../config/frameworks.yaml) | 추가 프레임워크·contract Wrapper 등록 |
+| [`config/agentdojo/tool_roles.yaml`](../config/agentdojo/tool_roles.yaml) | effect 툴 목록과 범주 |
+| [`config/agentdojo/tool_args.yaml`](../config/agentdojo/tool_args.yaml) | 툴 인자 역할, R4 임계값 |
+| [`config/agentdojo/named_source_rules.yaml`](../config/agentdojo/named_source_rules.yaml) | 지목 자료 판정 규칙, 신뢰 툴 |
+| [`config/agentdojo/sensitive_reads.yaml`](../config/agentdojo/sensitive_reads.yaml) | 민감 읽기 툴 범주(R4) |
+
+AgentDojo 고유 값(툴 이름 등)은 `config/agentdojo/`와 `src/agentgate/scenarios/`에만 둔다. 신뢰 툴은 인젝션 벡터가 없어야 하며 [`tests/test_config_consistency.py`](../tests/test_config_consistency.py)가 확인한다.
+
+## 8. 주요 설계 결정
+
+| 주제 | 결정 | 이유 |
+|---|---|---|
+| 가로채기 지점 | `FunctionsRuntime.run_function` 재정의 | AgentDojo의 모든 실행 경로가 이 메서드를 지난다 |
+| 출처 우선순위 | 값이 나타난 곳 중 가장 신뢰도 높은 범주 | "최초 출현" 기준이면 공격자가 같은 값을 먼저 심어 정당한 값을 불신 범주로 떨어뜨릴 수 있다 |
+| 판정 입력 | 툴 응답 원문 대신 ToolSpec | 판정기가 주입 문구를 직접 읽지 않게 한다 |
+| 판정 결과 | ALLOW / BLOCK 두 가지 | 사람 확인 단계 없이 실행 직전에 결정한다 |
+| executed-only security | 실행된 호출만으로 공격 성공을 다시 판정(`security_executed`) | AgentDojo의 일부 판정은 차단된 시도도 성공으로 센다 |
+| 의존성 격리 | 충돌하는 프레임워크는 별도 venv worker | agentgate·AgentDojo 의존성을 바꾸지 않는다 |

@@ -1,4 +1,4 @@
-"""mini-swe-agent gated shell parsing and browser-use conformance in its own venv (LLM-free)."""
+"""mini-swe-agent gated shell 해석 테스트와 별도 venv의 browser-use conformance 테스트(LLM 없음)."""
 
 import subprocess
 

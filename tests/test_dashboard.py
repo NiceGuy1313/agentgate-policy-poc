@@ -1,4 +1,4 @@
-"""Dashboard API without network or LLM: catalog, run request validation, and a pilot run with a mocked runner."""
+"""대시보드 API 테스트(네트워크·LLM 없음): 목록, 실행 요청 검증, runner를 mock한 파일럿 실행."""
 
 import json
 import re

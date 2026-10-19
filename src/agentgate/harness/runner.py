@@ -1,8 +1,8 @@
-"""Run one (framework, model, scenario) and return the per-pair record. Shared by the dashboard and batch runs.
+"""(프레임워크, 모델, 시나리오) 하나를 실행해 쌍별 레코드를 돌려준다. 대시보드와 배치 실행이 함께 쓴다.
 
-`run_scenario` runs in this process. `run_scenario_subprocess` runs the same function in a worker process
-(`python -m agentgate.harness.worker`) with another interpreter, for frameworks whose dependencies cannot live
-next to agentdojo; events stream back as JSON lines.
+`run_scenario`는 이 프로세스에서 돈다. `run_scenario_subprocess`는 같은 함수를 다른 인터프리터의 worker 프로세스
+(`python -m agentgate.harness.worker`)에서 돌린다. 의존성을 agentdojo와 함께 설치할 수 없는 프레임워크용이며,
+이벤트는 JSON lines로 돌아온다.
 """
 
 from __future__ import annotations

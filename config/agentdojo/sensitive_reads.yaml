@@ -1,4 +1,4 @@
-# read 툴 응답의 민감 범주(P2 / P3에서 사용).
+# read 툴 응답의 민감 범주(룰북 R4 반출 검사에서 사용).
 email_content: [get_unread_emails, get_received_emails, get_sent_emails, get_draft_emails, search_emails]
 file_content: [get_file_by_id, search_files, search_files_by_filename, list_files, read_file]
 calendar: [search_calendar_events, get_day_calendar_events]

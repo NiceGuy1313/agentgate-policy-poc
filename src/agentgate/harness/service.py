@@ -1,12 +1,11 @@
-"""Wrapper contract v1 over HTTP: a gate session per scenario (docs/architecture.md, "Wrapper 연결 규약").
+"""HTTP 상의 Wrapper 규약 v1: 시나리오마다 Gate session 하나를 연다(docs/integration_guide.md).
 
-Mounted by the dashboard (`dashboard/app.py`); `serve_background()` starts it alone for batch runs of
-contract Wrappers. Binds to 127.0.0.1 only; every session endpoint needs the session's bearer token.
+대시보드(`dashboard/app.py`)가 mount한다. `serve_background()`는 contract Wrapper 배치 실행용으로 단독 실행한다.
+127.0.0.1에만 바인딩하고, session endpoint는 모두 그 session의 bearer token을 요구한다.
 
-Fail closed: `/invoke` is the only way to execute a scenario tool, and it goes through the policy gate. A session
-without a TaskSpec blocks every call; `/decide` judges only the Wrapper's own tools (scenario tools: 400); a Wrapper
-cannot report gate decisions, bypasses or results; tool executions the Wrapper reports (`tool_start`) that the gate
-never saw make the run invalid.
+fail-closed: 시나리오 툴은 `/invoke`로만 실행하며 정책 Gate를 지난다. TaskSpec이 없는 session은 모든 호출을 막는다.
+`/decide`는 Wrapper 자체 툴만 판정한다(시나리오 툴: 400). Wrapper는 Gate 판정·우회·결과를 보고할 수 없다.
+Wrapper가 보고한 툴 실행(`tool_start`) 중 Gate가 보지 못한 것이 있으면 run은 무효다.
 """
 
 from __future__ import annotations

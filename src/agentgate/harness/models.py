@@ -1,13 +1,13 @@
-"""Provider-neutral model choice (`ModelSpec`) and its conversion to each framework's model arguments.
+"""제공자 독립 모델 선택(`ModelSpec`)과 프레임워크별 모델 인자로의 변환.
 
-Providers
+제공자
   anthropic      Anthropic API (ANTHROPIC_API_KEY)
   openai         OpenAI API (OPENAI_API_KEY)
-  ollama         Ollama, cloud or local, through its OpenAI-compatible endpoint {OLLAMA_HOST}/v1
-                 (OLLAMA_API_KEY for https://ollama.com; a local server needs no key)
-  openai_compat  any OpenAI-compatible server (vLLM, LM Studio, the conformance fake LLM, ...): base_url required
+  ollama         Ollama(cloud 또는 local), OpenAI 호환 endpoint {OLLAMA_HOST}/v1
+                 (https://ollama.com은 OLLAMA_API_KEY 필요, local 서버는 키 불필요)
+  openai_compat  임의의 OpenAI 호환 서버(vLLM, LM Studio, conformance 가짜 LLM 등): base_url 필수
 
-A new provider is one entry in PROVIDERS; adapters only call `litellm_kwargs()` / `openai_kwargs()`.
+새 제공자는 PROVIDERS 항목 하나로 추가한다. 어댑터는 `litellm_kwargs()` / `openai_kwargs()`만 부른다.
 """
 
 from __future__ import annotations

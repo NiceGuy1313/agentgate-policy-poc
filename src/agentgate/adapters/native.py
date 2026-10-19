@@ -1,7 +1,7 @@
-"""Reference adapter: AgentDojo's own tool-calling pipeline, on a harness Session.
+"""native 어댑터(기준 구현): AgentDojo 자체 tool-calling pipeline을 harness Session 위에서 실행한다.
 
-The pipeline gets a `BridgeRuntime`: the session's tool list, but every execution goes through `GateToolBridge.invoke`
-(-> `Session.invoke` -> `PolicyGateRuntime.run_function`), like any other framework.
+pipeline에는 `BridgeRuntime`을 넘긴다. 툴 목록은 session의 것이고, 모든 실행은 다른 프레임워크와 같이
+`GateToolBridge.invoke` -> `Session.invoke` -> `PolicyGateRuntime.run_function`을 지난다.
 """
 
 from __future__ import annotations

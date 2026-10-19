@@ -1,5 +1,7 @@
-"""agentgate.scenarios.run: job selection, every framework x condition, per-run records and the summary (no network,
-no LLM: scripted agent / fake LLM, oracle TaskSpec, offline ToolSpec)."""
+"""agentgate.scenarios.run 테스트: 작업 선택, 프레임워크 x 조건 전체, run별 레코드와 요약.
+
+네트워크·LLM 없음: scripted agent / 가짜 LLM, oracle TaskSpec, offline ToolSpec.
+"""
 
 import json
 

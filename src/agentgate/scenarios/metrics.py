@@ -1,4 +1,4 @@
-"""재생·live 결과 파일의 지표를 계산한다(summarize 스크립트와 build_report가 공유)."""
+"""재생·live 결과 파일의 지표를 계산한다(summarize·significance·replay_contrast 스크립트가 공유)."""
 
 from __future__ import annotations
 

@@ -1,1 +1,4 @@
-"""Agent frameworks under test. Each adapter only translates between a framework and `GateToolBridge`."""
+"""평가 대상 에이전트 프레임워크의 어댑터 패키지.
+
+각 어댑터는 프레임워크와 `GateToolBridge` 사이의 번역만 맡는다.
+"""

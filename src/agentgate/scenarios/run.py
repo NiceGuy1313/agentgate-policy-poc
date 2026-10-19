@@ -1,4 +1,4 @@
-"""Run AgentDojo scenarios with any framework under any condition (`agentgate.scenarios.runner`).
+"""AgentDojo 시나리오를 임의의 프레임워크·조건으로 실행하는 CLI(`agentgate.scenarios.runner`).
 
   python -m agentgate.scenarios.run --framework smolagents --condition gate_static_rules \
       --model ollama:gpt-oss:120b --suite banking --user-task user_task_0 \
@@ -6,21 +6,20 @@
   python -m agentgate.scenarios.run --framework native --conditions no_gate gate_llm_judge gate_static_rules \
       --pairs @data/agentdojo/pairs/strat3_seed0.txt --out results/runs/<name>
   python -m agentgate.scenarios.run --agent scripted --framework mini-swe-agent --condition gate_static_rules \
-      --pilot --out results/runs/scripted          # no API key: the scripted agent / fake LLM
+      --pilot --out results/runs/scripted          # API 키 없음: scripted agent / 가짜 LLM
 
-Scenario selection
-  --pairs suite:user:injection,... | @file     explicit pairs ('none' = benign); overrides the options below
+시나리오 선택
+  --pairs suite:user:injection,... | @file     명시한 쌍('none' = 공격 없음). 아래 옵션보다 우선한다
   --suite S..  --user-task U..  --injection-task I..
-      no --injection-task: every injection task plus a benign run, or only the benign run when --user-task is given
-      --injection-task none                    benign run (may be listed with injection tasks)
-  --pilot                                      banking, 4 user x 3 injection tasks
-  --sample N --seed K                          N user tasks per suite
+      --injection-task 없음: 모든 injection task와 공격 없는 run 하나(--user-task를 주면 공격 없는 run만)
+      --injection-task none                    공격 없는 run(injection task와 함께 쓸 수 있다)
+  --pilot                                      banking, 사용자 작업 4 x injection task 3
+  --sample N --seed K                          suite마다 사용자 작업 N개
 
-Output: <out>/<condition>/<suite>/<user_task>/<injection_task|none>.json per run, <out>/scenario_summary.json, and
-<out>/run_<time>.json (arguments and status counts). Completed runs are skipped, so an interrupted run resumes.
-A run whose tools bypassed the policy gate is invalid; its scores are excluded from the summary.
-Caches: TaskSpec data/cache/taskspec/ (--spec-cache-dir to use another), ToolSpec data/cache/toolspec/, judge
-data/cache/judge/.
+출력: run마다 <out>/<condition>/<suite>/<user_task>/<injection_task|none>.json, <out>/scenario_summary.json,
+<out>/run_<time>.json(인자와 상태별 개수). 끝난 run은 건너뛰므로 중단된 실행을 이어 갈 수 있다.
+정책 Gate를 우회한 툴 실행이 있는 run은 무효이고 점수는 요약에서 빠진다.
+캐시: TaskSpec data/cache/taskspec/(--spec-cache-dir로 변경), ToolSpec data/cache/toolspec/, 판정 data/cache/judge/.
 """
 
 from __future__ import annotations

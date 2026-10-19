@@ -1,4 +1,4 @@
-"""Subprocess worker: reads a RunRequest (JSON) on stdin, streams events and the final record as JSON lines."""
+"""subprocess worker: stdin으로 RunRequest(JSON)를 받아 이벤트와 최종 레코드를 JSON lines로 내보낸다."""
 
 from __future__ import annotations
 

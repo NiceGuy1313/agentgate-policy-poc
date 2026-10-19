@@ -1,11 +1,9 @@
-"""Normalized run events.
+"""실행 이벤트 정규화: 프레임워크 경계 로그를 공통 이벤트(`Event`)로 바꾸고 실행별로 모은다(`EventSink`).
 
-A superset of the event format used by the NiceGuy1313 framework dashboards (`run`, `llm_query`, `llm_response`,
-`llm_error`, `tool_start`, `tool_end`, `tool_error`, `step`, `log`) plus `gate_decision`, `gate_bypass` (a tool
-execution outside the policy gate: the run is invalid) and `result`. Those
-dashboards turn boundary log records such as ``"[TOOL_EXECUTION_START] action=%s params=%s"`` into events;
-`BoundaryLogHandler` does the same generically by reading the ``key=%s`` names from the format string, so a new
-framework that follows the same logging convention needs no parser of its own.
+NiceGuy1313 프레임워크 대시보드의 이벤트 형식(`run`, `llm_query`, `llm_response`, `llm_error`, `tool_start`, `tool_end`,
+`tool_error`, `step`, `log`)에 `gate_decision`, `gate_bypass`(Gate 밖 툴 실행: run 무효), `result`를 더한 상위 집합이다.
+`BoundaryLogHandler`는 ``"[TOOL_EXECUTION_START] action=%s params=%s"`` 같은 경계 로그의 format 문자열에서 ``key=%s``
+이름을 읽어 이벤트로 바꾼다. 같은 로그 관례를 따르는 새 프레임워크는 별도 parser가 필요 없다.
 """
 
 from __future__ import annotations

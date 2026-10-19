@@ -1,4 +1,4 @@
-"""오프라인 provenance 분석(scripts/benchmark)과 runtime ValueIndex가 공유하는 값 정규화이다.
+"""값 정규화: runtime ValueIndex, 룰북 정적 검사기, ToolSpec 검증, 분석 스크립트가 함께 쓴다.
 
 규칙:
 - e-mail: 소문자화

@@ -1,4 +1,4 @@
-"""AgentDojo에서 태스크와 툴 목록을 추출하고, 정답 호출에 config/tool_roles.yaml의 역할(prep | effect)을 표시한다. LLM 호출 없음.
+"""AgentDojo에서 태스크와 툴 목록을 추출하고, 정답 호출에 config/agentdojo/tool_roles.yaml의 역할(prep | effect)을 표시한다. LLM 호출 없음.
 
 출력:
   data/agentdojo/benchmark/user_tasks.json

@@ -1,8 +1,8 @@
-"""smolagents (NiceGuy1313 fork with boundary logs): AgentDojo tools as smolagents `Tool`s.
+"""smolagents 어댑터(NiceGuy1313 fork, 경계 로그 포함): AgentDojo 툴을 smolagents `Tool`로 등록한다.
 
-Every tool's `forward` calls `GateToolBridge.invoke`, so the fork's `Tool.__call__` boundary log
-(`[TOOL_EXECUTION_START]` ...) wraps the gate decision: tool_start -> gate_decision -> tool_end.
-Step results come from `step_callbacks`, as in the fork's dashboard (examples/agent_dashboard/app.py).
+각 툴의 `forward`가 `GateToolBridge.invoke`를 부르므로 fork의 `Tool.__call__` 경계 로그(`[TOOL_EXECUTION_START]` …)가
+tool_start -> gate_decision -> tool_end 순서로 Gate 판정을 감싼다. 단계 결과는 `step_callbacks`에서 얻는다.
+새 어댑터를 만들 때 참조 구현으로 쓴다(docs/integration_guide.md).
 """
 
 from __future__ import annotations

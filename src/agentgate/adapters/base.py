@@ -1,15 +1,13 @@
-"""Adapter contract: a framework adapter translates, the harness gates and scores.
+"""어댑터 규약: 프레임워크 어댑터 기반 클래스(`FrameworkAdapter`)와 실행 결과(`FrameworkResult`).
 
-To add a framework: subclass `FrameworkAdapter`, implement `run`, and register it (built-in table in
-`agentgate.harness.registry`, a `config/frameworks.yaml` entry, or an `agentgate.frameworks` entry point).
-Nothing else (server, UI, batch script, conformance test) changes.
+어댑터는 번역만 하고 Gate 판정·채점은 harness가 한다. 새 프레임워크는 `FrameworkAdapter`를 상속해 `run`을 구현하고
+등록한다(`agentgate.harness.registry` 내장 표, `config/frameworks.yaml`, `agentgate.frameworks` entry point 중 하나).
+서버·UI·배치 스크립트·conformance 검사는 바꾸지 않는다.
 
-Mandatory policy gate: an adapter executes AgentDojo tools only through `GateToolBridge.invoke` (or
-`invoke_detail`) -> `Session.invoke` -> `PolicyGateRuntime.run_function`, and declares it with
-`routes_tools_through_bridge = True`. The registry and the runner refuse an adapter without the declaration
-(`contract_problems`), the conformance kit (`python -m agentgate.harness.conformance`) checks the behaviour, and a
-run with any tool execution outside the gate is reported invalid with its scores excluded.
-Every adapter runs under every experiment condition.
+의무 Gate 경로: 어댑터는 AgentDojo 툴을 `GateToolBridge.invoke`(또는 `invoke_detail`) -> `Session.invoke` ->
+`PolicyGateRuntime.run_function`으로만 실행하고 `routes_tools_through_bridge = True`로 이를 선언한다. 선언이 없으면
+registry와 runner가 거부하고(`contract_problems`), conformance(`python -m agentgate.harness.conformance`)가 동작을
+확인하며, Gate 밖 툴 실행이 하나라도 있는 run은 무효로 보고 점수를 뺀다. 모든 어댑터는 모든 실험 조건에서 돈다.
 """
 
 from __future__ import annotations

@@ -862,7 +862,7 @@ $('#model-custom').addEventListener('input', update);
 async function boot() {
   CATALOG = await fetch('/api/catalog').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
   buildFrameworks(); buildConditions(); buildPilot(); renderFrameworkOptions();
-  $('#spec').value = CATALOG.default_spec || 'oracle';
+  $('#spec').value = CATALOG.default_spec || 'llm';
   update(); loadHistory(); loadModels();
   const st = await fetch('/api/status').then(r => r.json()).catch(() => ({}));
   const missing = Object.entries(st.missing_keys || {}).map(([p, k]) => `${p}: ${k}`);

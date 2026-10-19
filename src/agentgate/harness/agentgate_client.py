@@ -1,20 +1,20 @@
-"""agentgate Wrapper client, contract v1. Standard library only: copy this file into any Wrapper.
+"""agentgate Wrapper client(contract v1). 표준 라이브러리만 쓰므로 이 파일을 Wrapper에 복사해 쓴다.
 
-Environment (set by agentgate when it launches a Wrapper):
-  AGENTGATE_URL        e.g. http://127.0.0.1:8000
+환경 변수(agentgate가 Wrapper를 실행할 때 지정한다)
+  AGENTGATE_URL        예: http://127.0.0.1:8000
   AGENTGATE_SESSION    session id
-  AGENTGATE_TOKEN      bearer token of the session
+  AGENTGATE_TOKEN      session의 bearer token
   AGENTGATE_MODEL      JSON: {"provider", "model", "base_url", "api_key", "litellm": {...}, "openai": {...}}
-  AGENTGATE_MAX_STEPS  step limit
-  AGENTGATE_OPTIONS    JSON of framework options
+  AGENTGATE_MAX_STEPS  단계 상한
+  AGENTGATE_OPTIONS    프레임워크 옵션 JSON
 
-Usage in a Wrapper's tool execution point:
+Wrapper의 툴 실행 지점에서 쓰는 법
     gate = GateSession.from_env()
-    task, tools = gate.prompt(), gate.tools()          # register `tools` as the agent's tools
-    text = gate.invoke(name, args)                     # instead of executing the tool
-    gate.event("llm_query", "...", step=1, data={...}) # optional: mirror boundary logs to the dashboard
+    task, tools = gate.prompt(), gate.tools()          # `tools`를 에이전트 툴로 등록한다
+    text = gate.invoke(name, args)                     # 툴을 실행하는 대신 부른다
+    gate.event("llm_query", "...", step=1, data={...}) # 선택: 경계 로그를 대시보드에 보낸다
     gate.finish(final_answer)
-Fail-closed: if the gate cannot be reached, `invoke` returns a block message (the call is never executed).
+fail-closed: Gate에 닿지 못하면 `invoke`는 차단 메시지를 돌려준다(호출은 실행되지 않는다).
 """
 
 from __future__ import annotations

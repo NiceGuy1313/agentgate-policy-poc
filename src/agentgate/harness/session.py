@@ -1,8 +1,8 @@
-"""One AgentDojo scenario behind the gate: environment + injections + PolicyGateRuntime + TaskSpec + scoring.
+"""Gate 뒤의 AgentDojo 시나리오 하나(`Session`): 환경 + 인젝션 + PolicyGateRuntime + TaskSpec + 채점.
 
-`Session` is what every agent framework talks to (through `GateToolBridge`). It follows the same steps as
-`agentgate.scenarios.pipeline.run_live_task` / `agentgate.scenarios.runner.run_one`, but leaves the agent loop to
-the caller: the framework calls tools through `invoke` and hands in its final answer with `finish`.
+모든 에이전트 프레임워크는 `GateToolBridge`를 거쳐 `Session`과 통신한다. 단계는
+`agentgate.scenarios.pipeline.run_live_task` / `agentgate.scenarios.runner.run_one`과 같지만 에이전트 루프는 호출자에게
+맡긴다. 프레임워크는 `invoke`로 툴을 부르고 `finish`로 최종 답을 넘긴다.
 """
 
 from __future__ import annotations

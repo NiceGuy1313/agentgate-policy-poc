@@ -1,4 +1,4 @@
-"""Wrapper contract v1 endpoints and the stdlib client (fail closed)."""
+"""Wrapper 규약 v1 endpoint와 표준 라이브러리 client 테스트(fail-closed 포함)."""
 
 import pytest
 
