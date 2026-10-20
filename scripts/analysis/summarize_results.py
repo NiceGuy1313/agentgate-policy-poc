@@ -258,10 +258,12 @@ def main():
         end = old.find("\n## ", start + len(title))
         return (old[start:] if end == -1 else old[start:end + 1]).rstrip() + "\n"
     analysis, contrast = section("## 분석"), section("## 재생 대조")
+    frameworks = section("## 프레임워크별 결과")   # scripts/analysis/summarize_frameworks.py
     text = "\n".join(lines) + "\n"
-    if analysis:
-        anchor = "## 실험 흐름"
-        text = text.replace(anchor, analysis + "\n" + anchor, 1)
+    anchor = "## 실험 흐름"
+    for kept in (analysis, frameworks):
+        if kept:
+            text = text.replace(anchor, kept + "\n" + anchor, 1)
     if contrast:
         text += "\n" + contrast
     out_path.parent.mkdir(parents=True, exist_ok=True)
