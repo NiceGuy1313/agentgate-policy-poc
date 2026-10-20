@@ -259,9 +259,10 @@ def main():
         return (old[start:] if end == -1 else old[start:end + 1]).rstrip() + "\n"
     analysis, contrast = section("## 분석"), section("## 재생 대조")
     frameworks = section("## 프레임워크별 결과")   # scripts/analysis/summarize_frameworks.py
+    agent_figures = section("## 에이전트별 그래프")   # scripts/analysis/make_agent_figures.py
     text = "\n".join(lines) + "\n"
     anchor = "## 실험 흐름"
-    for kept in (analysis, frameworks):
+    for kept in (analysis, frameworks, agent_figures):
         if kept:
             text = text.replace(anchor, kept + "\n" + anchor, 1)
     if contrast:

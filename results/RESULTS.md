@@ -87,6 +87,23 @@
 
 ![프레임워크별 결과](figures/frameworks.png)
 
+## 에이전트별 그래프
+
+> `scripts/analysis/make_agent_figures.py`가 집계 JSON(`results/summary/`)에서 생성한다. 에이전트마다 세 조건의 ASR·정상 Utility·공격 중 Utility와 95% Wilson 신뢰구간이다. native는 전체 규모, 나머지는 층화 표본이다.
+
+**native**
+
+![native](figures/agent_native.png)
+
+**smolagents**
+
+![smolagents](figures/agent_smolagents.png)
+
+**mini-swe-agent**
+
+![mini-swe-agent](figures/agent_mini-swe-agent.png)
+
+
 ## 실험 흐름
 
 ```mermaid
