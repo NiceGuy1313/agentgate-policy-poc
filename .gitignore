@@ -34,9 +34,6 @@ AGENTS.md
 
 # Run artefacts
 logs/
-# Raw live-run directories (per-run JSON); summaries go to results/RESULTS.md
-results/**/live/
-results/**/replay/
 
 # Dashboard run history (inspection only)
 dashboard/runs/
@@ -47,4 +44,6 @@ data/cache/
 # Stray logs from local runs
 *.log
 nohup.out
-results/runs/
+
+# Experiment reports and outputs (local only)
+results/
