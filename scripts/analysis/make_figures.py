@@ -25,7 +25,7 @@ from agentgate.experiment.metrics import wilson  # noqa: E402
 
 FIG_DIR = PROJECT_ROOT / "results" / "figures"
 ORDER = ["no_gate", "gate_static_rules", "gate_llm_judge"]
-LABEL = {"no_gate": "No gate", "gate_static_rules": "Static rules (regex)", "gate_llm_judge": "LLM Judge(Policy)"}
+LABEL = {"no_gate": "No Gate", "gate_static_rules": "Static Checker (Policy)", "gate_llm_judge": "LLM Judge (Policy)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_static_rules": "#1a73e8", "gate_llm_judge": "#e8710a"}
 METRICS = [("asr", "ASR (lower is better)"), ("utility", "Utility (benign)"),
            ("utility_under_attack", "Utility under attack")]
@@ -184,8 +184,8 @@ def fig_contrast(contrast: dict, out: Path) -> None:
             errs[1].append(100 * (hi - rate))
         xs = [j + (i - 0.5) * 0.38 for j in range(len(groups))]
         bars = ax.bar(xs, vals, 0.38, yerr=errs, capsize=3, color=color, label=label)
-        for bar, value in zip(bars, vals):
-            ax.text(bar.get_x() + bar.get_width() / 2, value + 2, f"{value:.1f}", ha="center", fontsize=8)
+        for bar, value, up in zip(bars, vals, errs[1]):
+            ax.text(bar.get_x() + bar.get_width() / 2, value + up + 1.5, f"{value:.1f}", ha="center", fontsize=8)
     ax.set_xticks(range(len(groups)), [name for _, name in groups])
     ax.set_ylim(0, 110)
     ax.set_ylabel("% of effect calls")

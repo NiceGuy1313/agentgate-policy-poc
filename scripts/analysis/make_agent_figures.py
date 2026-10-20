@@ -22,7 +22,7 @@ SUMMARY = PROJECT_ROOT / "results" / "summary"
 FIG_DIR = PROJECT_ROOT / "results" / "figures"
 SECTION = "## 에이전트별 그래프"
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
-LABEL = {"no_gate": "No gate", "gate_llm_judge": "LLM Judge(Policy)", "gate_static_rules": "Static rules (regex)"}
+LABEL = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_llm_judge": "#e8710a", "gate_static_rules": "#1a73e8"}
 METRICS = [("asr", "ASR\n(lower is better)"), ("utility", "Utility\n(benign)"), ("uua", "Utility\nunder attack")]
 
