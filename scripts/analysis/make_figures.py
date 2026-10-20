@@ -25,7 +25,7 @@ from agentgate.experiment.metrics import wilson  # noqa: E402
 
 FIG_DIR = PROJECT_ROOT / "results" / "figures"
 ORDER = ["no_gate", "gate_static_rules", "gate_llm_judge"]
-LABEL = {"no_gate": "No gate", "gate_static_rules": "Static rules (regex)", "gate_llm_judge": "LLM judge + rulebook"}
+LABEL = {"no_gate": "No gate", "gate_static_rules": "Static rules (regex)", "gate_llm_judge": "LLM Judge(Policy)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_static_rules": "#1a73e8", "gate_llm_judge": "#e8710a"}
 METRICS = [("asr", "ASR (lower is better)"), ("utility", "Utility (benign)"),
            ("utility_under_attack", "Utility under attack")]

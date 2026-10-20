@@ -26,7 +26,7 @@ RESULTS = PROJECT_ROOT / "results" / "RESULTS.md"
 SECTION = "## 프레임워크별 결과(층화 표본)"
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
 NAMES = {"no_gate": "Gate 없음", "gate_llm_judge": "판정 LLM + 룰북", "gate_static_rules": "룰북 정적 코드(정규식)"}
-LABEL = {"no_gate": "No gate", "gate_llm_judge": "LLM judge + rulebook", "gate_static_rules": "Static rules (regex)"}
+LABEL = {"no_gate": "No gate", "gate_llm_judge": "LLM Judge(Policy)", "gate_static_rules": "Static rules (regex)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_static_rules": "#1a73e8", "gate_llm_judge": "#e8710a"}
 METRICS = [("asr", "ASR"), ("utility", "Utility"), ("uua", "공격 중 Utility")]
 

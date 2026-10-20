@@ -103,7 +103,6 @@
 
 ![mini-swe-agent](figures/agent_mini-swe-agent.png)
 
-
 ## 실험 흐름
 
 ```mermaid

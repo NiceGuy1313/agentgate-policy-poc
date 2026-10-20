@@ -22,7 +22,7 @@ SUMMARY = PROJECT_ROOT / "results" / "summary"
 FIG_DIR = PROJECT_ROOT / "results" / "figures"
 SECTION = "## 에이전트별 그래프"
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
-LABEL = {"no_gate": "No gate", "gate_llm_judge": "LLM judge + rulebook", "gate_static_rules": "Static rules (regex)"}
+LABEL = {"no_gate": "No gate", "gate_llm_judge": "LLM Judge(Policy)", "gate_static_rules": "Static rules (regex)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_llm_judge": "#e8710a", "gate_static_rules": "#1a73e8"}
 METRICS = [("asr", "ASR\n(lower is better)"), ("utility", "Utility\n(benign)"), ("uua", "Utility\nunder attack")]
 
@@ -58,7 +58,7 @@ def draw(agent: str, info: dict, out) -> None:
     ax.set_xticks(range(len(METRICS)), [name for _, name in METRICS])
     ax.set_ylim(0, 108)
     ax.set_ylabel("%")
-    ax.set_title(f"{agent} — {info['sample']}", fontsize=10)
+    ax.set_title(agent, fontsize=11)
     ax.legend(frameon=False, fontsize=8, loc="upper left")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
