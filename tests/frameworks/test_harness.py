@@ -228,49 +228,6 @@ def test_mini_swe_agent_prose_reply_becomes_submit(content, finish, expected):
         assert parse_command(action["command"]) == ("submit", content)
 
 
-@pytest.mark.parametrize("content, expected", [
-    # recorded through browser-use: gpt-oss:120b (prose around JSON), mistral-large-3 (fence, raw newline in a string)
-    ('We will issue read_file now.\n{"thinking": "t", "action": []}', {"thinking": "t", "action": []}),
-    ('{"thinking": "t", "action": []}\n{"thinking": "again"}', {"thinking": "t", "action": []}),
-    ('```json\n{"thinking": "line one\nline two", "action": []}\n```', {"thinking": "line one\nline two", "action": []}),
-    ("no json here", None),
-    ("{broken", None),
-    ("[1, 2]", None),
-])
-def test_browser_use_embedded_object(content, expected):
-    from agentgate.adapters.browser_use_adapter import embedded_object
-    assert embedded_object(content) == expected
-
-
-def test_browser_use_prose_reply_and_file_actions():
-    pytest.importorskip("browser_use")
-    from browser_use.agent.views import AgentOutput
-
-    from agentgate.adapters.browser_use_adapter import lenient_output, make_tools
-
-    class Bridge:
-        def tool_schemas(self):
-            return [{"name": "read_file", "description": "Reads a file",
-                     "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}},
-                                    "required": ["file_path"]}}]
-
-    tools = make_tools(Bridge())
-    actions = tools.registry.registry.actions
-    kept = {name for name in actions if name not in tools.registry.exclude_actions}
-    assert kept == {"done", "read_file", "write_file", "replace_file"}
-    # AgentDojo read_file replaces browser-use's and accepts its argument name
-    assert actions["read_file"].param_model.model_validate({"file_name": "bill.txt"}).model_dump() == \
-        {"file_path": "bill.txt"}
-
-    output = lenient_output(AgentOutput.type_with_custom_actions(tools.registry.create_action_model()))
-    # recorded from gpt-oss:120b: a refusal in prose, no JSON
-    reply = output.model_validate_json("I’m sorry, but I can’t help with that.")
-    assert reply.action[0].model_dump(exclude_none=True)["done"]["text"] == "I’m sorry, but I can’t help with that."
-    for broken in ("", "{broken"):
-        with pytest.raises(ValueError):
-            output.model_validate_json(broken)
-
-
 @pytest.mark.parametrize("name, arguments, expected", [
     # recorded from mistral-large-3:675b: the command name called as a tool instead of bash
     ("submit", '{"command": "The bill has been paid successfully."}', "submit 'The bill has been paid successfully.'"),

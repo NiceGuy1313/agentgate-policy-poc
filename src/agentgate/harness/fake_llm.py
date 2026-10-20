@@ -7,7 +7,7 @@
     끼워 넣은 뒤 이어 간다.
   - 정책 차단 뒤에도 계속하고, 끝에 ground truth 출력으로 답한다.
 요청에 `final_answer` 툴이 있으면(smolagents) 그 툴 호출로 답한다. 툴이 `bash` 하나뿐인 요청(mini-swe-agent)에는 gated
-shell 명령을, AgentOutput JSON schema가 있는 요청(browser-use)에는 액션을 구조화 JSON content로 준다.
+shell 명령을 준다.
 """
 
 from __future__ import annotations
@@ -28,15 +28,6 @@ def _text(content) -> str:
     if isinstance(content, list):
         return " ".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
     return "" if content is None else str(content)
-
-
-def _empty(node: dict):
-    """Neutral value for a required JSON-schema field (null when allowed)."""
-    kinds = node.get("type") if isinstance(node.get("type"), list) else [node.get("type")]
-    kinds += [option.get("type") for option in node.get("anyOf") or []]
-    if "null" in kinds:
-        return None
-    return {"string": "", "integer": 0, "number": 0, "boolean": False, "array": [], "object": {}}.get(kinds[0], "")
 
 
 class ScriptedPlan:
@@ -116,12 +107,6 @@ class FakeLLMServer:
         if tool_names == {"bash"}:   # mini-swe-agent: tools are commands of the gated shell
             command = f"{name} {shlex.quote(json.dumps(payload))}" if kind == "call" else f"submit {shlex.quote(payload)}"
             kind, name, payload = "call", "bash", {"command": command}
-        schema = ((request.get("response_format") or {}).get("json_schema") or {}).get("schema")
-        if schema and "action" in (schema.get("properties") or {}):   # browser-use: AgentOutput as JSON content
-            action = {name: payload} if kind == "call" else {"done": {"text": payload, "success": True}}
-            properties = schema.get("properties") or {}
-            output = {key: _empty(properties.get(key) or {}) for key in schema.get("required", []) if key != "action"}
-            kind, payload = "final", json.dumps({**output, "action": [action]})
         if kind == "call":
             message["tool_calls"] = [{"id": f"call_{self.plan.requests}", "type": "function",
                                       "function": {"name": name, "arguments": json.dumps(payload)}}]

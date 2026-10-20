@@ -1,12 +1,8 @@
-"""mini-swe-agent gated shell 해석 테스트와 별도 venv의 browser-use conformance 테스트(LLM 없음)."""
-
-import subprocess
+"""mini-swe-agent gated shell 해석 테스트(LLM 없음)."""
 
 import pytest
 
 from agentgate.adapters.mini_swe_agent_adapter import GatedShell, parse_command
-from agentgate.config import PROJECT_ROOT
-from agentgate.harness import registry
 
 
 @pytest.mark.parametrize("line, expected", [
@@ -49,16 +45,3 @@ def test_gated_shell_runs_only_gated_tools_and_submit():
     with pytest.raises(Submitted) as exit_:
         shell.execute({"command": "submit 'done'"})
     assert exit_.value.messages[0]["extra"]["submission"] == "done"
-
-
-BROWSER_USE_PYTHON = registry.entry("browser-use").get("python")
-
-
-@pytest.mark.skipif(not BROWSER_USE_PYTHON or not (PROJECT_ROOT / BROWSER_USE_PYTHON).exists(),
-                    reason="browser-use venv not set up (README)")
-def test_browser_use_conformance_in_its_venv():
-    """browser-use cannot be imported next to agentgate's dependencies, so its conformance run uses its venv."""
-    result = subprocess.run([BROWSER_USE_PYTHON, "-m", "agentgate.harness.conformance", "--framework", "browser-use"],
-                            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=900)
-    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-2000:]
-    assert "8/8 passed" in result.stdout

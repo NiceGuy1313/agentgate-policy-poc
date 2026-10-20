@@ -41,7 +41,7 @@ def build_parser(legacy: bool = False) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m agentgate.experiment.cli", description=__doc__,
         epilog="Frameworks: any name registered in agentgate.harness.registry (native, smolagents, mini-swe-agent, "
-               "browser-use, config/frameworks.yaml entries).", formatter_class=argparse.RawDescriptionHelpFormatter)
+               "config/frameworks.yaml entries).", formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--framework", default="native",
                         help="agent framework (default native = AgentDojo pipeline); every condition works with each")
     parser.add_argument("--conditions", "--condition", dest="conditions", nargs="+",

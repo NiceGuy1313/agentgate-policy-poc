@@ -25,7 +25,6 @@ BUILTIN = {
     "native": "agentgate.adapters.native:NativeAdapter",
     "smolagents": "agentgate.adapters.smolagents_adapter:SmolagentsAdapter",
     "mini-swe-agent": "agentgate.adapters.mini_swe_agent_adapter:MiniSweAgentAdapter",
-    "browser-use": "agentgate.adapters.browser_use_adapter:BrowserUseAdapter",
 }
 ENTRY_POINT_GROUP = "agentgate.frameworks"
 

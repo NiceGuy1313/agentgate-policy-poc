@@ -101,7 +101,7 @@ class ModelSpec:
         return kwargs
 
     def openai_kwargs(self) -> dict:
-        """Arguments for OpenAI-SDK-style chat classes (browser-use ChatOpenAI, openai.OpenAI)."""
+        """Arguments for OpenAI-SDK-style chat classes (openai.OpenAI)."""
         return {"model": self.model, "base_url": self.resolved_base_url(), "api_key": self.api_key()}
 
     def label(self) -> str:

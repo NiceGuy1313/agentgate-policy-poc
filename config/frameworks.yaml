@@ -1,6 +1,6 @@
 # 추가 에이전트 프레임워크·contract Wrapper 등록(agentgate.harness.registry, docs/integration_guide.md).
 # Agent frameworks the dashboard and agentgate.scenarios.run --framework can run.
-# Built-in adapters (native, smolagents, mini-swe-agent, browser-use) need no entry. Add a Wrapper that follows contract v1 like this:
+# Built-in adapters (native, smolagents, mini-swe-agent) need no entry. Add a Wrapper that follows contract v1 like this:
 #
 #   my-wrapper:
 #     contract:
@@ -16,7 +16,3 @@ frameworks:
     description: Reference Wrapper (examples/contract_wrapper), stdlib OpenAI-compatible tool loop
     contract:
       command: [python, examples/contract_wrapper/minimal_agent.py]
-  browser-use:
-    # browser-use pins anthropic/openai versions that conflict with agentgate's, so it runs in its own venv
-    # (README "설치"). Built-in adapter; this entry only adds the interpreter.
-    python: .venv-browser-use/bin/python

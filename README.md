@@ -29,14 +29,6 @@ cp .env.example .env    # API 키 입력, git 제외
 python -m pytest -q
 ```
 
-browser-use는 의존성이 충돌하므로 별도 venv에 설치한다(`config/frameworks.yaml`의 `python:`가 이 venv를 가리킨다, Chrome 필요).
-
-```bash
-python3.13 -m venv .venv-browser-use
-.venv-browser-use/bin/pip install "browser-use @ git+https://github.com/NiceGuy1313/browser-use@f39fb5c3a6fc611688007819c71ef104bd6ca01a" agentdojo==0.1.35 pyyaml requests
-.venv-browser-use/bin/pip install --no-deps -e .
-```
-
 ## 실행
 
 ```bash

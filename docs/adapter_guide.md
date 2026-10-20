@@ -25,7 +25,6 @@ flowchart LR
 |---|---|---|---|
 | smolagents | 생성한 `Tool` 클래스의 `forward` | `forward`가 `gated_callable(bridge, name)`을 부른다 | [`adapters/smolagents_adapter.py`](../src/agentgate/adapters/smolagents_adapter.py):`make_tools` |
 | mini-swe-agent | 에이전트 환경(`Environment.execute`) | 셸 환경을 `GatedShell`로 바꾼다. 명령 한 줄이 툴 호출 하나이며 `bridge.invoke`로 간다(실제 셸 실행 없음) | [`adapters/mini_swe_agent_adapter.py`](../src/agentgate/adapters/mini_swe_agent_adapter.py):`GatedShell.execute` |
-| browser-use | `tools.registry.action`으로 등록한 액션 | AgentDojo 툴마다 gated 액션을 등록한다. 브라우저 액션은 뺀다 | [`adapters/browser_use_adapter.py`](../src/agentgate/adapters/browser_use_adapter.py):`make_tools`, `_gated_action` |
 | AgentDojo native | pipeline의 `runtime.run_function` | pipeline에 `BridgeRuntime`을 넘긴다. `run_function`이 `bridge.invoke_detail`을 부른다 | [`adapters/native.py`](../src/agentgate/adapters/native.py):`BridgeRuntime.run_function` |
 | 외부 프로세스 Wrapper | Wrapper 자신의 툴 실행 지점 | contract v1: 그 지점에서 `GateSession.invoke`를 부른다 → HTTP `/invoke` → `bridge.invoke` | [`harness/agentgate_client.py`](../src/agentgate/harness/agentgate_client.py):`GateSession.invoke`, [`harness/service.py`](../src/agentgate/harness/service.py):`invoke` |
 

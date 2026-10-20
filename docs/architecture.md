@@ -19,7 +19,7 @@ src/agentgate/
   policy_gate/   runtime(PolicyGateRuntime) · judge(Judge, register_judge) · rule_checker · rule_facts
                  · llm_judge · toolspec · toolspec_schema · assembly
   environments/  base(Environment, ScenarioRun) · agentdojo(AgentDojoEnvironment) · ENVIRONMENTS 등록부
-  adapters/      base(FrameworkAdapter) · native · smolagents · mini-swe-agent · browser-use · contract
+  adapters/      base(FrameworkAdapter) · native · smolagents · mini-swe-agent · contract
   harness/       bridge · session · registry · runner · worker · service · agentgate_client · conformance · tool_schema
   experiment/    conditions(register_condition) · batch(실행기) · cli(시나리오 CLI) · metrics · live_run_analysis
   scenarios/     AgentDojo suite·pipeline·재생·공격 궤적·쌍(runner·run·metrics·live_run_analysis는 experiment shim)
@@ -87,7 +87,6 @@ native 어댑터는 AgentDojo pipeline에 `BridgeRuntime`을 넘긴다. pipeline
 | native | AgentDojo pipeline에 `BridgeRuntime`. `run_function`이 `bridge.invoke_detail`을 부른다 | 경계 로그 없음(`tool_start` 없음). 우회는 툴 함수 보호(`ungated_executions`)로 잡는다 |
 | smolagents | 툴마다 `Tool`, `forward`에서 `bridge.invoke` | `Tool.__call__`: tool_start → gate_decision → tool_end |
 | mini-swe-agent | 툴은 `bash` 하나. `GatedShell`이 명령 한 줄을 툴 호출 하나로 처리한다(실제 셸 실행 없음) | `execute_action`: tool_start(bash) → gate_decision(명령별) → tool_end(bash) |
-| browser-use | 브라우저 액션을 빼고 툴마다 커스텀 액션. 이름이 겹치면 AgentDojo 툴 우선. 별도 venv | `Registry.execute_action`: tool_start → gate_decision → tool_end |
 | contract Wrapper | HTTP `/invoke` | Wrapper가 보낸 tool_start → gate_decision → tool_end |
 
 ## 4. 우회 감지와 무효 처리

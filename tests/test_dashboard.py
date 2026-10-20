@@ -223,7 +223,7 @@ def test_a_crashed_run_reports_the_error(client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------------------------- architecture
-@pytest.mark.parametrize("framework", ["smolagents", "mini-swe-agent", "browser-use"])
+@pytest.mark.parametrize("framework", ["smolagents", "mini-swe-agent"])
 def test_archify_diagrams_carry_the_agentgate_nodes(client, framework):
     response = client.get(f"/architecture/{framework}")
     assert response.status_code == 200

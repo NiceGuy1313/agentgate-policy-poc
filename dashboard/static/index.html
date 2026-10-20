@@ -480,7 +480,6 @@ const ADAPTER = {
   'native': 'AgentDojo 자체 파이프라인이 GatedRuntime을 직접 사용',
   'smolagents': 'smolagents Tool의 forward를 bridge.invoke로 교체',
   'mini-swe-agent': 'bash 환경을 툴 호출만 받는 GatedShell로 교체',
-  'browser-use': 'browser-use 액션 함수를 bridge.invoke로 교체',
 };
 const COST = {no_gate: '에이전트 LLM만', gate_llm_judge: '에이전트 + ToolSpec + 판정 LLM', gate_static_rules: '에이전트 + ToolSpec LLM'};
 const CAPTION = {
@@ -602,7 +601,7 @@ function renderDiagram() {
   diagramKey = key; host.replaceChildren();
   if (!has) {
     host.append(el('div', 'none', s.fw === 'native'
-      ? 'native는 AgentDojo 자체 파이프라인이 GatedRuntime(PolicyGateRuntime)을 직접 사용하므로 별도 Adapter 구조도가 없습니다. smolagents, mini-swe-agent, browser-use를 고르면 Archify 구조도를 볼 수 있습니다.'
+      ? 'native는 AgentDojo 자체 파이프라인이 GatedRuntime(PolicyGateRuntime)을 직접 사용하므로 별도 Adapter 구조도가 없습니다. smolagents, mini-swe-agent를 고르면 Archify 구조도를 볼 수 있습니다.'
       : `${s.fw}에는 구조도가 없습니다.`));
     return;
   }
