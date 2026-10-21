@@ -1,4 +1,6 @@
-[
+{
+"replay_mismatches": 0,
+"rows": [
 {
 "run": "banking/user_task_0/injection_task_5",
 "suite": "banking",
@@ -11315,3 +11317,4 @@
 "B": null
 }
 ]
+}
