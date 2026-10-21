@@ -1,4 +1,4 @@
-"""여러 Agent 프레임워크의 실행 결과를 집계해 results/summary/frameworks.json과 results/figures/frameworks.png를 만든다.
+"""여러 Agent 프레임워크의 실행 결과를 집계해 results/summary/frameworks.json을 만든다(그림은 make_agent_figures.py).
 
 입력: 프레임워크마다 같은 표본(--pairs)으로 돌린 실행 디렉터리(results/runs/<name>, 기록의 framework 필드로 구분).
 출력: 조건별 ASR·Utility·Utility under Attack(Wilson 신뢰구간)·차단 호출 수, 같은 짝 비교(exact McNemar).
@@ -13,14 +13,9 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-
-from agentgate.config import PROJECT_ROOT  # noqa: E402
-from agentgate.experiment.live_run_analysis import live_run_files  # noqa: E402
-from agentgate.experiment.metrics import mcnemar_exact, wilson  # noqa: E402
+from agentgate.config import PROJECT_ROOT
+from agentgate.experiment.live_run_analysis import live_run_files
+from agentgate.experiment.metrics import mcnemar_exact, wilson
 
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
 NAMES = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
@@ -79,29 +74,6 @@ def diff_text(d: dict) -> str:
     return f"{100 * d['diff']:+.1f}%p (p={d['p']:.3g}{', 유의' if d['p'] < 0.05 else ''})"
 
 
-def figure(table: dict, frameworks: list[str], out: Path) -> None:
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
-    width = 0.8 / len(CONDITIONS)
-    for ax, (metric, title) in zip(axes, [("asr", "ASR (lower is better)"), ("utility", "Utility (benign)"),
-                                          ("uua", "Utility under attack")]):
-        for i, c in enumerate(CONDITIONS):
-            vals = [100 * table[f][c][metric]["rate"] for f in frameworks]
-            lo = [100 * (table[f][c][metric]["rate"] - table[f][c][metric]["ci95"][0]) for f in frameworks]
-            hi = [100 * (table[f][c][metric]["ci95"][1] - table[f][c][metric]["rate"]) for f in frameworks]
-            xs = [j + (i - (len(CONDITIONS) - 1) / 2) * width for j in range(len(frameworks))]
-            ax.bar(xs, vals, width, yerr=[lo, hi], capsize=2, color=COLOR[c], label=LABEL[c])
-        ax.set_xticks(range(len(frameworks)), frameworks, fontsize=8)
-        ax.set_ylim(0, 105)
-        ax.set_title(title)
-        ax.set_ylabel("%")
-        ax.spines[["top", "right"]].set_visible(False)
-    axes[0].legend(frameon=False, fontsize=8)
-    fig.suptitle("Agent frameworks × verification method (stratified sample, 95% Wilson CI)", fontsize=10)
-    fig.tight_layout()
-    fig.savefig(out, dpi=160)
-    plt.close(fig)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--runs", nargs="+", required=True)
@@ -117,9 +89,6 @@ def main():
             cell = [r for r in runs if r["framework"] == f and r["condition"] == c]
             table[f][c] = {m: rate([v for r in cell if (v := outcome(r, m)) is not None]) for m, _ in METRICS}
             table[f][c]["blocked"] = sum(e.get("blocked", False) for r in cell for e in r["trace"])
-    fig_dir = PROJECT_ROOT / "results" / "figures"
-    fig_dir.mkdir(parents=True, exist_ok=True)
-    figure(table, frameworks, fig_dir / "frameworks.png")
     summary_dir = PROJECT_ROOT / "results" / "summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
     comparisons = [("gate_llm_judge", "no_gate"), ("gate_static_rules", "no_gate"), ("gate_llm_judge", "gate_static_rules")]
@@ -129,7 +98,7 @@ def main():
         {"sample": args.pairs, "skipped": dict(skipped), "table": table, "paired": paired_table},
         indent=1, ensure_ascii=False))
 
-    print(f"wrote {fig_dir / 'frameworks.png'}, {summary_dir / 'frameworks.json'} (report: write_report.py)")
+    print(f"wrote {summary_dir / 'frameworks.json'} (figures: make_agent_figures.py, report: write_report.py)")
 
 
 if __name__ == "__main__":
