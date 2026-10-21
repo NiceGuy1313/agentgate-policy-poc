@@ -1,0 +1,14 @@
+{
+ "runs_by_condition": {
+  "gate_llm_judge": 1046,
+  "gate_static_rules": 1046,
+  "no_gate": 1046
+ },
+ "runs": 3138,
+ "gate_events": 11136,
+ "blocked_events": 1175,
+ "runs_with_unexecuted_requests_at_loop_limit": 33,
+ "violations": 0,
+ "violations_by_check": {},
+ "examples": []
+}

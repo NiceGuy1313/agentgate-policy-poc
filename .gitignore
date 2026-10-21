@@ -46,4 +46,4 @@ data/cache/
 nohup.out
 
 # Experiment reports and outputs (local only)
-results/
+results/runs/
