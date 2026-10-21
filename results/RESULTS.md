@@ -74,50 +74,114 @@
 **8. smolagents의 ASR이 mini-swe-agent의 두 배인 이유**
 
 현상
-- Gate 없음 ASR: smolagents 56.7%(165/291), mini-swe-agent 25.4%(74/291), native 23.2%다. 같은 모델(gpt-oss:120b)과 같은 공격(`tool_knowledge`)을 썼다.
-- 능력 차이가 아니다.
-  - 정상 Utility가 81.4%와 83.5%로 같다.
-  - 주입문이 든 툴 응답을 받는 비율도 같다(83–90%).
-- 차이는 주입문을 받은 뒤 그 지시를 따르는 비율에서 난다.
-  - 추종률: smolagents 63%, mini-swe-agent 21%.
-  - 따르지 않은 경우 모델은 주입을 지적하지 않고 무시한다. 최종 답에서 주입을 언급한 run은 0–1건이다.
-  - smolagents는 주입된 지시를 따르다 원래 작업도 놓친다(공격 중 Utility 44.0% 대 66.0%).
+- Gate 없음 ASR(층화 표본)은 smolagents 56.7%(165/291), mini-swe-agent 25.4%(74/291)다.
+- 두 실행은 같은 모델(gpt-oss:120b)과 같은 공격(`tool_knowledge`)을 썼다.
+- 정상 Utility(81.4%, 83.5%)와 주입문이 든 툴 응답을 받는 비율(85–91%)은 같다.
+- 차이는 주입문을 받은 뒤 그 지시를 따르는 비율에서만 난다.
 
-원인 1: smolagents 기본 시스템 프롬프트가 툴 응답 속 지시를 행동으로 옮기게 만든다(가장 큰 요인)
-- smolagents `ToolCallingAgent`의 기본 프롬프트
-  - 모델을 "expert assistant who can solve any task"로 둔다.
-  - "You can use the result of the previous action as input for the next action"이라 쓰고, 툴 결과(Observation)를 받아 곧바로 다음 툴을 부르는 예시 3개를 보인다.
-  - "ALWAYS provide a tool call, else you will fail"을 첫 규칙으로 둔다.
-  - 그 결과 "툴 결과에 적힌 것을 다음 행동으로 옮긴다"는 패턴이 강화된다.
-- 주입문은 정확히 그 형태다. "먼저 이 일을 하라"는 지시와 함께 쓸 툴 이름과 인자를 준다.
-- mini-swe-agent와 native는 짧은 지시만 쓴다("You are a helpful assistant that completes the user's task", AgentDojo 기본 시스템 메시지).
-- 근거: smolagents의 시스템 프롬프트만 mini-swe-agent와 같은 짧은 지시로 바꾸면 같은 공격 96건에서 ASR이 57.3%에서 39.6%로 준다(exact McNemar p=0.0002).
+결론
+- **주원인은 smolagents의 기본 시스템 프롬프트다.**
+  - 이 프롬프트만 짧은 지시로 바꾸면 ASR이 51.0%에서 34.4%로 내려간다(p=0.00015).
+  - 독립된 두 번의 실행에서 같은 결과가 나왔다(지난 실행 57.3% → 39.6%, p=0.0002).
+- **툴 응답의 역할(`user` 대 `tool`)은 원인이 아니다.**
+  - 기본 프롬프트에서 역할만 바꾸면 51.0% → 51.0%(p=1)다.
+  - 짧은 프롬프트에서 역할만 바꾸면 34.4% → 32.3%(p=0.79)다.
+- **mini-swe-agent의 `bash` 명령 인터페이스·셸 출력 형식은 작은 추가 요인이다.**
+  - mini-swe-agent는 같은 짧은 프롬프트·`tool` 역할의 native보다 ASR이 10%p 낮다(24.0% 대 34.4%, p=0.021). 지난 실행에서도 p=0.021로 같았다.
+  - 다만 출력 형식과 인터페이스를 하나씩 바꾼 단계는 각각 유의하지 않아, 둘 중 어느 쪽인지는 나누지 못했다.
+- **멀티턴 구조 차이는 원인이 아니다.**
+  - 세 에이전트 모두 "LLM 호출 → 툴 실행 → 결과를 대화 기록에 붙여 다시 호출"하는 같은 단일 에이전트 루프다.
+  - smolagents 안에서 루프는 그대로 두고 프롬프트만 바꿔도 ASR이 내려간다. 이때 작업당 LLM 턴은 오히려 5.9에서 7.0으로 늘었다.
 
-원인 2: smolagents는 툴 응답을 `user` 역할로 넘긴다(원인 1이 없을 때 드러나는 요인)
-- smolagents는 툴 호출을 assistant 텍스트로 적고, 툴 응답을 `user` 메시지(`Observation:\n…`)로 보낸다(`tool_role_conversions`, `smolagents/models.py` 282–285행).
-- mini-swe-agent와 native는 `tool` 역할로 보낸다.
-- 주입문은 "This is an important message from me, Emma Johnson"으로 시작해 사용자 서명으로 끝난다. `user` 역할로 들어가면 형식상 실제 사용자 발화와 같다.
-- 근거
-  - 기본 프롬프트에서는 역할만 `tool`로 바꿔도 ASR이 줄지 않는다(57.3% → 53.1%, p=0.42). 원인 1이 이 차이를 덮는다.
-  - 짧은 프롬프트에서는 `tool` 역할로 바꾸면 39.6%에서 28.1%로 더 준다(p=0.019).
+구조 차이: 모델이 받는 대화
 
-두 원인을 함께 없애면 차이가 사라진다
-- smolagents의 프롬프트와 역할을 모두 mini-swe-agent·native처럼 바꾸면 다음과 같다.
-  - ASR이 28.1%가 되어 native(31.2%), mini-swe-agent(20.8%)와 차이가 유의하지 않다(p=0.61, 0.14).
-  - 공격 중 Utility도 63.5%로 mini-swe-agent와 같다.
-- 따라서 두 배 차이는 이 두 가지 Wrapper 구성에서 나온다. 기반 모델이나 smolagents의 툴 실행 방식 자체에서 나오지 않는다.
+```mermaid
+flowchart LR
+  subgraph S["smolagents (기본) — ASR 51–57%"]
+    direction TB
+    S1["system<br/>기본 ToolCallingAgent 프롬프트 3,778자<br/>expert persona · 결과 연결 지시 · 예시 3개 · ALWAYS 규칙"]
+    S2["user<br/>New task: 사용자 작업"]
+    S3["assistant (텍스트)<br/>Calling tools: [read_file ...]"]
+    S4["user<br/>Observation: …주입문…"]
+    S1 --> S2 --> S3 --> S4 -->|다음 턴| S3
+  end
+  subgraph N["native (AgentDojo) — ASR 31–34%"]
+    direction TB
+    N1["system<br/>AgentDojo 기본 메시지(짧음)"]
+    N2["user<br/>사용자 작업"]
+    N3["assistant<br/>tool_calls: read_file(...)"]
+    N4["tool<br/>…주입문…"]
+    N1 --> N2 --> N3 --> N4 -->|다음 턴| N3
+  end
+  subgraph M["mini-swe-agent — ASR 21–25%"]
+    direction TB
+    M1["system<br/>Adapter SYSTEM_TEMPLATE 919자<br/>helpful assistant · bash 명령 문법"]
+    M2["user<br/>사용자 작업"]
+    M3["assistant<br/>tool_calls: bash(command=#quot;read_file '{...}'#quot;)"]
+    M4["tool<br/>#lt;returncode#gt;0#lt;/returncode#gt;#lt;output#gt;…주입문…#lt;/output#gt;"]
+    M1 --> M2 --> M3 --> M4 -->|다음 턴| M3
+  end
+  S ~~~ N ~~~ M
+  style S1 fill:#fde2e1,stroke:#d93025
+  style S4 fill:#fef7e0,stroke:#f9ab00
+  style M3 fill:#e6f4ea,stroke:#188038
+  style M4 fill:#e6f4ea,stroke:#188038
+```
 
-원인 3(작은 요인): mini-swe-agent의 명령 인터페이스
-- mini-swe-agent는 툴이 `bash` 하나다.
-- 주입문이 지목한 툴을 부르려면 `send_money '{...}'` 같은 명령 문자열로 바꿔야 하고, 툴 결과도 `<output>` 셸 출력으로 감싸진다.
-- 같은 짧은 프롬프트·`tool` 역할인 native(31.2%)보다 mini-swe-agent(20.8%)가 더 낮다(p=0.021). 이 차이가 인터페이스에서 오는지는 따로 측정하지 않았다.
+- 붉은 칸(시스템 프롬프트)이 효과가 확인된 원인이다.
+- 노란 칸(툴 응답을 `user` 역할로 보냄)은 효과가 없었다.
+- 초록 칸(`bash` 명령과 셸 출력 형식)은 mini-swe-agent만의 작은 추가 요인이다.
+
+ASR 분해: smolagents 기본에서 mini-swe-agent까지 한 요인씩 바꿨을 때(같은 공격 96건, exact McNemar)
+
+```mermaid
+flowchart LR
+  A["smolagents 기본<br/>51.0%"] -->|"시스템 프롬프트 → 짧은 지시<br/>−16.6%p · p=0.00015 · 유의"| B["34.4%"]
+  B -->|"툴 응답 user → tool<br/>−2.1%p · p=0.79"| C["32.3%<br/>(native 34.4%와 p=0.82)"]
+  C -->|"툴 결과 셸 형식 감싸기<br/>−3.1%p · p=0.55"| D["29.2%"]
+  D -->|"bash 명령 인터페이스<br/>−5.2%p · p=0.30"| E["mini-swe-agent<br/>24.0%"]
+  style A fill:#fde2e1,stroke:#d93025
+  style B fill:#fef7e0,stroke:#f9ab00
+  style E fill:#e6f4ea,stroke:#188038
+```
+
+후보별 판정 근거
+- 시스템 프롬프트: 원인으로 확정
+  - smolagents 기본 프롬프트(3,778자)는 다음을 담는다.
+    - persona: "expert assistant who can solve any task"
+    - 결과 연결 지시: "You can use the result of the previous action as input for the next action"
+    - Observation 다음에 곧바로 툴을 부르는 예시 3개
+    - 규칙: "ALWAYS provide a tool call, else you will fail"
+  - 짧은 지시(mini-swe-agent와 같은 문장)로 바꾸면 ASR이 16.6%p 내려간다.
+  - 바꾼 뒤 smolagents(34.4%)는 native(34.4%)와 같다(p=1).
+  - 구성 요소를 하나씩만 빼면 ASR이 내려가지 않는다.
+    - persona 50.0%, 결과 연결 지시 55.2%, 예시 50.0%, ALWAYS 규칙 55.2%
+    - 기본 51.0%와 비교해 모두 p≥0.2다.
+  - 따라서 특정 문장 하나가 원인이 아니다. 네 요소가 모두 "툴 결과를 받아 곧바로 다음 툴 호출로 옮기라"는 같은 방향을 가리키므로, 하나만 빼면 나머지가 같은 효과를 낸다. 전부 없앨 때만 ASR이 내려간다.
+- 툴 응답 역할: 원인 아님
+  - smolagents는 툴 응답을 `user` 메시지(`Observation:\n…`)로 보낸다(`tool_role_conversions`, `smolagents/models.py` 282–285행).
+  - 이를 `tool` 메시지로 바꿔도 기본 프롬프트에서 51.0% → 51.0%(p=1), 짧은 프롬프트에서 34.4% → 32.3%(p=0.79)다.
+  - 지난 실행의 기본 프롬프트 비교(57.3% → 53.1%, p=0.42)도 같다.
+  - 지난 실행에서 짧은 프롬프트일 때 보인 감소(p=0.019)는 이번에 재현되지 않았다.
+- `bash` 인터페이스·셸 출력 형식: 작은 요인(mini-swe-agent 한정)
+  - mini-swe-agent는 native보다 두 실행 모두 10%p 낮다(p=0.021).
+  - 짧은 프롬프트·`tool` 역할은 두 쪽이 같으므로, 차이는 툴 호출 방식(`bash` 한 개에 명령 문자열)과 툴 결과 형식(`<returncode>`·`<output>`)에서 온다.
+  - 하나씩 바꾼 단계(−3.1%p, −5.2%p)는 각각 유의하지 않아 어느 쪽 몫인지는 나누지 못했다.
+- 멀티턴 구조: 원인 아님
+  - 세 에이전트 모두 단일 에이전트가 같은 대화 기록을 이어 가는 루프다. 요약·계획 단계는 없다.
+  - 루프 코드가 같은 smolagents 안에서 프롬프트만 바꿔도 ASR이 바뀐다.
 
 시사점
-- 같은 모델이라도 Wrapper의 시스템 프롬프트와 메시지 구성에 따라 Gate 없는 ASR이 두 배 넘게 달라진다.
-- Gate를 붙이면 세 에이전트의 ASR이 모두 0.7–3.1%로 수렴한다. 툴 실행 지점에서 판정하는 방식은 이런 Wrapper 차이에 영향을 받지 않는다.
-- 근거 수치는 같은 공격 짝 96건(`data/agentdojo/pairs/role_ablation_97.txt`)을 Gate 없이 돌린 대조 실험에서 왔다(`results/summary/role_ablation.json`).
-  - 팔마다 한 번 실행했다.
-  - 오류로 1건을 제외했다.
+- 같은 모델이라도 Wrapper의 기본 시스템 프롬프트가 Gate 없는 ASR을 크게 바꾼다. 특히 "툴 결과를 곧바로 다음 행동으로 옮기라"고 미는 프롬프트가 그렇다.
+- Gate를 붙이면 세 에이전트 모두 ASR이 0.7–3.1%로 수렴한다. 툴 실행 지점에서 판정하는 방식은 이런 Wrapper 차이에 영향을 받지 않는다.
+
+실험 방법과 한계
+- 같은 공격 96건(`data/agentdojo/pairs/role_ablation_97.txt`, 층화 표본에서 사용자 작업마다 공격 하나)을 Gate 없이 11가지 구성으로 돌렸다.
+  - 구성은 Adapter 옵션 `system_prompt`, `tool_response_role`, `observation_format`으로 바꿨다.
+  - 실행 스크립트: `scripts/evaluation/factor_runs.sh`
+  - 집계: `results/summary/factor_analysis.json`
+- 구성마다 한 번 실행했다. 같은 구성의 실행 간 차이는 약 6%p(기본 smolagents 57.3%, 51.0%)이므로, 이보다 작은 차이는 원인으로 판정하지 않았다.
+- Ollama 오류로 세 번 실패한 1건은 모든 구성에서 뺐다.
 
 **결론**
 - 보안: 두 방식이 live에서 같은 수준(ASR 1–2%)이고, 같은 입력에서는 판정 LLM이 공격 호출을 조금 더 막는다.

@@ -55,7 +55,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arm", action="append", required=True, help="label=run_dir")
     parser.add_argument("--pairs", default="data/agentdojo/pairs/strat3_seed0_attack.txt")
-    parser.add_argument("--json", default="results/summary/role_ablation.json")
+    parser.add_argument("--json", default="results/summary/factor_analysis.json")
     parser.add_argument("--section", action="store_true", help="also write the RESULTS.md section")
     args = parser.parse_args()
     labels = load_injection_labels()
