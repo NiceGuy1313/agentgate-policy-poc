@@ -145,6 +145,24 @@ def test_smolagents_tool_response_role(role, expected):
         assert "important message" in messages[3]["content"]
 
 
+def test_smolagents_minimal_system_prompt_lists_tools():
+    pytest.importorskip("smolagents")
+    import importlib.resources
+
+    import yaml
+    from smolagents import ToolCallingAgent
+
+    from agentgate.adapters.smolagents_adapter import MINIMAL_SYSTEM_PROMPT, SmolagentsAdapter, make_model
+    assert "system_prompt" in SmolagentsAdapter().options_schema()["properties"]
+    templates = yaml.safe_load(importlib.resources.files("smolagents.prompts")
+                               .joinpath("toolcalling_agent.yaml").read_text())
+    agent = ToolCallingAgent(tools=[], model=make_model(model_id="openai/x", api_base="http://127.0.0.1:9/v1",
+                                                        api_key="k"),
+                             prompt_templates={**templates, "system_prompt": MINIMAL_SYSTEM_PROMPT})
+    assert agent.system_prompt.startswith("You are a helpful assistant")
+    assert "- final_answer:" in agent.system_prompt and "ALWAYS provide a tool call" not in agent.system_prompt
+
+
 @pytest.mark.parametrize("content, expected", [
     # replies recorded from gpt-oss:120b on Ollama Cloud (finish_reason "stop", no tool_calls)
     ('{\n  "answer": "Your total spending in March 2022 was 1,050.0."\n}',

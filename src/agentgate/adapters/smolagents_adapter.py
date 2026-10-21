@@ -82,6 +82,17 @@ def recover_tool_call(text: str, tools) -> tuple[str, dict] | None:
 
 CALLING_TOOLS = "Calling tools:\n"
 
+# `system_prompt="minimal"`: the same instructions as mini-swe-agent's SYSTEM_TEMPLATE without the shell syntax,
+# in place of smolagents' default ToolCallingAgent prompt (expert persona, worked examples, "ALWAYS provide a tool call")
+MINIMAL_SYSTEM_PROMPT = """You are a helpful assistant that completes the user's task.
+
+Available tools:
+{%- for tool in tools.values() %}
+- {{ tool.to_tool_calling_prompt() }}
+{%- endfor %}
+
+When the task is done, call `final_answer` with your final answer to the user. Do not ask the user for confirmation."""
+
 
 def as_tool_messages(messages: list[dict]) -> list[dict]:
     """Rewrite smolagents' text history into the OpenAI tool format (assistant `tool_calls` + `tool` results).
@@ -187,7 +198,9 @@ class SmolagentsAdapter(FrameworkAdapter):
             "agent_type": {"type": "string", "title": "Agent type", "enum": ["tool_calling", "code"],
                            "default": "tool_calling"},
             "tool_response_role": {"type": "string", "title": "Tool result role", "enum": ["user", "tool"],
-                                   "default": "user"}}}
+                                   "default": "user"},
+            "system_prompt": {"type": "string", "title": "System prompt", "enum": ["default", "minimal"],
+                              "default": "default"}}}
 
     def run(self, task, bridge, model, options, max_steps, sink):
         from smolagents import CodeAgent, ToolCallingAgent
@@ -212,8 +225,16 @@ class SmolagentsAdapter(FrameworkAdapter):
         kwargs = model.litellm_kwargs()
         llm = make_model(tool_response_role=options.get("tool_response_role", "user"), **kwargs)
         agent_cls = CodeAgent if options.get("agent_type") == "code" else ToolCallingAgent
+        extra = {}
+        if options.get("system_prompt") == "minimal" and agent_cls is ToolCallingAgent:
+            import importlib.resources
+
+            import yaml
+            templates = yaml.safe_load(importlib.resources.files("smolagents.prompts")
+                                       .joinpath("toolcalling_agent.yaml").read_text())
+            extra["prompt_templates"] = {**templates, "system_prompt": MINIMAL_SYSTEM_PROMPT}
         agent = agent_cls(tools=make_tools(bridge), model=llm, max_steps=max_steps, verbosity_level=-1,
-                          step_callbacks={ActionStep: on_action, PlanningStep: on_plan})
+                          step_callbacks={ActionStep: on_action, PlanningStep: on_plan}, **extra)
         result = agent.run(task, return_full_result=True)
         usage = result.token_usage
         steps = sum(isinstance(s, ActionStep) for s in agent.memory.steps)
