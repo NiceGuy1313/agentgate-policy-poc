@@ -45,6 +45,7 @@ python -m agentgate.harness.conformance --framework smolagents      # Gate 경�
 - [`docs/architecture.md`](docs/architecture.md): 모듈 구조, 단일 집행 지점, fail-closed
 - [`docs/rulebook.md`](docs/rulebook.md): 룰북 R1–R10, TaskSpec·ToolSpec, 정적 규칙 해석
 - 결과: `results/RESULTS.md`(스크립트 생성물, 실험 전에는 없다)
+- 정책 준수율·Gate 배치 분석: `results/COMPLIANCE.md`(에이전트 호출 대 사람 기준 판정)
 
 ## 폴더
 
