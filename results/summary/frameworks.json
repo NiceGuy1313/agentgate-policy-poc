@@ -188,5 +188,95 @@
     "blocked": 255
    }
   }
+ },
+ "paired": {
+  "smolagents": {
+   "gate_llm_judge - no_gate": {
+    "asr": {
+     "diff": -0.536,
+     "p": 8.7e-46
+    },
+    "utility": {
+     "diff": -0.07200000000000001,
+     "p": 0.118
+    },
+    "uua": {
+     "diff": 0.096,
+     "p": 0.00557
+    }
+   },
+   "gate_static_rules - no_gate": {
+    "asr": {
+     "diff": -0.5429999999999999,
+     "p": 2.2e-46
+    },
+    "utility": {
+     "diff": -0.175,
+     "p": 7.63e-05
+    },
+    "uua": {
+     "diff": 0.086,
+     "p": 0.0187
+    }
+   },
+   "gate_llm_judge - gate_static_rules": {
+    "asr": {
+     "diff": 0.006999999999999999,
+     "p": 0.688
+    },
+    "utility": {
+     "diff": 0.10300000000000001,
+     "p": 0.0129
+    },
+    "uua": {
+     "diff": 0.01,
+     "p": 0.795
+    }
+   }
+  },
+  "mini-swe-agent": {
+   "gate_llm_judge - no_gate": {
+    "asr": {
+     "diff": -0.247,
+     "p": 7.94e-21
+    },
+    "utility": {
+     "diff": -0.155,
+     "p": 0.00408
+    },
+    "uua": {
+     "diff": -0.062,
+     "p": 0.0247
+    }
+   },
+   "gate_static_rules - no_gate": {
+    "asr": {
+     "diff": -0.244,
+     "p": 1.51e-19
+    },
+    "utility": {
+     "diff": -0.146,
+     "p": 0.00258
+    },
+    "uua": {
+     "diff": -0.038,
+     "p": 0.235
+    }
+   },
+   "gate_llm_judge - gate_static_rules": {
+    "asr": {
+     "diff": -0.003,
+     "p": 1.0
+    },
+    "utility": {
+     "diff": 0.0,
+     "p": 1.0
+    },
+    "uua": {
+     "diff": -0.024,
+     "p": 0.382
+    }
+   }
+  }
  }
 }

@@ -1,9 +1,9 @@
-"""여러 에이전트 프레임워크의 실행 결과를 비교해 RESULTS.md의 "## 프레임워크별 결과" 절과 그림을 만든다.
+"""여러 Agent 프레임워크의 실행 결과를 집계해 results/summary/frameworks.json과 results/figures/frameworks.png를 만든다.
 
 입력: 프레임워크마다 같은 표본(--pairs)으로 돌린 실행 디렉터리(results/runs/<name>, 기록의 framework 필드로 구분).
-출력: results/RESULTS.md의 해당 절(있으면 교체, 없으면 "## 실험 흐름" 앞에 넣음), results/figures/frameworks.png,
-      results/summary/frameworks.json. 수치는 모두 실행 기록에서 계산한다(Gate 우회로 무효인 run은 제외).
-사용법: python scripts/analysis/summarize_frameworks.py --runs results/runs/strat_native results/runs/strat_smolagents ...
+출력: 조건별 ASR·Utility·Utility under Attack(Wilson 신뢰구간)·차단 호출 수, 같은 짝 비교(exact McNemar).
+      보고서 results/RESULTS.md는 scripts/analysis/write_report.py가 이 JSON으로 만든다. Gate 우회로 무효인 run은 제외.
+사용법: python scripts/analysis/summarize_frameworks.py --runs results/runs/strat_smolagents results/runs/strat_mini-swe-agent
 """
 
 from __future__ import annotations
@@ -22,8 +22,6 @@ from agentgate.config import PROJECT_ROOT  # noqa: E402
 from agentgate.experiment.live_run_analysis import live_run_files  # noqa: E402
 from agentgate.experiment.metrics import mcnemar_exact, wilson  # noqa: E402
 
-RESULTS = PROJECT_ROOT / "results" / "RESULTS.md"
-SECTION = "## 프레임워크별 결과(층화 표본)"
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
 NAMES = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
 LABEL = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
@@ -124,53 +122,14 @@ def main():
     figure(table, frameworks, fig_dir / "frameworks.png")
     summary_dir = PROJECT_ROOT / "results" / "summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
+    comparisons = [("gate_llm_judge", "no_gate"), ("gate_static_rules", "no_gate"), ("gate_llm_judge", "gate_static_rules")]
+    paired_table = {f: {f"{a} - {b}": {m: paired(runs, f, a, b, m) for m, _ in METRICS} for a, b in comparisons}
+                    for f in frameworks}
     (summary_dir / "frameworks.json").write_text(json.dumps(
-        {"sample": args.pairs, "skipped": dict(skipped), "table": table}, indent=1, ensure_ascii=False))
+        {"sample": args.pairs, "skipped": dict(skipped), "table": table, "paired": paired_table},
+        indent=1, ensure_ascii=False))
 
-    def cell(f, c, m):
-        x = table[f][c][m]
-        return f"{100 * x['rate']:.1f}% ({x['k']}/{x['n']})"
-    n_attack = table[frameworks[0]][CONDITIONS[0]]["asr"]["n"]
-    n_benign = table[frameworks[0]][CONDITIONS[0]]["utility"]["n"]
-    lines = [SECTION, "",
-             f"> `scripts/analysis/summarize_frameworks.py`가 생성한다. 팀원 Wrapper가 씌워진 프레임워크({', '.join(frameworks)})를 "
-             f"같은 층화 표본(`{args.pairs}`, 정상 {n_benign}건 · 공격 {n_attack}건, 작업마다 공격 3개)으로 돌렸다. "
-             "에이전트·LLM Judge는 모두 `ollama:gpt-oss:120b`, 공격은 `tool_knowledge`다. 모든 툴 실행은 Adapter → Bridge → "
-             "Policy Gate를 지난다. native 결과는 위 \"결과\" 절의 전체 규모 실험(조건마다 정상 97건 · 공격 949건)이다.", "",
-             f"제외한 run: 오류 {skipped.get('error', 0)}건, Gate 우회로 무효 {skipped.get('invalid', 0)}건. "
-             "Ollama 서버 오류(500·429)로 실패한 run은 다시 실행해 채웠고, 남은 오류는 AgentDojo 채점 함수가 에이전트 호출에 없는 "
-             "인자를 읽다 실패한 경우다.", "",
-             "| 프레임워크 | 조건 | ASR | Utility | Utility under Attack | 차단 호출 |", "|---|---|---|---|---|---|"]
-    for f in frameworks:
-        for c in CONDITIONS:
-            lines.append(f"| {f} | {NAMES[c]} | {cell(f, c, 'asr')} | {cell(f, c, 'utility')} | {cell(f, c, 'uua')} | "
-                         f"{table[f][c]['blocked']} |")
-    lines += ["", "같은 (사용자 작업, 공격) 짝끼리 비교한 차이(exact McNemar p):", ""]
-    for f in frameworks:
-        parts = []
-        for c in ("gate_llm_judge", "gate_static_rules"):
-            parts.append(f"{NAMES[c]} − No Gate: ASR {diff_text(paired(runs, f, c, 'no_gate', 'asr'))}, "
-                         f"Utility {diff_text(paired(runs, f, c, 'no_gate', 'utility'))}, "
-                         f"Utility under Attack {diff_text(paired(runs, f, c, 'no_gate', 'uua'))}")
-        parts.append("LLM Judge − Static Checker: ASR "
-                     f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'asr'))}, Utility "
-                     f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'utility'))}, Utility under Attack "
-                     f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'uua'))}")
-        lines.append(f"- **{f}**")
-        lines += [f"  - {p}" for p in parts]
-    lines += ["", "**프레임워크 × 검증 방식(95% Wilson 신뢰구간)**", "", "![프레임워크별 결과](figures/frameworks.png)", ""]
-
-    text = RESULTS.read_text() if RESULTS.exists() else "# 결과\n\n"
-    block = "\n".join(lines) + "\n"
-    if SECTION in text:
-        start = text.index(SECTION)
-        end = text.find("\n## ", start + len(SECTION))
-        text = text[:start] + block + ("" if end == -1 else text[end + 1:])
-    else:
-        anchor = "## 실험 흐름"
-        text = text.replace(anchor, block + "\n" + anchor, 1) if anchor in text else text + "\n" + block
-    RESULTS.write_text(text)
-    print(f"wrote {RESULTS}, {fig_dir / 'frameworks.png'}, {summary_dir / 'frameworks.json'}")
+    print(f"wrote {fig_dir / 'frameworks.png'}, {summary_dir / 'frameworks.json'} (report: write_report.py)")
 
 
 if __name__ == "__main__":
