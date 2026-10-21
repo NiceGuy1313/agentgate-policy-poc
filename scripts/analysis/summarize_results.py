@@ -260,9 +260,10 @@ def main():
     analysis, contrast = section("## 분석"), section("## 재생 대조")
     frameworks = section("## 프레임워크별 결과")   # scripts/analysis/summarize_frameworks.py
     agent_figures = section("## 에이전트별 그래프")   # scripts/analysis/make_agent_figures.py
+    role_ablation = section("## 프레임워크 요인 대조")   # scripts/analysis/role_ablation.py
     text = "\n".join(lines) + "\n"
     anchor = "## 실험 흐름"
-    for kept in (analysis, frameworks, agent_figures):
+    for kept in (analysis, frameworks, role_ablation, agent_figures):
         if kept:
             text = text.replace(anchor, kept + "\n" + anchor, 1)
     if contrast:

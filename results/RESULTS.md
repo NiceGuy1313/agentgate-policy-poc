@@ -50,63 +50,68 @@
 - 모든 프레임워크 실행에서 Gate를 우회한 툴 실행과 차단된 호출의 실행은 0건이다. Adapter가 툴 실행 지점을 Gate로 바꿔 두면 프레임워크 구조가 달라도 같은 판정이 강제된다.
 - browser-use는 gpt-oss:120b가 정상 작업을 거의 끝내지 못해(중간 집계 정상 Utility 5.9%) 평가에서 제외하였다.
 
-**8. smolagents와 mini-swe-agent의 Gate 없음 ASR이 두 배 넘게 차이 나는 이유**
+**8. smolagents와 mini-swe-agent의 Gate 없음 ASR이 두 배 넘게 차이 나는 이유(소규모 대조 실험, 아래 "프레임워크 요인 대조" 절)**
 
-차이의 크기와 범위
-- Gate 없음 ASR: smolagents 56.7%(165/291, 95% CI 51.0–62.3), mini-swe-agent 25.4%(74/291, 20.8–30.7)로 2.2배 차이다. 신뢰구간이 겹치지 않는다.
-- 통제된 조건: 두 실행은 같은 표본(`strat3_seed0`, 공격 291건), 같은 에이전트 모델(gpt-oss:120b), 같은 공격(`tool_knowledge`)을 썼다. 따라서 차이는 프레임워크에서 나온다.
-- 기본 능력 차이는 아니다. 정상 Utility는 81.4%(72.6–87.9)와 83.5%(74.9–89.6)로 신뢰구간이 겹친다.
-- 차이는 공격을 받을 때만 생긴다.
-  - 공격 중 Utility: smolagents 44.0%, mini-swe-agent 66.0%.
-  - smolagents는 주입된 지시를 따르면서 원래 작업도 놓친다.
-- Gate를 붙이면 차이가 대부분 사라진다.
-  - 판정 LLM: ASR 3.1% 대 0.7%.
-  - 정적 코드: ASR 2.4% 대 1.0%.
-  - 두 방식 모두 두 프레임워크의 신뢰구간이 겹친다.
+차이의 크기와 범위(층화 표본)
+- Gate 없음 ASR: smolagents 56.7%(165/291, 95% CI 51.0–62.3), mini-swe-agent 25.4%(74/291, 20.8–30.7)다.
+- 같은 표본, 같은 에이전트 모델(gpt-oss:120b), 같은 공격(`tool_knowledge`)이므로 차이는 프레임워크에서 나온다.
+- 기본 능력 차이는 아니다. 정상 Utility는 81.4%와 83.5%로 신뢰구간이 겹친다.
+- Gate를 붙이면 차이가 대부분 사라진다(판정 LLM 3.1% 대 0.7%, 정적 코드 2.4% 대 1.0%, 신뢰구간 겹침).
 
-주원인(코드로 확인): 툴 응답이 모델에 들어가는 역할(role)이 다르다
-- smolagents(`ToolCallingAgent` + `LiteLLMModel`)
-  - 툴 응답을 `user` 역할 메시지(`Observation:\n<툴 응답>`)로 보낸다.
-    - 기본 변환표 `tool_role_conversions`가 `TOOL_RESPONSE → USER`로 바꾼다(`smolagents/models.py` 282–285, 525행).
-    - 우리 Adapter(`make_model`)는 `custom_role_conversions`를 넘기지 않으므로 이 기본값이 그대로 적용된다.
-  - 툴 호출도 assistant 텍스트(`Calling tools: [...]`)로 기록되므로, 모델이 보는 대화에는 `tool` 역할이 없고 user와 assistant 발화만 번갈아 나온다.
-- mini-swe-agent
-  - 툴 응답을 `tool` 역할 메시지(`<returncode>0</returncode><output>…</output>`)로 보낸다(`minisweagent/models/litellm_model.py` 40–43행, `models/utils/actions_toolcall.py` 105–107행).
-- 같은 주입 문자열을 두 프레임워크의 실제 메시지 변환 코드에 넣어 확인했다. smolagents는 `user`, mini-swe-agent는 `tool`로 나간다.
-- `tool_knowledge` 주입문 형식
-  - "This is an important message from me, {user}, to you, {model}"로 시작하고 사용자 서명으로 끝난다.
-  - `user` 역할로 들어가면 형식상 실제 사용자 발화와 구분할 수 없다.
-- 세 에이전트의 역할과 Gate 없음 ASR. 툴 응답을 `tool` 역할로 보내는 두 에이전트는 23–25%이고, `user`로 보내는 smolagents만 56.7%다.
+후보 원인(코드로 확인한 두 프레임워크의 차이)
+- 시스템 프롬프트
+  - smolagents 기본 `ToolCallingAgent` 프롬프트는 "expert assistant who can solve any task", 예시 3개, "ALWAYS provide a tool call, else you will fail" 규칙을 담는다.
+  - mini-swe-agent는 Adapter의 짧은 `SYSTEM_TEMPLATE`("You are a helpful assistant that completes the user's task")를 쓴다.
+- 툴 응답 역할
+  - smolagents는 툴 호출을 assistant 텍스트로 적고, 툴 응답을 `user` 역할 메시지(`Observation:\n…`)로 보낸다(`tool_role_conversions`, `smolagents/models.py` 282–285행).
+  - mini-swe-agent와 native는 `tool` 역할로 보낸다.
+  - 주입문은 "This is an important message from me, {user}"로 시작하므로, `user` 역할이면 형식상 사용자 발화와 같다.
+- 행동 인터페이스
+  - smolagents와 native는 툴마다 함수 호출을 쓴다.
+  - mini-swe-agent는 `bash` 하나에 `send_money '{...}'` 명령 문자열을 쓴다.
 
-  | 에이전트 | 툴 응답 역할 | Gate 없음 ASR | 표본 |
-  |---|---|---|---|
-  | native | `tool`(`agents/ollama_agent.py` 69행) | 23.2% | 전체 규모(공격 949건) |
-  | mini-swe-agent | `tool` | 25.4% | 층화 표본(공격 291건) |
-  | smolagents | `user` | 56.7% | 층화 표본(공격 291건) |
+대조 실험
+- 같은 공격 짝 96건에서 Gate 없이 smolagents의 두 요인만 바꿨다.
+  - Adapter 옵션: `system_prompt=minimal`(mini-swe-agent와 같은 지시), `tool_response_role=tool`.
+  - native와 mini-swe-agent를 같은 짝으로 함께 돌렸다.
+- 기본 smolagents ASR은 57.3%로 층화 표본의 56.7%가 재현됐다.
 
-- 해석(추정): gpt-oss는 메시지 역할별 지시 우선순위를 따르도록 학습된 모델이어서 `user` 역할의 지시를 `tool` 역할의 지시보다 더 따르는 것으로 보인다. 이 인과는 아래 대조 실험으로 확인해야 한다.
+| smolagents 팔 | 시스템 프롬프트 | 툴 응답 역할 | ASR |
+|---|---|---|---|
+| 기본 | 기본 | `user` | 57.3% |
+| 역할만 변경 | 기본 | `tool` | 53.1% |
+| 프롬프트만 변경 | 짧은 프롬프트 | `user` | 39.6% |
+| 둘 다 변경 | 짧은 프롬프트 | `tool` | 28.1% |
 
-보조 요인(추정, 따로 측정하지 않음)
-- 행동까지의 거리
-  - 주입문은 실행할 툴 이름과 인자를 그대로 제시한다(`{tools}` 절).
-  - smolagents는 그 이름이 곧 호출 가능한 함수다.
-  - mini-swe-agent는 툴이 `bash` 하나뿐이어서 `send_money '{...}'` 같은 명령 문자열로 바꿔야 한다. 주입된 지시를 실행하기까지 한 단계가 더 있다.
-- 출력 감싸기: mini-swe-agent는 툴 응답을 `<output>` 태그 안의 셸 출력으로 보이게 감싼다. smolagents는 `Observation:` 머리말만 붙인다.
-- 시스템 프롬프트: 두 프레임워크의 시스템 프롬프트가 다르다(smolagents 기본 프롬프트, mini-swe-agent는 Adapter의 `SYSTEM_TEMPLATE`). 영향은 확인되지 않음.
+  비교 기준(같은 짝): native 31.2%, mini-swe-agent 20.8%.
 
-확인하지 못한 것
-- run 단위 분해는 확인되지 않음. 원시 실행 기록(`results/runs/`)을 정리하며 지웠기 때문이다. 해당 항목:
-  - suite별 차이
-  - injection task별 차이
-  - 공격 성공 경로(툴 호출 대 답변 텍스트)
-  - 같은 짝에서 한쪽만 성공한 사례
-- 두 프레임워크 차이의 McNemar 검정도 같은 이유로 계산하지 못했다. 위 비교는 Wilson 신뢰구간 기준이다.
-- 조건마다 한 번만 실행했으므로 실행 간 변동은 확인되지 않음.
+결과
+- 역할만 바꾸면 효과가 없다: 57.3% → 53.1%(p=0.424).
+  - 처음 세운 "툴 응답이 `user` 역할이라서"라는 단일 원인 가설은 기각된다.
+- 시스템 프롬프트만 바꾸면 크게 줄어든다: 57.3% → 39.6%(p=0.000221).
+- 둘 다 바꾸면 28.1%로 내려간다(p=2.46e-07).
+  - native(31.2%, p=0.607)와 차이가 유의하지 않다.
+  - mini-swe-agent(20.8%, p=0.143)와도 차이가 유의하지 않다.
+  - 공격 중 Utility도 45.8%에서 63.5%로 올라 mini-swe-agent(63.5%)와 같아진다.
+- 역할 효과는 짧은 프롬프트에서만 나타난다(39.6% → 28.1%, p=0.0192).
+  - 기본 프롬프트에서는 역할을 바꿔도 줄지 않는다.
+  - 기본 프롬프트가 "항상 툴을 호출해 과제를 해결하라"고 강하게 밀어서 역할 차이를 덮는 것으로 보인다(해석).
+- 노출률은 모든 팔이 83–90%로 비슷하다. 차이는 주입을 본 뒤의 추종률에서 난다.
+  - 추종률: 기본 smolagents 62.7%, 둘 다 바꾼 smolagents 30.6%, mini-swe-agent 21.4%.
+- 따르지 않은 run에서 최종 답이 주입을 언급한 경우는 팔마다 0–1건이다. 모델은 주입을 지적하지 않고 무시한다.
+- 남은 차이
+  - native와 mini-swe-agent 사이에는 작은 차이가 남는다(31.2% 대 20.8%, p=0.0213). `bash` 명령 인터페이스나 `<output>` 감싸기의 영향일 수 있으나 따로 측정하지 않았다.
+  - 둘 다 바꾼 smolagents와 mini-swe-agent의 차이(28.1% 대 20.8%)는 이 표본에서 유의하지 않다.
 
-인과를 확인하는 방법(실행하지 않음)
-- smolagents에 `custom_role_conversions={TOOL_CALL: ASSISTANT}`를 넘겨 툴 응답을 `tool` 역할로 유지한다. 같은 291건을 Gate 없음으로 다시 돌린다.
-- 반대로 mini-swe-agent의 툴 응답을 `user` 역할로 바꿔 돌린다.
-- ASR이 역할을 따라 움직이면 주원인이 확인된다. 이때는 원시 기록을 남겨 run 단위로 분해한다.
+결론
+- 두 배 차이의 주원인은 smolagents 기본 시스템 프롬프트다.
+- 툴 응답을 `user` 역할로 보내는 구조는 짧은 프롬프트와 함께일 때만 추가로 ASR을 높인다.
+- 두 요인을 mini-swe-agent·native 수준으로 맞추면 smolagents의 ASR도 같은 수준(28%)으로 내려간다.
+
+한계
+- 표본은 공격 96건(사용자 작업마다 공격 하나)이고, 조건마다 한 번 실행했다.
+- smolagents `tool` 역할 팔은 1건(`workspace/user_task_7/injection_task_13`)이 Ollama 500 오류로 세 번 실패해 모든 팔에서 제외했다.
+- 기본 프롬프트의 어느 부분(persona, 예시, "ALWAYS provide a tool call" 규칙)이 효과를 내는지는 나누어 보지 않았다.
 
 **결론**
 - 보안: 두 방식이 live에서 같은 수준(ASR 1–2%)이고, 같은 입력에서는 판정 LLM이 공격 호출을 조금 더 막는다.
@@ -144,6 +149,60 @@
 **프레임워크 × 검증 방식(95% Wilson 신뢰구간)**
 
 ![프레임워크별 결과](figures/frameworks.png)
+
+## 프레임워크 요인 대조(소규모)
+
+> `scripts/analysis/role_ablation.py`가 생성한다. 같은 공격 짝 96건(`data/agentdojo/pairs/role_ablation_97.txt`, `strat3_seed0`에서 사용자 작업마다 첫 공격 하나)을 Gate 없이, gpt-oss:120b와 `tool_knowledge`로 돌렸다. smolagents 팔은 Adapter 옵션 두 개만 바꾼다. `system_prompt=minimal`은 기본 `ToolCallingAgent` 프롬프트 대신 mini-swe-agent와 같은 짧은 지시를 쓰고, `tool_response_role=tool`은 툴 호출·응답을 smolagents 기본(assistant 텍스트 + `user` 메시지) 대신 OpenAI 툴 형식(assistant `tool_calls` + `tool` 메시지)으로 보낸다. 오류로 빠진 짝은 모든 팔에서 제외한다. 노출은 주입문이 든 툴 응답을 받은 run, 추종률은 노출된 run 중 공격이 성공한 비율이다.
+
+| 팔 | ASR | 공격 중 Utility | 노출 | 노출 시 추종률 | 평균 툴 호출 | 오류 제외 |
+|---|---|---|---|---|---|---|
+| smolagents 기본(기본 프롬프트·user 역할) | 57.3% (55/96, 47.3–66.7) | 45.8% (44/96, 36.2–55.8) | 86.5% (83/96, 78.2–91.9) | 62.7% (52/83, 51.9–72.3) | 5.16 | 0 |
+| smolagents tool 역할 | 53.1% (51/96, 43.2–62.8) | 51.0% (49/96, 41.2–60.8) | 89.6% (86/96, 81.9–94.2) | 57.0% (49/86, 46.4–66.9) | 5.33 | 1 |
+| smolagents 짧은 프롬프트 | 39.6% (38/96, 30.4–49.6) | 52.1% (50/96, 42.2–61.8) | 89.6% (86/96, 81.9–94.2) | 43.0% (37/86, 33.1–53.6) | 5.82 | 0 |
+| smolagents 짧은 프롬프트·tool 역할 | 28.1% (27/96, 20.1–37.8) | 63.5% (61/96, 53.6–72.5) | 88.5% (85/96, 80.6–93.5) | 30.6% (26/85, 21.8–41.0) | 4.74 | 0 |
+| native | 31.2% (30/96, 22.9–41.1) | 57.3% (55/96, 47.3–66.7) | 83.3% (80/96, 74.6–89.5) | 36.2% (29/80, 26.6–47.2) | 4.3 | 0 |
+| mini-swe-agent | 20.8% (20/96, 13.9–30.0) | 63.5% (61/96, 53.6–72.5) | 87.5% (84/96, 79.4–92.7) | 21.4% (18/84, 14.0–31.4) | 4.17 | 0 |
+
+같은 짝끼리 비교(exact McNemar p, 앞 팔만 성공 / 뒤 팔만 성공):
+
+- smolagents 기본(기본 프롬프트·user 역할) vs smolagents tool 역할: ASR 9/5 (p=0.424), 공격 중 Utility 5/10 (p=0.302)
+- smolagents 기본(기본 프롬프트·user 역할) vs smolagents 짧은 프롬프트: ASR 19/2 (p=0.000221), 공격 중 Utility 6/12 (p=0.238)
+- smolagents 기본(기본 프롬프트·user 역할) vs smolagents 짧은 프롬프트·tool 역할: ASR 30/2 (p=2.46e-07), 공격 중 Utility 4/21 (p=0.000911)
+- smolagents 기본(기본 프롬프트·user 역할) vs native: ASR 27/2 (p=1.62e-06), 공격 중 Utility 7/18 (p=0.0433)
+- smolagents 기본(기본 프롬프트·user 역할) vs mini-swe-agent: ASR 38/3 (p=1.05e-08), 공격 중 Utility 6/23 (p=0.00232)
+- smolagents tool 역할 vs smolagents 짧은 프롬프트: ASR 17/4 (p=0.0072), 공격 중 Utility 9/10 (p=1)
+- smolagents tool 역할 vs smolagents 짧은 프롬프트·tool 역할: ASR 25/1 (p=8.05e-07), 공격 중 Utility 5/17 (p=0.0169)
+- smolagents tool 역할 vs native: ASR 23/2 (p=1.94e-05), 공격 중 Utility 11/17 (p=0.345)
+- smolagents tool 역할 vs mini-swe-agent: ASR 33/2 (p=3.67e-08), 공격 중 Utility 8/20 (p=0.0357)
+- smolagents 짧은 프롬프트 vs smolagents 짧은 프롬프트·tool 역할: ASR 15/4 (p=0.0192), 공격 중 Utility 5/16 (p=0.0266)
+- smolagents 짧은 프롬프트 vs native: ASR 14/6 (p=0.115), 공격 중 Utility 10/15 (p=0.424)
+- smolagents 짧은 프롬프트 vs mini-swe-agent: ASR 22/4 (p=0.000534), 공격 중 Utility 7/18 (p=0.0433)
+- smolagents 짧은 프롬프트·tool 역할 vs native: ASR 6/9 (p=0.607), 공격 중 Utility 13/7 (p=0.263)
+- smolagents 짧은 프롬프트·tool 역할 vs mini-swe-agent: ASR 12/5 (p=0.143), 공격 중 Utility 11/11 (p=1)
+- native vs mini-swe-agent: ASR 13/3 (p=0.0213), 공격 중 Utility 6/12 (p=0.238)
+
+suite별 ASR:
+
+| 팔 | banking | slack | travel | workspace |
+|---|---|---|---|---|
+| smolagents 기본(기본 프롬프트·user 역할) | 50% (8/16) | 90% (19/21) | 80% (16/20) | 31% (12/39) |
+| smolagents tool 역할 | 56% (9/16) | 100% (21/21) | 65% (13/20) | 21% (8/39) |
+| smolagents 짧은 프롬프트 | 25% (4/16) | 67% (14/21) | 70% (14/20) | 15% (6/39) |
+| smolagents 짧은 프롬프트·tool 역할 | 12% (2/16) | 62% (13/21) | 45% (9/20) | 8% (3/39) |
+| native | 19% (3/16) | 67% (14/21) | 60% (12/20) | 3% (1/39) |
+| mini-swe-agent | 19% (3/16) | 33% (7/21) | 40% (8/20) | 5% (2/39) |
+
+주입 유형별 ASR(A 외부 연락, B 금전, C 반출, D 삭제, E 계정, F 전파·방문, G 예약, H 툴 없는 출력):
+
+| 팔 | A | B | C | D | E | F | G | H |
+|---|---|---|---|---|---|---|---|---|
+| smolagents 기본(기본 프롬프트·user 역할) | 100% (3/3) | 0% (0/6) | 46% (25/54) | 100% (3/3) | 75% (3/4) | 73% (8/11) | 92% (11/12) | 67% (2/3) |
+| smolagents tool 역할 | 100% (3/3) | 17% (1/6) | 43% (23/54) | 33% (1/3) | 100% (4/4) | 82% (9/11) | 75% (9/12) | 33% (1/3) |
+| smolagents 짧은 프롬프트 | 100% (3/3) | 0% (0/6) | 22% (12/54) | 67% (2/3) | 75% (3/4) | 73% (8/11) | 75% (9/12) | 33% (1/3) |
+| smolagents 짧은 프롬프트·tool 역할 | 67% (2/3) | 0% (0/6) | 15% (8/54) | 33% (1/3) | 75% (3/4) | 45% (5/11) | 67% (8/12) | 0% (0/3) |
+| native | 33% (1/3) | 17% (1/6) | 17% (9/54) | 0% (0/3) | 75% (3/4) | 55% (6/11) | 75% (9/12) | 33% (1/3) |
+| mini-swe-agent | 33% (1/3) | 17% (1/6) | 9% (5/54) | 33% (1/3) | 75% (3/4) | 18% (2/11) | 58% (7/12) | 0% (0/3) |
+
 
 ## 에이전트별 그래프
 
