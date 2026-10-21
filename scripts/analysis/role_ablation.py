@@ -1,9 +1,9 @@
-"""프레임워크 요인 대조 실험(smolagents 시스템 프롬프트·툴 응답 역할, native, mini-swe-agent)을 집계해 RESULTS.md 절과 summary JSON을 만든다.
+"""프레임워크 요인 분리 실험(smolagents 시스템 프롬프트·툴 응답 역할·결과 형식, native, mini-swe-agent)을 집계한다.
 
-입력: 같은 공격 짝(`data/agentdojo/pairs/role_ablation_97.txt`)을 Gate 없이 돌린 실행 디렉터리 세 개.
+입력: 같은 공격 짝(기본 `data/agentdojo/pairs/strat3_seed0_attack.txt`)을 Gate 없이 돌린 팔별 실행 디렉터리.
 지표: ASR, 공격 중 Utility, 노출률(주입이 든 툴 응답을 받은 run), 노출 시 추종률, suite·주입 유형별 ASR,
-같은 짝끼리의 exact McNemar p. 수치는 모두 실행 기록에서 계산한다.
-사용법: python scripts/analysis/role_ablation.py --arm "smolagents (user)=results/runs/role_smol_user" ...
+같은 짝끼리의 exact McNemar p. 수치는 모두 실행 기록에서 계산해 summary JSON에 쓴다(--section이면 RESULTS.md 절도).
+사용법: python scripts/analysis/role_ablation.py --arm "기본=results/runs/f_s_default" --arm ... [--json ...]
 """
 
 from __future__ import annotations
@@ -54,7 +54,9 @@ def pct(x: dict) -> str:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arm", action="append", required=True, help="label=run_dir")
-    parser.add_argument("--pairs", default="data/agentdojo/pairs/role_ablation_97.txt")
+    parser.add_argument("--pairs", default="data/agentdojo/pairs/strat3_seed0_attack.txt")
+    parser.add_argument("--json", default="results/summary/role_ablation.json")
+    parser.add_argument("--section", action="store_true", help="also write the RESULTS.md section")
     args = parser.parse_args()
     labels = load_injection_labels()
     arms = {}
@@ -92,11 +94,14 @@ def main():
 
     comparisons = {f"{a} vs {b}": {"asr": paired(a, b), "uua": paired(a, b, "utility")}
                    for i, a in enumerate(names) for b in names[i + 1:]}
-    out = PROJECT_ROOT / "results" / "summary" / "role_ablation.json"
+    out = PROJECT_ROOT / args.json
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"pairs": args.pairs, "n_pairs": len(keys), "table": table,
                                "comparisons": comparisons}, indent=1, ensure_ascii=False))
 
+    if not args.section:
+        print(f"wrote {out}")
+        return
     lines = [SECTION, "",
              f"> `scripts/analysis/role_ablation.py`가 생성한다. 같은 공격 짝 {len(keys)}건(`{args.pairs}`, "
              "`strat3_seed0`에서 사용자 작업마다 첫 공격 하나)을 Gate 없이, gpt-oss:120b와 `tool_knowledge`로 돌렸다. "
