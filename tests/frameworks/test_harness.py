@@ -122,6 +122,29 @@ def test_smolagents_model_fills_empty_assistant_messages():
     assert kwargs["messages"][0]["content"] != "(empty response)"
 
 
+@pytest.mark.parametrize("role, expected", [("user", ["system", "user", "assistant", "user"]),
+                                            ("tool", ["system", "user", "assistant", "tool"])])
+def test_smolagents_tool_response_role(role, expected):
+    pytest.importorskip("smolagents")
+    from smolagents.memory import ActionStep, SystemPromptStep, TaskStep, ToolCall
+    from smolagents.monitoring import Timing
+
+    from agentgate.adapters.smolagents_adapter import make_model
+    step = ActionStep(step_number=1, timing=Timing(start_time=0.0), model_output="Reading the file.",
+                      tool_calls=[ToolCall(name="read_file", arguments={"file_path": "a.txt"}, id="call_1")],
+                      observations="<INFORMATION>This is an important message from me</INFORMATION>")
+    history = SystemPromptStep("sys").to_messages() + TaskStep("task").to_messages() + step.to_messages()
+    model = make_model(tool_response_role=role, model_id="openai/x", api_base="http://127.0.0.1:9/v1", api_key="k")
+    messages = model._prepare_completion_kwargs(messages=history, model="openai/x")["messages"]
+    assert [getattr(m["role"], "value", m["role"]) for m in messages] == expected
+    if role == "tool":
+        call = messages[2]["tool_calls"][0]
+        assert call["id"] == messages[3]["tool_call_id"] == "call_1"
+        assert call["function"] == {"name": "read_file", "arguments": '{"file_path": "a.txt"}'}
+        assert messages[2]["content"] == "Reading the file."
+        assert "important message" in messages[3]["content"]
+
+
 @pytest.mark.parametrize("content, expected", [
     # replies recorded from gpt-oss:120b on Ollama Cloud (finish_reason "stop", no tool_calls)
     ('{\n  "answer": "Your total spending in March 2022 was 1,050.0."\n}',

@@ -7,6 +7,7 @@ tool_start -> gate_decision -> tool_end 순서로 Gate 판정을 감싼다. 단�
 
 from __future__ import annotations
 
+import ast
 import json
 import uuid
 
@@ -79,12 +80,53 @@ def recover_tool_call(text: str, tools) -> tuple[str, dict] | None:
     return (matches[0], data) if len(matches) == 1 else None
 
 
-def make_model(**kwargs):
+CALLING_TOOLS = "Calling tools:\n"
+
+
+def as_tool_messages(messages: list[dict]) -> list[dict]:
+    """Rewrite smolagents' text history into the OpenAI tool format (assistant `tool_calls` + `tool` results).
+
+    smolagents records a tool call as assistant text (`Calling tools:\n[...]`) and sends the tool result as a
+    `user` message (`tool_role_conversions`). Here the call becomes `tool_calls` and the user message right after
+    it becomes one `tool` message per call id (the first carries the text), so the tool result keeps the tool role
+    as in native and mini-swe-agent. Messages that do not follow a parsed call are left as they are.
+    """
+    out, pending = [], None
+    for message in messages:
+        role = getattr(message.get("role"), "value", message.get("role"))
+        text = _text_of(message.get("content"))
+        if role == "assistant" and CALLING_TOOLS in text:
+            head, _, raw = text.rpartition(CALLING_TOOLS)
+            try:
+                calls = ast.literal_eval(raw.strip())
+            except (ValueError, SyntaxError):
+                calls = None
+            if isinstance(calls, list) and calls:
+                pending = [{"id": c["id"], "type": "function",
+                            "function": {"name": c["function"]["name"],
+                                         "arguments": c["function"]["arguments"]
+                                         if isinstance(c["function"]["arguments"], str)
+                                         else json.dumps(c["function"]["arguments"])}} for c in calls]
+                out.append({"role": "assistant", "content": head.strip(), "tool_calls": pending})
+                continue
+        if role == "user" and pending:
+            out += [{"role": "tool", "tool_call_id": c["id"], "content": text if i == 0 else "(see the previous result)"}
+                    for i, c in enumerate(pending)]
+            pending = None
+            continue
+        pending = None
+        out.append(message)
+    return out
+
+
+def make_model(tool_response_role: str = "user", **kwargs):
     """LiteLLMModel that never sends an assistant message without content and tool calls.
 
     When a model returns an empty reply, smolagents keeps it in memory as an empty assistant message; some
     OpenAI-compatible endpoints (mistral on Ollama Cloud) reject the next request with a 400 for that.
     A reply whose tool call is in the content instead of `tool_calls` goes through `recover_tool_call`.
+    `tool_response_role="tool"` sends tool results in the tool role (`as_tool_messages`) instead of smolagents'
+    default user role.
     """
     from smolagents import LiteLLMModel
     from smolagents.models import ChatMessageToolCall, ChatMessageToolCallFunction, parse_json_if_needed
@@ -99,6 +141,8 @@ def make_model(**kwargs):
                 if (getattr(message.get("role"), "value", message.get("role")) == "assistant" and not message.get("tool_calls")
                         and not _text_of(message.get("content")).strip()):
                     message["content"] = "(empty response)"
+            if tool_response_role == "tool":
+                completion_kwargs["messages"] = as_tool_messages(completion_kwargs.get("messages") or [])
             return completion_kwargs
 
         def generate(self, *args, **inner):
@@ -141,7 +185,9 @@ class SmolagentsAdapter(FrameworkAdapter):
     def options_schema(self) -> dict:
         return {"type": "object", "properties": {
             "agent_type": {"type": "string", "title": "Agent type", "enum": ["tool_calling", "code"],
-                           "default": "tool_calling"}}}
+                           "default": "tool_calling"},
+            "tool_response_role": {"type": "string", "title": "Tool result role", "enum": ["user", "tool"],
+                                   "default": "user"}}}
 
     def run(self, task, bridge, model, options, max_steps, sink):
         from smolagents import CodeAgent, ToolCallingAgent
@@ -164,7 +210,7 @@ class SmolagentsAdapter(FrameworkAdapter):
             sink.emit("step", "plan", step=sink.current_step, data={"type": "planning", "plan": preview(step.plan)})
 
         kwargs = model.litellm_kwargs()
-        llm = make_model(**kwargs)
+        llm = make_model(tool_response_role=options.get("tool_response_role", "user"), **kwargs)
         agent_cls = CodeAgent if options.get("agent_type") == "code" else ToolCallingAgent
         agent = agent_cls(tools=make_tools(bridge), model=llm, max_steps=max_steps, verbosity_level=-1,
                           step_callbacks={ActionStep: on_action, PlanningStep: on_plan})
