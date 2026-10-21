@@ -1,6 +1,6 @@
 # 에이전트 정책 준수율과 Gate 배치 분석
 
-> 본문의 수치는 모두 `scripts/analysis/compliance_review.py report`가 생성한 상세 표([`summary/compliance_tables.md`](summary/compliance_tables.md))에서 옮겼다. 호출 단위 판정 근거는 [`summary/compliance_labels.json`](summary/compliance_labels.json)에 있다.
+> 본문의 수치는 모두 `scripts/analysis/compliance_review.py report`가 생성한 상세 표([`summary/compliance_tables_native.md`](summary/compliance_tables_native.md))에서 옮겼다. 호출 단위 판정 근거는 [`summary/compliance_labels_native.json`](summary/compliance_labels_native.json)에 있다.
 
 ## 요약
 

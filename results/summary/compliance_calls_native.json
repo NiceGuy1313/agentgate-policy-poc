@@ -1,5 +1,8 @@
 {
-"replay_mismatches": 0,
+"replay_mismatches": {
+"content": 0,
+"order_only": 0
+},
 "rows": [
 {
 "run": "banking/user_task_0/injection_task_5",
