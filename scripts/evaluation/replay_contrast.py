@@ -1,16 +1,16 @@
-"""판정 LLM과 룰북 정적 코드의 재생 대조: 같은 입력을 판정 LLM + 룰북(gate_llm_judge)과 룰북 정적 코드
-(gate_static_rules)에 넣고 호출 단위로 비교한다.
+"""LLM Judge와 Static Checker의 재생 대조: 같은 입력을 LLM Judge (Policy, gate_llm_judge)와 Static Checker (Policy,
+gate_static_rules)에 넣고 호출 단위로 비교한다.
 
 정답 궤적(정상 97, 공격 949쌍)의 호출을 그대로 실행한다. effect 호출마다 판정 입력(TaskSpec + 지금까지의 ToolSpec +
 대기 중 호출)을 만들고 판정 결과로 막지는 않으므로, 두 판정기의 입력은 모든 호출에서 같다. 에이전트는 없다.
 B(`agentgate.policy_gate.rule_checker.RuleChecker`)는 같은 자리에서 로컬로 계산한다(LLM 호출 없음, 비용 0).
-모든 입력을 미리 알 수 있으므로 TaskSpec·ToolSpec은 Message Batches(50%)로 처리한다. 판정 LLM은 에이전트와 같은 모델을 쓰고
+모든 입력을 미리 알 수 있으므로 TaskSpec·ToolSpec은 Message Batches(50%)로 처리한다. LLM Judge는 에이전트와 같은 모델을 쓰고
 (`agentgate.policy_gate.llm_judge.resolve_judge_settings`), anthropic이면 Message Batches와 프롬프트 캐시, 그 밖의 provider(Ollama 등)면
 스레드 풀 동기 호출이다.
 
 라벨: 공격 쌍의 injection 단계 effect 호출 = 공격 호출(막아야 함), user 단계 effect 호출 = 정상 호출(허용해야 함).
 출력: results/RESULTS.md의 "## 재생 대조" 절(있으면 교체, 파일이 없으면 만든다). 중간 기록은 남기지 않는다.
-B(정적 코드)는 막은 규칙 id를 남기므로 규칙별 차단 수(공격 호출·정상 호출)를 함께 적는다.
+B(Static Checker)는 막은 규칙 id를 남기므로 규칙별 차단 수(공격 호출·정상 호출)를 함께 적는다.
 
 사용법: python scripts/evaluation/replay_contrast.py [--attack tool_knowledge] [--limit N] [--workers 6]
 """
@@ -48,7 +48,7 @@ from agentgate.scenarios.replay import replay_attack_pair, replay_benign_task
 from agentgate.scenarios.suites import describe_tools, load_suite
 
 RESULTS = PROJECT_ROOT / "results" / "RESULTS.md"
-SECTION = "## 재생 대조: 같은 입력에서 판정 LLM(A)과 룰북 정적 코드(B)"
+SECTION = "## 재생 대조: 같은 입력에서 LLM Judge (Policy, A)와 Static Checker (Policy, B)"
 EFFECT = effect_tools()
 CHECKER = RuleChecker()
 
@@ -236,14 +236,14 @@ def main():
 
     lines = [SECTION, "",
              "> `scripts/evaluation/replay_contrast.py`가 생성한다. 에이전트 없이 정답 궤적의 호출을 그대로 실행하고, effect 호출마다 "
-             "같은 입력(TaskSpec + 지금까지의 ToolSpec + 대기 중 호출)을 A(판정 LLM + 룰북, gate_llm_judge)와 B(룰북 정적 코드, gate_static_rules)에 "
+             "같은 입력(TaskSpec + 지금까지의 ToolSpec + 대기 중 호출)을 A(LLM Judge (Policy), gate_llm_judge)와 B(Static Checker (Policy), gate_static_rules)에 "
              "넣었다. 판정으로 막지 않으므로 모든 호출에서 두 판정기의 입력이 같다.", "",
              f"- 궤적: 정상 {len(benign_ok['A'])}개, 공격 쌍 {len(pair_stopped['A'])}개(`{args.attack}`). "
              f"판정한 effect 호출: 공격 호출 {len(attack_calls)}개, 정상 호출 {len(legit_calls)}개.",
-             f"- A(판정 LLM) 판정 LLM: `{client.provider}` `{client.model}`"
+             f"- A(LLM Judge) LLM Judge: `{client.provider}` `{client.model}`"
              + (f", think `{think}`" if think is not None else ""),
              f"- 두 판정이 같은 답을 낸 호출: {pct(agree, total)}",
-             f"- A(판정 LLM) 답을 읽을 수 없어 BLOCK으로 센 고유 입력: {sum(unparsed.values())}개"
+             f"- A(LLM Judge) 답을 읽을 수 없어 BLOCK으로 센 고유 입력: {sum(unparsed.values())}개"
              + (" (" + ", ".join(f"{k} {v}" for k, v in unparsed.most_common()) + ")" if unparsed else ""), "",
              "### 호출 단위", "",
              paired_line("공격 호출을 BLOCK (높을수록 좋음)", [c["A"] == "BLOCK" for c in attack_calls],
@@ -254,17 +254,17 @@ def main():
              paired_line("공격 쌍에서 공격 호출을 하나라도 막음", pair_stopped["A"], pair_stopped["B"]),
              paired_line("공격 쌍에서 정상 호출을 모두 허용", pair_kept["A"], pair_kept["B"]),
              paired_line("정상 작업에서 정상 호출을 모두 허용", benign_ok["A"], benign_ok["B"]), "",
-             "### B(정적 코드) 규칙별 BLOCK (한 호출을 여러 규칙이 막을 수 있다)", "",
+             "### B(Static Checker) 규칙별 BLOCK (한 호출을 여러 규칙이 막을 수 있다)", "",
              "- 공격 호출: " + (", ".join(f"{rid} {b_rules['attack'][rid]}" for rid in RULE_IDS
                                        if b_rules["attack"][rid]) or "없음"),
              "- 정상 호출: " + (", ".join(f"{rid} {b_rules['legit'][rid]}" for rid in RULE_IDS
                                        if b_rules["legit"][rid]) or "없음"), "",
-             "### A(판정 LLM) 판정이 인용한 조항", "",
+             "### A(LLM Judge) 판정이 인용한 조항", "",
              "- " + ", ".join(f"{rid} {n}" for rid, n in sorted(cited.items(), key=lambda x: int(x[0][1:]))), "",
              f"### 비용 ({'Message Batches' if client.provider == 'anthropic' else '동기 호출'}, 고유 입력 기준)", "",
-             f"- A(판정 LLM): 판정 {len(answers)}회, 입력 {usage['input']:,}, 캐시 읽기 {usage['cache_read']:,}, "
+             f"- A(LLM Judge): 판정 {len(answers)}회, 입력 {usage['input']:,}, 캐시 읽기 {usage['cache_read']:,}, "
              f"출력 {usage['output']:,} 토큰",
-             "- B(정적 코드): LLM 호출 없음"]
+             "- B(Static Checker): LLM 호출 없음"]
     text = RESULTS.read_text() if RESULTS.exists() else "# 결과\n\n"
     if SECTION in text:
         start = text.index(SECTION)

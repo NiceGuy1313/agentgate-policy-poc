@@ -1,4 +1,4 @@
-"""ATR(agent-threat-rules) test-corpora의 에이전트 관련 공격 사례를 분류해 룰북(config/rulebook.yaml)의 근거로 쓴다.
+"""ATR(agent-threat-rules) test-corpora의 에이전트 관련 공격 사례를 분류해 Policy(config/rulebook.yaml)의 근거로 쓴다.
 
 AgentDojo와 무관한 외부 공격 사례만 쓴다(규칙에 벤치마크 문구가 들어가지 않게 하기 위함).
 대상: llmail-inject(메일 속 간접 주입), browsesafe-bench(웹 페이지 속 주입), owasp-llm-top10 공격 시나리오,

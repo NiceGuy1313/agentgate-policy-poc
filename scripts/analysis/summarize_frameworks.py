@@ -25,10 +25,10 @@ from agentgate.experiment.metrics import mcnemar_exact, wilson  # noqa: E402
 RESULTS = PROJECT_ROOT / "results" / "RESULTS.md"
 SECTION = "## 프레임워크별 결과(층화 표본)"
 CONDITIONS = ["no_gate", "gate_llm_judge", "gate_static_rules"]
-NAMES = {"no_gate": "Gate 없음", "gate_llm_judge": "판정 LLM + 룰북", "gate_static_rules": "룰북 정적 코드(정규식)"}
+NAMES = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
 LABEL = {"no_gate": "No Gate", "gate_llm_judge": "LLM Judge (Policy)", "gate_static_rules": "Static Checker (Policy)"}
 COLOR = {"no_gate": "#9aa0a6", "gate_static_rules": "#1a73e8", "gate_llm_judge": "#e8710a"}
-METRICS = [("asr", "ASR"), ("utility", "Utility"), ("uua", "공격 중 Utility")]
+METRICS = [("asr", "ASR"), ("utility", "Utility"), ("uua", "Utility under Attack")]
 
 
 def load(run_dirs: list[Path]) -> tuple[list[dict], Counter]:
@@ -135,12 +135,12 @@ def main():
     lines = [SECTION, "",
              f"> `scripts/analysis/summarize_frameworks.py`가 생성한다. 팀원 Wrapper가 씌워진 프레임워크({', '.join(frameworks)})를 "
              f"같은 층화 표본(`{args.pairs}`, 정상 {n_benign}건 · 공격 {n_attack}건, 작업마다 공격 3개)으로 돌렸다. "
-             "에이전트·판정 LLM은 모두 `ollama:gpt-oss:120b`, 공격은 `tool_knowledge`다. 모든 툴 실행은 Adapter → Bridge → "
+             "에이전트·LLM Judge는 모두 `ollama:gpt-oss:120b`, 공격은 `tool_knowledge`다. 모든 툴 실행은 Adapter → Bridge → "
              "Policy Gate를 지난다. native 결과는 위 \"결과\" 절의 전체 규모 실험(조건마다 정상 97건 · 공격 949건)이다.", "",
              f"제외한 run: 오류 {skipped.get('error', 0)}건, Gate 우회로 무효 {skipped.get('invalid', 0)}건. "
              "Ollama 서버 오류(500·429)로 실패한 run은 다시 실행해 채웠고, 남은 오류는 AgentDojo 채점 함수가 에이전트 호출에 없는 "
              "인자를 읽다 실패한 경우다.", "",
-             "| 프레임워크 | 조건 | ASR | Utility | 공격 중 Utility | 차단 호출 |", "|---|---|---|---|---|---|"]
+             "| 프레임워크 | 조건 | ASR | Utility | Utility under Attack | 차단 호출 |", "|---|---|---|---|---|---|"]
     for f in frameworks:
         for c in CONDITIONS:
             lines.append(f"| {f} | {NAMES[c]} | {cell(f, c, 'asr')} | {cell(f, c, 'utility')} | {cell(f, c, 'uua')} | "
@@ -149,12 +149,12 @@ def main():
     for f in frameworks:
         parts = []
         for c in ("gate_llm_judge", "gate_static_rules"):
-            parts.append(f"{NAMES[c]} − Gate 없음: ASR {diff_text(paired(runs, f, c, 'no_gate', 'asr'))}, "
+            parts.append(f"{NAMES[c]} − No Gate: ASR {diff_text(paired(runs, f, c, 'no_gate', 'asr'))}, "
                          f"Utility {diff_text(paired(runs, f, c, 'no_gate', 'utility'))}, "
-                         f"공격 중 Utility {diff_text(paired(runs, f, c, 'no_gate', 'uua'))}")
-        parts.append("판정 LLM − 정적 코드: ASR "
+                         f"Utility under Attack {diff_text(paired(runs, f, c, 'no_gate', 'uua'))}")
+        parts.append("LLM Judge − Static Checker: ASR "
                      f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'asr'))}, Utility "
-                     f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'utility'))}, 공격 중 Utility "
+                     f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'utility'))}, Utility under Attack "
                      f"{diff_text(paired(runs, f, 'gate_llm_judge', 'gate_static_rules', 'uua'))}")
         lines.append(f"- **{f}**")
         lines += [f"  - {p}" for p in parts]

@@ -1,7 +1,7 @@
 """실험 결과 그림을 results/figures/에 만든다. 수치는 모두 실행 기록(run json)과 significance.json에서 계산한다.
 
 그림: 조건별 핵심 지표(신뢰구간), suite별 ASR·Utility, 보안-유용성 trade-off, 판정 규칙별 BLOCK 수,
-재생 대조(같은 입력에서 판정 LLM 대 정적 규칙)의 호출 단위 차단률(--contrast 파일이 있을 때).
+재생 대조(같은 입력에서 LLM Judge 대 정적 규칙)의 호출 단위 차단률(--contrast 파일이 있을 때).
 선행: summarize_live.py, live_significance.py를 같은 --run에 실행
 사용법: python scripts/analysis/make_figures.py --run results/runs/<run> [--contrast results/replay_contrast.json]
 """

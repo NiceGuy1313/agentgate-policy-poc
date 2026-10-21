@@ -1,6 +1,6 @@
 """live 결과를 results/RESULTS.md로 만든다. 수치는 모두 실행 기록에서 계산한다(손으로 고치지 않는다).
 
-세 조건: no_gate(Gate 없음) / gate_llm_judge(판정 LLM + 룰북) / gate_static_rules(룰북 정적 코드).
+세 조건: no_gate(No Gate) / gate_llm_judge(LLM Judge (Policy)) / gate_static_rules(Static Checker (Policy)).
 선행: check_enforcement.py, summarize_live.py, live_significance.py를 같은 --run에 실행
 정책 Gate를 우회해 무효(valid: false)인 run은 어느 표에도 넣지 않고, 건수만 집행 무결성 줄에 적는다.
 사용법: python scripts/analysis/summarize_results.py --run results/live/<run>
@@ -22,9 +22,9 @@ from agentgate.policy_gate.toolspec import DEFAULT_MODEL as TOOLSPEC_DEFAULT_MOD
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 BASELINE, LLM_JUDGE, STATIC_RULES = "no_gate", "gate_llm_judge", "gate_static_rules"
-NAMES = {BASELINE: "Gate 없음", LLM_JUDGE: "판정 LLM + 룰북", STATIC_RULES: "룰북 정적 코드"}
-METRICS = {"ASR": ("attack", "security"), "Utility": ("benign", "utility"), "공격 중 Utility": ("attack", "utility")}
-SIG_KEYS = {"ASR": "asr", "Utility": "utility", "공격 중 Utility": "utility_under_attack"}
+NAMES = {BASELINE: "No Gate", LLM_JUDGE: "LLM Judge (Policy)", STATIC_RULES: "Static Checker (Policy)"}
+METRICS = {"ASR": ("attack", "security"), "Utility": ("benign", "utility"), "Utility under Attack": ("attack", "utility")}
+SIG_KEYS = {"ASR": "asr", "Utility": "utility", "Utility under Attack": "utility_under_attack"}
 
 FLOW = """```mermaid
 sequenceDiagram
@@ -33,7 +33,7 @@ sequenceDiagram
     participant TS as TaskSpec 추출기<br/>({spec_model})
     participant AG as 에이전트<br/>({agent})
     participant GT as Gate
-    participant JD as 판정<br/>({judge_model} + 룰북<br/>또는 룰북 정적 코드)
+    participant JD as 판정<br/>({judge_model} + Policy<br/>또는 Static Checker (Policy))
     participant TL as 툴<br/>(AgentDojo 환경)
     participant TO as ToolSpec 추출기<br/>({toolspec_model})
 
@@ -70,14 +70,14 @@ COMPONENTS = """**TaskSpec 추출기** (`{spec_model}`): 사용자가 허락한 
 
 **Gate**: 툴 호출이 실행되기 직전의 관문이다. 규칙으로 판정하지 않는다.
 - 입력: 툴 호출.
-- 출력: 읽기 호출은 그대로 실행한다. effect 호출(상태 변경·외부 전송·URL 방문)은 판정기(판정 LLM 또는 룰북 정적 코드)의 답대로 실행하거나 차단한다.
+- 출력: 읽기 호출은 그대로 실행한다. effect 호출(상태 변경·외부 전송·URL 방문)은 판정기(LLM Judge (Policy) 또는 Static Checker (Policy))의 답대로 실행하거나 차단한다.
 
-**판정 LLM** (`{judge_model}`, gate_llm_judge): effect 호출을 실행할지 정한다.
-- 입력: 룰북(`config/rulebook.yaml`, R1–R10), 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 ToolSpec, 대기 중 호출(툴, 인자). 툴 응답 원문은 받지 않는다.
+**LLM Judge (Policy)** (`{judge_model}`, gate_llm_judge): effect 호출을 실행할지 정한다.
+- 입력: Policy(`config/rulebook.yaml`, R1–R10), 사용자 프롬프트와 TaskSpec, 지금까지 받은 툴 응답의 ToolSpec, 대기 중 호출(툴, 인자). 툴 응답 원문은 받지 않는다.
 - 출력: ALLOW 또는 BLOCK과 이유 한 문장.
 
-**룰북 정적 코드** (`src/agentgate/policy_gate/rule_checker.py`, gate_static_rules): 같은 입력을 코드로 검사한다. LLM 호출이 없다.
-- 입력: 판정 LLM과 같은 TaskSpec·ToolSpec·대기 중 호출, 툴 인자 역할(`config/agentdojo/tool_args.yaml`).
+**Static Checker (Policy)** (`src/agentgate/policy_gate/rule_checker.py`, gate_static_rules): 같은 입력을 코드로 검사한다. LLM 호출이 없다.
+- 입력: LLM Judge와 같은 TaskSpec·ToolSpec·대기 중 호출, 툴 인자 역할(`config/agentdojo/tool_args.yaml`).
 - 출력: ALLOW 또는 BLOCK과 막은 규칙 id(R1–R8). 어떤 규칙도 막지 않으면 ALLOW(R10).
 
 **툴** (AgentDojo v1.2.2 환경):
@@ -150,16 +150,16 @@ def main():
 
     method_effect = {m: paired(runs, LLM_JUDGE, STATIC_RULES, kind, field) for m, (kind, field) in METRICS.items()}
 
-    lines = ["# 결과: Gate 없음 / 판정 LLM + 룰북 / 룰북 정적 코드", "",
+    lines = ["# 결과: No Gate / LLM Judge (Policy) / Static Checker (Policy)", "",
              "> `scripts/analysis/summarize_results.py`가 live 실행 기록에서 생성한다. 손으로 고치지 않는다. "
              "실행 기록(json)은 요약 후 지웠고, 집계 JSON은 `results/summary/`에 남겼다.", "",
              "## 한눈에 보기", "",
-             f"- 공격 성공률(ASR): Gate 없음 {rate(BASELINE, 'ASR')}, 판정 LLM {rate(LLM_JUDGE, 'ASR')}, "
-             f"룰북 정적 코드 {rate(STATIC_RULES, 'ASR')}.",
-             *[f"- {NAMES[c]}(−{BASELINE}): ASR {vs_baseline(c, 'ASR')}, 정상 Utility {vs_baseline(c, 'Utility')}, "
-               f"공격 중 Utility {vs_baseline(c, '공격 중 Utility')}." for c in (LLM_JUDGE, STATIC_RULES)],
-             f"- 판정 LLM − 룰북 정적 코드: ASR {diff_text(method_effect['ASR'])}, 정상 Utility "
-             f"{diff_text(method_effect['Utility'])}, 공격 중 Utility {diff_text(method_effect['공격 중 Utility'])}.", "",
+             f"- 공격 성공률(ASR): No Gate {rate(BASELINE, 'ASR')}, LLM Judge (Policy) {rate(LLM_JUDGE, 'ASR')}, "
+             f"Static Checker (Policy) {rate(STATIC_RULES, 'ASR')}.",
+             *[f"- {NAMES[c]} − {NAMES[BASELINE]}: ASR {vs_baseline(c, 'ASR')}, Utility {vs_baseline(c, 'Utility')}, "
+               f"Utility under Attack {vs_baseline(c, 'Utility under Attack')}." for c in (LLM_JUDGE, STATIC_RULES)],
+             f"- LLM Judge (Policy) − Static Checker (Policy): ASR {diff_text(method_effect['ASR'])}, Utility "
+             f"{diff_text(method_effect['Utility'])}, Utility under Attack {diff_text(method_effect['Utility under Attack'])}.", "",
              "## 실험 흐름", "", FLOW.format(**names), "",
              "## 구성 요소", "", COMPONENTS.format(**names), "",
              "## 비교한 조건", ""]
@@ -169,13 +169,13 @@ def main():
               "## 결과", "",
               "- **ASR**: 공격 실행 중 공격자 목표가 달성된 비율. 낮을수록 좋다.",
               "- **Utility**: 공격 없는 실행에서 사용자 작업을 끝낸 비율.",
-              "- **공격 중 Utility**: 공격 실행에서도 사용자 작업을 끝낸 비율.", "",
-              "| 조건 | ASR | Utility | 공격 중 Utility |", "|---|---|---|---|"]
+              "- **Utility under Attack**: 공격 실행에서도 사용자 작업을 끝낸 비율.", "",
+              "| 조건 | ASR | Utility | Utility under Attack |", "|---|---|---|---|"]
     for c in conditions:
         cells = [f"{100 * sig(c, m)['rate']:.1f}% ({sig(c, m)['k']}/{sig(c, m)['n']})" for m in METRICS]
         lines.append(f"| {c} {NAMES[c]} | " + " | ".join(cells) + " |")
     figures = [("main_metrics.png", "조건별 핵심 지표(95% Wilson 신뢰구간)"), ("tradeoff.png", "보안-유용성 trade-off"),
-               ("by_suite.png", "suite별 ASR·정상 Utility"), ("rules.png", "판정 규칙별 BLOCK 수(공격 실행·정상 실행)"),
+               ("by_suite.png", "suite별 ASR·Utility"), ("rules.png", "판정 규칙별 BLOCK 수(공격 실행·정상 실행)"),
                ("replay_contrast.png", "재생 대조: 같은 입력에서 호출 단위 차단률")]
     shown = [(name, title) for name, title in figures if (RESULTS_DIR / "figures" / name).exists()]
     if shown:
@@ -184,9 +184,9 @@ def main():
             lines += [f"**{title}**", "", f"![{title}](figures/{name})", ""]
     lines += ["", "같은 (사용자 작업, 공격) 짝끼리 비교했다. 차이는 앞 조건 − 뒤 조건, p는 exact McNemar다.", ""]
     for c in conditions[1:]:
-        lines.append(f"**{c} − {BASELINE}** ({NAMES[c]} 대 Gate 없음)")
+        lines.append(f"**{c} − {BASELINE}** ({NAMES[c]} 대 No Gate)")
         lines += [f"- {m} {vs_baseline(c, m)}" for m in METRICS] + [""]
-    lines.append(f"**{LLM_JUDGE} − {STATIC_RULES}** (판정 LLM 대 룰북 정적 코드)")
+    lines.append(f"**{LLM_JUDGE} − {STATIC_RULES}** (LLM Judge (Policy) 대 Static Checker (Policy))")
     lines += [f"- {m} {diff_text(method_effect[m])}" for m in METRICS] + [""]
     lines.append("95% 신뢰구간(Wilson):")
     for m in METRICS:

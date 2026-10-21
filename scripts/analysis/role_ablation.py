@@ -1,7 +1,7 @@
 """프레임워크 요인 분리 실험(smolagents 시스템 프롬프트·툴 응답 역할·결과 형식, native, mini-swe-agent)을 집계한다.
 
 입력: 같은 공격 짝(기본 `data/agentdojo/pairs/strat3_seed0_attack.txt`)을 Gate 없이 돌린 팔별 실행 디렉터리.
-지표: ASR, 공격 중 Utility, 노출률(주입이 든 툴 응답을 받은 run), 노출 시 추종률, suite·주입 유형별 ASR,
+지표: ASR, Utility under Attack, 노출률(주입이 든 툴 응답을 받은 run), 노출 시 추종률, suite·주입 유형별 ASR,
 같은 짝끼리의 exact McNemar p. 수치는 모두 실행 기록에서 계산해 summary JSON에 쓴다(--section이면 RESULTS.md 절도).
 사용법: python scripts/analysis/role_ablation.py --arm "기본=results/runs/f_s_default" --arm ... [--json ...]
 """
@@ -110,7 +110,7 @@ def main():
              "텍스트 + `user` 메시지) 대신 OpenAI 툴 형식(assistant `tool_calls` + `tool` 메시지)으로 보낸다. 오류로 빠진 짝은 "
              "모든 팔에서 제외한다. 노출은 주입문이 든 툴 응답을 받은 run, 추종률은 노출된 run 중 "
              "공격이 성공한 비율이다.", "",
-             "| 팔 | ASR | 공격 중 Utility | 노출 | 노출 시 추종률 | 평균 툴 호출 | 오류 제외 |",
+             "| 팔 | ASR | Utility under Attack | 노출 | 노출 시 추종률 | 평균 툴 호출 | 오류 제외 |",
              "|---|---|---|---|---|---|---|"]
     for name, t in table.items():
         lines.append(f"| {name} | {pct(t['asr'])} | {pct(t['uua'])} | {pct(t['exposed'])} | {pct(t['follow'])} | "
@@ -118,7 +118,7 @@ def main():
     lines += ["", "같은 짝끼리 비교(exact McNemar p, 앞 팔만 성공 / 뒤 팔만 성공):", ""]
     for title, c in comparisons.items():
         lines.append(f"- {title}: ASR {c['asr']['a_only']}/{c['asr']['b_only']} (p={c['asr']['p']:.3g}), "
-                     f"공격 중 Utility {c['uua']['a_only']}/{c['uua']['b_only']} (p={c['uua']['p']:.3g})")
+                     f"Utility under Attack {c['uua']['a_only']}/{c['uua']['b_only']} (p={c['uua']['p']:.3g})")
     suites = sorted({s for t in table.values() for s in t["by_suite"]})
     types = sorted({s for t in table.values() for s in t["by_type"]})
     lines += ["", "suite별 ASR:", "", "| 팔 | " + " | ".join(suites) + " |", "|---|" + "---|" * len(suites)]

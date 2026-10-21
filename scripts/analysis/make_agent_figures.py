@@ -1,8 +1,8 @@
 """에이전트(프레임워크)마다 그래프 하나씩을 results/figures/agent_<name>.png로 그리고 RESULTS.md에 붙인다.
 
 입력은 집계 JSON뿐이다(원시 실행 기록 불필요): native는 results/summary/significance.json(전체 규모),
-팀원 Wrapper 프레임워크는 results/summary/frameworks.json(층화 표본). 각 그래프는 ASR·정상 Utility·공격 중 Utility를
-세 조건(Gate 없음, 판정 LLM + 룰북, 룰북 정적 코드)으로 나란히 보이고 95% Wilson 신뢰구간을 표시한다.
+팀원 Wrapper 프레임워크는 results/summary/frameworks.json(층화 표본). 각 그래프는 ASR·Utility·Utility under Attack을
+세 조건(No Gate, LLM Judge (Policy), Static Checker (Policy))으로 나란히 보이고 95% Wilson 신뢰구간을 표시한다.
 사용법: python scripts/analysis/make_agent_figures.py
 """
 
@@ -71,7 +71,7 @@ def main():
     agents = load_agents()
     lines = [SECTION, "",
              "> `scripts/analysis/make_agent_figures.py`가 집계 JSON(`results/summary/`)에서 생성한다. 에이전트마다 세 조건의 "
-             "ASR·정상 Utility·공격 중 Utility와 95% Wilson 신뢰구간이다. native는 전체 규모, 나머지는 층화 표본이다.", ""]
+             "ASR·Utility·Utility under Attack과 95% Wilson 신뢰구간이다. native는 전체 규모, 나머지는 층화 표본이다.", ""]
     for agent, info in agents.items():
         name = f"agent_{agent}.png"
         draw(agent, info, FIG_DIR / name)
