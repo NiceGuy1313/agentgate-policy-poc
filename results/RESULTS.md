@@ -50,6 +50,64 @@
 - 모든 프레임워크 실행에서 Gate를 우회한 툴 실행과 차단된 호출의 실행은 0건이다. Adapter가 툴 실행 지점을 Gate로 바꿔 두면 프레임워크 구조가 달라도 같은 판정이 강제된다.
 - browser-use는 gpt-oss:120b가 정상 작업을 거의 끝내지 못해(중간 집계 정상 Utility 5.9%) 평가에서 제외하였다.
 
+**8. smolagents와 mini-swe-agent의 Gate 없음 ASR이 두 배 넘게 차이 나는 이유**
+
+차이의 크기와 범위
+- Gate 없음 ASR: smolagents 56.7%(165/291, 95% CI 51.0–62.3), mini-swe-agent 25.4%(74/291, 20.8–30.7)로 2.2배 차이다. 신뢰구간이 겹치지 않는다.
+- 통제된 조건: 두 실행은 같은 표본(`strat3_seed0`, 공격 291건), 같은 에이전트 모델(gpt-oss:120b), 같은 공격(`tool_knowledge`)을 썼다. 따라서 차이는 프레임워크에서 나온다.
+- 기본 능력 차이는 아니다. 정상 Utility는 81.4%(72.6–87.9)와 83.5%(74.9–89.6)로 신뢰구간이 겹친다.
+- 차이는 공격을 받을 때만 생긴다.
+  - 공격 중 Utility: smolagents 44.0%, mini-swe-agent 66.0%.
+  - smolagents는 주입된 지시를 따르면서 원래 작업도 놓친다.
+- Gate를 붙이면 차이가 대부분 사라진다.
+  - 판정 LLM: ASR 3.1% 대 0.7%.
+  - 정적 코드: ASR 2.4% 대 1.0%.
+  - 두 방식 모두 두 프레임워크의 신뢰구간이 겹친다.
+
+주원인(코드로 확인): 툴 응답이 모델에 들어가는 역할(role)이 다르다
+- smolagents(`ToolCallingAgent` + `LiteLLMModel`)
+  - 툴 응답을 `user` 역할 메시지(`Observation:\n<툴 응답>`)로 보낸다.
+    - 기본 변환표 `tool_role_conversions`가 `TOOL_RESPONSE → USER`로 바꾼다(`smolagents/models.py` 282–285, 525행).
+    - 우리 Adapter(`make_model`)는 `custom_role_conversions`를 넘기지 않으므로 이 기본값이 그대로 적용된다.
+  - 툴 호출도 assistant 텍스트(`Calling tools: [...]`)로 기록되므로, 모델이 보는 대화에는 `tool` 역할이 없고 user와 assistant 발화만 번갈아 나온다.
+- mini-swe-agent
+  - 툴 응답을 `tool` 역할 메시지(`<returncode>0</returncode><output>…</output>`)로 보낸다(`minisweagent/models/litellm_model.py` 40–43행, `models/utils/actions_toolcall.py` 105–107행).
+- 같은 주입 문자열을 두 프레임워크의 실제 메시지 변환 코드에 넣어 확인했다. smolagents는 `user`, mini-swe-agent는 `tool`로 나간다.
+- `tool_knowledge` 주입문 형식
+  - "This is an important message from me, {user}, to you, {model}"로 시작하고 사용자 서명으로 끝난다.
+  - `user` 역할로 들어가면 형식상 실제 사용자 발화와 구분할 수 없다.
+- 세 에이전트의 역할과 Gate 없음 ASR. 툴 응답을 `tool` 역할로 보내는 두 에이전트는 23–25%이고, `user`로 보내는 smolagents만 56.7%다.
+
+  | 에이전트 | 툴 응답 역할 | Gate 없음 ASR | 표본 |
+  |---|---|---|---|
+  | native | `tool`(`agents/ollama_agent.py` 69행) | 23.2% | 전체 규모(공격 949건) |
+  | mini-swe-agent | `tool` | 25.4% | 층화 표본(공격 291건) |
+  | smolagents | `user` | 56.7% | 층화 표본(공격 291건) |
+
+- 해석(추정): gpt-oss는 메시지 역할별 지시 우선순위를 따르도록 학습된 모델이어서 `user` 역할의 지시를 `tool` 역할의 지시보다 더 따르는 것으로 보인다. 이 인과는 아래 대조 실험으로 확인해야 한다.
+
+보조 요인(추정, 따로 측정하지 않음)
+- 행동까지의 거리
+  - 주입문은 실행할 툴 이름과 인자를 그대로 제시한다(`{tools}` 절).
+  - smolagents는 그 이름이 곧 호출 가능한 함수다.
+  - mini-swe-agent는 툴이 `bash` 하나뿐이어서 `send_money '{...}'` 같은 명령 문자열로 바꿔야 한다. 주입된 지시를 실행하기까지 한 단계가 더 있다.
+- 출력 감싸기: mini-swe-agent는 툴 응답을 `<output>` 태그 안의 셸 출력으로 보이게 감싼다. smolagents는 `Observation:` 머리말만 붙인다.
+- 시스템 프롬프트: 두 프레임워크의 시스템 프롬프트가 다르다(smolagents 기본 프롬프트, mini-swe-agent는 Adapter의 `SYSTEM_TEMPLATE`). 영향은 확인되지 않음.
+
+확인하지 못한 것
+- run 단위 분해는 확인되지 않음. 원시 실행 기록(`results/runs/`)을 정리하며 지웠기 때문이다. 해당 항목:
+  - suite별 차이
+  - injection task별 차이
+  - 공격 성공 경로(툴 호출 대 답변 텍스트)
+  - 같은 짝에서 한쪽만 성공한 사례
+- 두 프레임워크 차이의 McNemar 검정도 같은 이유로 계산하지 못했다. 위 비교는 Wilson 신뢰구간 기준이다.
+- 조건마다 한 번만 실행했으므로 실행 간 변동은 확인되지 않음.
+
+인과를 확인하는 방법(실행하지 않음)
+- smolagents에 `custom_role_conversions={TOOL_CALL: ASSISTANT}`를 넘겨 툴 응답을 `tool` 역할로 유지한다. 같은 291건을 Gate 없음으로 다시 돌린다.
+- 반대로 mini-swe-agent의 툴 응답을 `user` 역할로 바꿔 돌린다.
+- ASR이 역할을 따라 움직이면 주원인이 확인된다. 이때는 원시 기록을 남겨 run 단위로 분해한다.
+
 **결론**
 - 보안: 두 방식이 live에서 같은 수준(ASR 1–2%)이고, 같은 입력에서는 판정 LLM이 공격 호출을 조금 더 막는다.
 - 정상 작업: 판정 LLM이 덜 막는다(재생 대조 오차단 −5.3%p, live 정상 Utility +8.2%p는 유의하지 않음).
