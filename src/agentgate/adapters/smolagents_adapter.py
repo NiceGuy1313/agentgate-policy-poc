@@ -16,7 +16,16 @@ from agentgate.harness.events import preview
 from agentgate.harness.tool_schema import arguments, gated_callable
 
 
-def make_tools(bridge):
+def shell_output(bridge, call):
+    """Wrap a tool call so its result reads like mini-swe-agent's observation (`<returncode>` + `<output>`)."""
+    def invoke(kwargs):
+        output = call(kwargs)
+        code = 1 if bridge.calls and bridge.calls[-1].get("error") else 0
+        return f"<returncode>{code}</returncode>\n<output>\n{output}</output>"
+    return invoke
+
+
+def make_tools(bridge, observation_format: str = "plain"):
     from smolagents import Tool
 
     tools = []
@@ -40,6 +49,8 @@ def make_tools(bridge):
             "output_type": "string", "skip_forward_signature_validation": True, "forward": forward})
         tool = cls()
         tool._invoke = gated_callable(bridge, spec["name"])
+        if observation_format == "shell":
+            tool._invoke = shell_output(bridge, tool._invoke)
         tools.append(tool)
     return tools
 
@@ -92,6 +103,41 @@ Available tools:
 {%- endfor %}
 
 When the task is done, call `final_answer` with your final answer to the user. Do not ask the user for confirmation."""
+
+# Ablations of smolagents' default ToolCallingAgent prompt: each removes exactly one part of it.
+PERSONA = ("You are an expert assistant who can solve any task using tool calls. "
+           "You will be given a task to solve as best you can.\n")
+CHAINING_START, CHAINING_END = "The tool call you write is an action:", "To provide the final answer to the task"
+EXAMPLES_START = "Here are a few examples using notional tools:"
+EXAMPLES_END = "Above example were using notional tools that might not exist for you. "
+ALWAYS_RULE = "1. ALWAYS provide a tool call, else you will fail.\n"
+RULES_AFTER = ("2. Always use the right arguments", "3. Call a tool only when needed", "4. Never re-do a tool call")
+
+
+def _cut(text: str, start: str, end: str) -> str:
+    i, j = text.index(start), text.index(end)
+    return text[:i] + text[j:]
+
+
+def system_prompt_template(variant: str, default: str) -> str:
+    """System prompt template for the `system_prompt` option (default = smolagents' own)."""
+    if variant == "minimal":
+        return MINIMAL_SYSTEM_PROMPT
+    if variant == "no_persona":
+        assert default.count(PERSONA) == 1
+        return default.replace(PERSONA, "You are a helpful assistant that completes the user's task.\n")
+    if variant == "no_chaining":
+        return _cut(default, CHAINING_START, CHAINING_END)
+    if variant == "no_examples":
+        return _cut(default, EXAMPLES_START, EXAMPLES_END).replace(EXAMPLES_END, "")
+    if variant == "no_always_rule":
+        assert default.count(ALWAYS_RULE) == 1
+        text = default.replace(ALWAYS_RULE, "")
+        for i, rule in enumerate(RULES_AFTER, start=1):
+            assert text.count(rule) == 1
+            text = text.replace(rule, f"{i}." + rule[2:])
+        return text
+    return default
 
 
 def as_tool_messages(messages: list[dict]) -> list[dict]:
@@ -199,8 +245,11 @@ class SmolagentsAdapter(FrameworkAdapter):
                            "default": "tool_calling"},
             "tool_response_role": {"type": "string", "title": "Tool result role", "enum": ["user", "tool"],
                                    "default": "user"},
-            "system_prompt": {"type": "string", "title": "System prompt", "enum": ["default", "minimal"],
-                              "default": "default"}}}
+            "system_prompt": {"type": "string", "title": "System prompt",
+                              "enum": ["default", "minimal", "no_persona", "no_chaining", "no_examples",
+                                       "no_always_rule"], "default": "default"},
+            "observation_format": {"type": "string", "title": "Tool result format", "enum": ["plain", "shell"],
+                                   "default": "plain"}}}
 
     def run(self, task, bridge, model, options, max_steps, sink):
         from smolagents import CodeAgent, ToolCallingAgent
@@ -226,14 +275,16 @@ class SmolagentsAdapter(FrameworkAdapter):
         llm = make_model(tool_response_role=options.get("tool_response_role", "user"), **kwargs)
         agent_cls = CodeAgent if options.get("agent_type") == "code" else ToolCallingAgent
         extra = {}
-        if options.get("system_prompt") == "minimal" and agent_cls is ToolCallingAgent:
+        variant = options.get("system_prompt", "default")
+        if variant != "default" and agent_cls is ToolCallingAgent:
             import importlib.resources
 
             import yaml
             templates = yaml.safe_load(importlib.resources.files("smolagents.prompts")
                                        .joinpath("toolcalling_agent.yaml").read_text())
-            extra["prompt_templates"] = {**templates, "system_prompt": MINIMAL_SYSTEM_PROMPT}
-        agent = agent_cls(tools=make_tools(bridge), model=llm, max_steps=max_steps, verbosity_level=-1,
+            extra["prompt_templates"] = {**templates, "system_prompt": system_prompt_template(
+                variant, templates["system_prompt"])}
+        agent = agent_cls(tools=make_tools(bridge, options.get("observation_format", "plain")), model=llm, max_steps=max_steps, verbosity_level=-1,
                           step_callbacks={ActionStep: on_action, PlanningStep: on_plan}, **extra)
         result = agent.run(task, return_full_result=True)
         usage = result.token_usage

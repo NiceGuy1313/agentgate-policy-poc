@@ -163,6 +163,33 @@ def test_smolagents_minimal_system_prompt_lists_tools():
     assert "- final_answer:" in agent.system_prompt and "ALWAYS provide a tool call" not in agent.system_prompt
 
 
+@pytest.mark.parametrize("variant, gone, kept", [
+    ("no_persona", "expert assistant who can solve any task", "ALWAYS provide a tool call"),
+    ("no_chaining", "You can use the result of the previous action", "Here are a few examples"),
+    ("no_examples", "Here are a few examples", "You can use the result of the previous action"),
+    ("no_always_rule", "ALWAYS provide a tool call", "1. Always use the right arguments")])
+def test_smolagents_prompt_ablation_removes_one_part(variant, gone, kept):
+    pytest.importorskip("smolagents")
+    import importlib.resources
+
+    import yaml
+
+    from agentgate.adapters.smolagents_adapter import system_prompt_template
+    default = yaml.safe_load(importlib.resources.files("smolagents.prompts")
+                             .joinpath("toolcalling_agent.yaml").read_text())["system_prompt"]
+    text = system_prompt_template(variant, default)
+    assert gone in default and gone not in text and kept in text
+    assert "{%- for tool in tools.values() %}" in text
+
+
+def test_smolagents_shell_observation_format():
+    from agentgate.adapters.smolagents_adapter import shell_output
+
+    class Bridge:
+        calls = [{"error": None}]
+    assert shell_output(Bridge(), lambda kwargs: "ok")({}) == "<returncode>0</returncode>\n<output>\nok</output>"
+
+
 @pytest.mark.parametrize("content, expected", [
     # replies recorded from gpt-oss:120b on Ollama Cloud (finish_reason "stop", no tool_calls)
     ('{\n  "answer": "Your total spending in March 2022 was 1,050.0."\n}',
