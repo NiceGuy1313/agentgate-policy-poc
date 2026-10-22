@@ -155,5 +155,25 @@
    },
    "live_utility_diff": -0.146
   }
+ },
+ "_gate_position": {
+  "smolagents": {
+   "execute": 165,
+   "read": 247,
+   "read_v": 24,
+   "read_v_pre_injection": 0,
+   "read_v_in_harm_runs": 24,
+   "harm_runs": 46,
+   "answer_only": 2
+  },
+  "mini-swe-agent": {
+   "execute": 126,
+   "read": 224,
+   "read_v": 8,
+   "read_v_pre_injection": 0,
+   "read_v_in_harm_runs": 8,
+   "harm_runs": 20,
+   "answer_only": 2
+  }
  }
 }

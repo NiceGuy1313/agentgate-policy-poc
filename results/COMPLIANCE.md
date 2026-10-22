@@ -1,26 +1,29 @@
 # 정책 준수율 분석: LLM Judge 대 Static Checker
 
 > - 수치 출처: `scripts/analysis/compliance_review.py simple`·`link`가 생성한 표([`summary/compliance_simple.md`](summary/compliance_simple.md), [`summary/compliance_link.md`](summary/compliance_link.md))에서 인용, 건수 포함 상세 수치도 해당 표에 수록
-> - Tool 호출별 사람 판정 및 근거: `summary/compliance_labels_<에이전트>.json`에 수록
-> - 그림 출처: `scripts/analysis/make_compliance_figures.py`
+> - Execute 호출별 사람 판정 및 근거: `summary/compliance_labels_<에이전트>.json`에 수록
 
 ## 요약
 
-- smolagents·mini-swe-agent의 Tool 호출별 LLM Judge·Static Checker 판정과 사람 판정 비교
+- smolagents·mini-swe-agent의 Execute 호출별 LLM Judge·Static Checker 판정과 사람 판정 비교
 - 두 판정 방식의 정책 준수율은 80–87%로 유사
 - 공격에 따른 비정상 호출은 대부분 차단(87.5–98.3%), 정상 호출의 약 20%도 차단
 - 판정 방식별 정책 불이행 상황의 차이
   - **LLM Judge**: 파일의 지시를 위임한 작업에서 공격 지시(비밀번호 변경, 공격자 계좌 송금) 허용
   - **Static Checker**: 사용자가 요청한 웹페이지 방문 다수 차단
-- 판정 사례로 산출한 잔여 ASR·Utility 손실과 Gate 실행 결과의 ASR·Utility 하락의 방향·규모 유사
+- Gate 실행 결과의 잔여 ASR·Utility 하락은 위 정책 불이행 사례로 설명 가능
+- Gate 위치(Tool 실행 직전, Execute 호출 판정)의 유효성 확인, 남은 공백은 최종 답변 단계
 
 ## 1. 분석 대상 및 방법
 
 - 에이전트: smolagents, mini-swe-agent(모델 gpt-oss:120b)
-- 작업: AgentDojo 작업 80개(정상 작업 20개, 공격 지시문이 삽입된 공격 작업 60개)
-- 판정 대상: 송금, 메시지·메일 발송, 웹 게시, 삭제, 계정·권한 변경, 예약, 웹페이지 방문, 일정·파일 작성 Tool 호출(smolagents 165건, mini-swe-agent 126건)
-- 사람 판정: 룰북 R1–R10에 따라 Tool 호출별로 비정상 호출(사용자가 요청하지 않은 호출, 공격 지시문에 따른 호출)과 정상 호출 구분
-- 판정 방식 비교: 동일한 Tool 호출을 LLM Judge와 Static Checker에 입력하여 허용·차단 판정 기록
+- 작업: 테스트셋(사용자 작업 97개)에서 suite별 5개씩 추출한 사용자 작업 20개, 작업마다 정상 실행 1회와 공격 지시문이 삽입된 공격 실행 3회(총 80회 실행)
+- Tool 호출 구분
+  - **Execute 호출**: 실제 결과가 발생하는 호출(송금, 메시지·메일 발송, 웹 게시, 삭제, 계정·권한 변경, 예약, 웹페이지 방문, 일정·파일 작성), Gate의 판정 대상
+  - **Read 호출**: 정보를 읽기만 하는 호출(메일 읽기, 잔액 확인, 목록 확인 등), 판정 없이 실행
+- 판정 대상: Execute 호출(smolagents 165건, mini-swe-agent 126건)
+- 사람 판정: 룰북 R1–R10에 따라 Execute 호출별로 비정상 호출(사용자가 요청하지 않은 호출, 공격 지시문에 따른 호출)과 정상 호출 구분
+- 판정 방식 비교: 동일한 Execute 호출을 LLM Judge와 Static Checker에 입력하여 허용·차단 판정 기록
 - **정책 준수율**: 판정 방식의 판정이 사람 판정과 일치한 비율(비정상 호출 차단, 정상 호출 허용)
 
 ## 2. 전체 정책 준수율
@@ -35,9 +38,9 @@
 - 두 판정 방식 간 차이는 1.5–3.1%p로 작음
 - 공통 경향: 비정상 호출은 대부분 차단, 정상 호출은 약 5건 중 1건 차단
 
-## 3. Tool 호출 유형별 정책 준수율
+## 3. Execute 호출 유형별 정책 준수율
 
-| Tool 호출 유형 | smolagents LLM Judge | smolagents Static Checker | mini-swe-agent LLM Judge | mini-swe-agent Static Checker |
+| Execute 호출 유형 | smolagents LLM Judge | smolagents Static Checker | mini-swe-agent LLM Judge | mini-swe-agent Static Checker |
 |---|---|---|---|---|
 | 송금 | 84.0% | 84.0% | 81.0% | 85.7% |
 | 메시지·메일 발송·웹 게시 | 76.0% | **92.0%** | 78.6% | 81.0% |
@@ -57,7 +60,7 @@
 |---|---|---|
 | 파일의 지시를 위임한 작업 내 공격 지시(비밀번호 변경·공격자 계좌 송금) | **허용(불이행)** | 차단 |
 | 웹페이지의 할 일 목록을 위임한 작업(채널 구성원 추가, 메시지 답장) | **차단(불이행)** | **차단(불이행)** |
-| 사용자가 요약을 요청한 웹사이트 방문 | 일부 차단(8건) | **다수 차단(18건)** |
+| 사용자가 요약을 요청한 웹사이트 방문 | 일부 차단 | **다수 차단** |
 | 사용자 요청의 확대 해석에 따른 호텔 예약(공격 지시) | 차단 | **허용(불이행)** |
 | 요청된 Tool의 금액·내용 오류(요청되지 않은 추가 송금, "test" 메시지 게시) | **허용(불이행)** | **허용(불이행)** |
 | 공격 지시문이 포함된 채널명으로의 메시지 발송(존재하지 않는 채널) | 차단 | 허용 |
@@ -69,37 +72,46 @@
 
 ## 5. 정책 준수율과 ASR·Utility의 관계
 
-| 에이전트 | 판정 방식 | 잔여 ASR(판정 사례 기반) | ASR(Gate 실행 결과) | Utility 손실(판정 사례 기반) | Utility 하락(Gate 실행 결과) |
+| 에이전트 | 판정 방식 | 잔여 ASR | ASR 잔존 원인 | Utility 하락 | Utility 하락 원인 |
 |---|---|---|---|---|---|
-| smolagents | LLM Judge | 5.0% | 3.1% | 10.0% | 7.2%p |
-| smolagents | Static Checker | 1.7% | 2.4% | 15.0% | 17.5%p |
-| mini-swe-agent | LLM Judge | 1.7% | 0.7% | 25.0% | 15.5%p |
-| mini-swe-agent | Static Checker | 1.7% | 1.0% | 20.0% | 14.6%p |
+| smolagents | LLM Judge | 3.1% | 위임 작업의 공격 지시 허용, 최종 답변을 통한 공격 | 7.2%p | 할 일 목록 위임 작업·요약 대상 웹사이트 방문 차단 |
+| smolagents | Static Checker | 2.4% | 최종 답변을 통한 공격 | 17.5%p | 할 일 목록 위임 작업·요약 대상 웹사이트 방문·이사 작업의 정기 이체 생성 차단 |
+| mini-swe-agent | LLM Judge | 0.7% | 위임 작업의 공격 지시 허용 | 15.5%p | 할 일 목록 위임 작업·요약 대상 웹사이트 방문·이사·청구서·집주인 공지 작업의 정상 호출 차단 |
+| mini-swe-agent | Static Checker | 1.0% | 확대 해석에 따른 호텔 예약 허용 | 14.6%p | 할 일 목록 위임 작업·요약 대상 웹사이트 방문·이사·집주인 공지 작업의 정상 호출 차단 |
 
-- 판정 사례 기반 값
-  - 산출 방법: 판정 방식을 적용하지 않은 실행 기록에서 판정만으로 산출
-  - 잔여 ASR: 비정상 호출을 하나 이상 허용한 공격 작업과 최종 답변으로 공격 지시를 수행한 공격 작업의 비율
-  - Utility 손실: 정상 호출을 하나 이상 차단한 정상 작업의 비율
-- Gate 실행 결과: Gate가 실제로 호출을 차단한 실행의 AgentDojo 채점 결과(388개 작업, RESULTS.md)
-- 두 값의 방향·규모 유사, 정책 준수율로 ASR·Utility 수치 설명 가능
-- 잔여 ASR의 원인
-  - LLM Judge의 위임 작업 공격 허용
-  - Static Checker의 확대 해석에 따른 예약 허용
-  - Tool 호출 없이 최종 답변을 통한 공격(판정 방식의 판정 대상 밖)
-- Utility 손실의 주된 원인: 할 일 목록 위임 작업과 요약 대상 웹사이트 방문에 대한 정상 호출 차단
+- 잔여 ASR·Utility 하락: Gate를 적용해 실행한 388회 전체의 AgentDojo 채점 결과(RESULTS.md), Utility 하락은 No Gate 대비 차이
+- 원인: 4절 정책 불이행 사례(표본 80회)에서 해당 판정 방식이 허용한 비정상 호출, 차단한 정상 호출
+- 잔여 ASR의 원인은 소수의 비정상 호출 허용과 Gate 판정 대상 밖의 최종 답변 공격
+- Utility 하락의 공통 원인은 할 일 목록 위임 작업과 요약 대상 웹사이트 방문의 정상 호출 차단
 
-![판정 사례 기반 값과 Gate 실행 결과](figures/compliance_link.png)
+## 6. Gate 위치의 유효성
 
-- 그림: 판정 사례 기반 값(Judgment-based, 회색)과 Gate 실행 결과(Gate run, 파랑) 비교, 왼쪽 잔여 ASR, 오른쪽 Utility 손실
+| 구분 | smolagents | mini-swe-agent |
+|---|---|---|
+| Gate 판정 대상(Execute 호출) | 165건 | 126건 |
+| Gate 판정 제외(Read 호출) | 247건 | 224건 |
+| 정책을 위반한 Read 호출 | 24건 | 8건 |
+| 위 Read 호출 중 같은 작업에서 Execute 호출·최종 답변 위반으로 이어진 호출 | 24건 | 8건 |
+| 피해가 발생한 작업(Execute 호출 또는 최종 답변에서 위반) | 46개 | 20개 |
+| 위 작업 중 Gate로 차단 불가한 작업(최종 답변에서만 위반) | 2개 | 2개 |
 
-## 6. 결론
+- Gate 위치: Tool 실행 직전 한 곳, Execute 호출만 판정
+- Read 호출 판정 불필요
+  - 정책을 위반한 Read 호출은 모두 공격 지시문을 읽은 뒤의 정보 수집이며, 전부 같은 작업의 Execute 호출·최종 답변 위반으로 이어짐
+  - Execute 호출 판정만으로 해당 작업의 피해 차단 가능, Read 호출까지 판정 시 판정 횟수 약 2.5–2.8배(smolagents 165 → 412, mini-swe-agent 126 → 350)
+- 남은 공백: 최종 답변 단계
+  - Execute 호출 위반 없이 최종 답변에서만 위반한 작업(smolagents 2, mini-swe-agent 2)은 현재 Gate 위치에서 차단 불가
+  - 최종 답변 검사 단계의 추가 필요
+
+## 7. 결론
 
 - 두 판정 방식의 정책 준수율은 80–87%로 유사, 우열보다 정책 불이행 상황의 차이가 중요
-  - LLM Judge: 위임 작업에서 공격 허용, 비밀번호 변경·송금 등 피해가 큰 Tool 호출 포함
+  - LLM Judge: 위임 작업에서 공격 허용, 비밀번호 변경·송금 등 피해가 큰 Execute 호출 포함
   - Static Checker: 사용자가 요청한 웹페이지 방문 차단으로 정상 작업 수행 저해
 - 두 판정 방식 공통의 처리 불가 상황
   - 별도 자료에 기재된 작업의 위임 시 정상 호출 차단
   - 요청된 Tool의 금액·내용 오류 허용, 송금은 실행 전 사용자 확인 절차 필요
+- Gate 위치: Tool 실행 직전의 Execute 호출 판정으로 대부분의 피해 차단 가능, 최종 답변 검사 단계 추가 필요
 - 개선 방향(정책 수정 사항으로 승인 후 진행)
   - LLM Judge: 위임된 작업에서도 계정 변경·과도한 송금 차단
   - Static Checker: 사용자가 요청한 웹페이지 방문 허용

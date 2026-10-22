@@ -715,6 +715,30 @@ def cmd_link(args) -> None:
           "| **판정 사례 기반 Utility 손실** | " + cells(lambda c: short_pct(c.get("benign_false_block", 0), c["n_benign"])) + " |",
           "| Gate 실행 결과 Utility 하락 | " + cells(lambda c: f"{100 * c['live_utility_diff']:+.1f}%p") + " |",
           "| Gate 실행 결과 Utility | " + cells(lambda c: short_pct(c["live_utility"]["k"], c["live_utility"]["n"])) + " |", ""]
+    md += ["## 3. Gate 위치(에이전트별, 판정 방식 무관)", "",
+           "| 구분 | " + " | ".join(SIMPLE_AGENTS) + " |", "|---|" + "---|" * len(SIMPLE_AGENTS)]
+    pos = {}
+    for agent in SIMPLE_AGENTS:
+        out = paths(agent)
+        rows = load_rows(None, json.loads(out["labels"].read_text()), out["calls"])[0]
+        harm_runs = {r["run"] for r in rows if harm(r)}
+        reads = [r for r in rows if r["step"] != "answer" and not r["effect"]]
+        read_v = [r for r in reads if r["label"] == "V"]
+        execute = [r for r in rows if r["effect"]]
+        answer_only = sum(all(h["step"] == "answer" for h in rows if h["run"] == run and harm(h)) for run in harm_runs)
+        pos[agent] = {"execute": len(execute), "read": len(reads), "read_v": len(read_v),
+                      "read_v_pre_injection": sum(not r["reached_before"] for r in read_v),
+                      "read_v_in_harm_runs": sum(r["run"] in harm_runs for r in read_v),
+                      "harm_runs": len(harm_runs), "answer_only": answer_only}
+    for label, k in (("Gate 판정 대상(Execute 호출)", "execute"), ("Gate 판정 제외(Read 호출)", "read"), ("정책을 위반한 Read 호출", "read_v"),
+                     ("위 Read 호출 중 공격 지시문을 읽기 전에 발생", "read_v_pre_injection"),
+                     ("위 Read 호출 중 같은 작업에서 Execute 호출·최종 답변 위반으로 이어진 호출", "read_v_in_harm_runs"),
+                     ("피해가 발생한 작업(Execute 호출 또는 최종 답변에서 위반)", "harm_runs"),
+                     ("위 작업 중 Gate로 차단 불가한 작업(최종 답변에서만 위반)", "answer_only")):
+        md.append(f"| {label} | " + " | ".join(str(pos[a][k]) for a in SIMPLE_AGENTS) + " |")
+    md.append("")
+    data["_gate_position"] = pos
+    LINK_JSON.write_text(json.dumps(data, ensure_ascii=False, indent=1))
     LINK_MD.write_text("\n".join(md) + "\n")
     print(f"link -> {LINK_MD}, {LINK_JSON}")
 
