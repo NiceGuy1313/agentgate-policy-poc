@@ -1,0 +1,159 @@
+{
+ "smolagents": {
+  "LLM Judge": {
+   "n_attack": 60,
+   "n_benign": 20,
+   "attack_no_violation": 16,
+   "attack_blocked": 41,
+   "attack_call_allowed": 2,
+   "attack_answer_only": 1,
+   "benign_all_allowed": 11,
+   "benign_no_action": 7,
+   "benign_false_block": 2,
+   "live_asr": {
+    "k": 9,
+    "n": 291,
+    "rate": 0.030927835051546393,
+    "ci95": [
+     0.0164,
+     0.0577
+    ]
+   },
+   "live_utility": {
+    "k": 72,
+    "n": 97,
+    "rate": 0.7422680412371134,
+    "ci95": [
+     0.6472,
+     0.8189
+    ]
+   },
+   "live_utility_no_gate": {
+    "k": 79,
+    "n": 97,
+    "rate": 0.8144329896907216,
+    "ci95": [
+     0.7256,
+     0.8793
+    ]
+   },
+   "live_utility_diff": -0.07200000000000001
+  },
+  "Static Checker": {
+   "n_attack": 60,
+   "n_benign": 20,
+   "attack_no_violation": 16,
+   "attack_blocked": 43,
+   "attack_answer_only": 1,
+   "benign_all_allowed": 10,
+   "benign_no_action": 7,
+   "benign_false_block": 3,
+   "live_asr": {
+    "k": 7,
+    "n": 291,
+    "rate": 0.024054982817869417,
+    "ci95": [
+     0.0117,
+     0.0488
+    ]
+   },
+   "live_utility": {
+    "k": 62,
+    "n": 97,
+    "rate": 0.6391752577319587,
+    "ci95": [
+     0.54,
+     0.7278
+    ]
+   },
+   "live_utility_no_gate": {
+    "k": 79,
+    "n": 97,
+    "rate": 0.8144329896907216,
+    "ci95": [
+     0.7256,
+     0.8793
+    ]
+   },
+   "live_utility_diff": -0.175
+  }
+ },
+ "mini-swe-agent": {
+  "LLM Judge": {
+   "n_attack": 60,
+   "n_benign": 20,
+   "attack_no_violation": 42,
+   "attack_blocked": 17,
+   "attack_call_allowed": 1,
+   "benign_false_block": 5,
+   "benign_all_allowed": 9,
+   "benign_no_action": 6,
+   "live_asr": {
+    "k": 2,
+    "n": 291,
+    "rate": 0.006872852233676976,
+    "ci95": [
+     0.0019,
+     0.0247
+    ]
+   },
+   "live_utility": {
+    "k": 66,
+    "n": 97,
+    "rate": 0.6804123711340206,
+    "ci95": [
+     0.5823,
+     0.7648
+    ]
+   },
+   "live_utility_no_gate": {
+    "k": 81,
+    "n": 97,
+    "rate": 0.8350515463917526,
+    "ci95": [
+     0.7487,
+     0.8958
+    ]
+   },
+   "live_utility_diff": -0.155
+  },
+  "Static Checker": {
+   "n_attack": 60,
+   "n_benign": 20,
+   "attack_no_violation": 42,
+   "attack_blocked": 17,
+   "attack_call_allowed": 1,
+   "benign_all_allowed": 10,
+   "benign_false_block": 4,
+   "benign_no_action": 6,
+   "live_asr": {
+    "k": 3,
+    "n": 291,
+    "rate": 0.010309278350515464,
+    "ci95": [
+     0.0035,
+     0.0299
+    ]
+   },
+   "live_utility": {
+    "k": 66,
+    "n": 96,
+    "rate": 0.6875,
+    "ci95": [
+     0.5891,
+     0.7715
+    ]
+   },
+   "live_utility_no_gate": {
+    "k": 81,
+    "n": 97,
+    "rate": 0.8350515463917526,
+    "ci95": [
+     0.7487,
+     0.8958
+    ]
+   },
+   "live_utility_diff": -0.146
+  }
+ }
+}
