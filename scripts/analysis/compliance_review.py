@@ -675,7 +675,7 @@ def link_counts(rows: list[dict], j: str) -> dict:
 
 
 def cmd_link(args) -> None:
-    """준수율 사례로 본 ASR·Utility: 예상 잔여 ASR·Utility 손실 작업과 frameworks.json 실측값의 대조."""
+    """준수율 판정 사례 기반 잔여 ASR·Utility 손실과 frameworks.json의 Gate 실행 결과 대조."""
     live = json.loads((SUMMARY / "frameworks.json").read_text())
     data = {}
     for agent in SIMPLE_AGENTS:
@@ -698,23 +698,23 @@ def cmd_link(args) -> None:
     sep = "|---|" + "---|" * (len(SIMPLE_AGENTS) * len(JUDGES))
     md = ["# 정책 준수율과 ASR·Utility의 관계", "",
           "> `scripts/analysis/compliance_review.py link`가 생성한다. 손으로 고치지 않는다.",
-          "> 예상값은 준수율 판정 사례(80개 작업)에서, 실측값은 `frameworks.json`(388개 작업, live 실행)에서 읽는다.", "",
+          "> 판정 사례 기반 값은 준수율 판정 사례(80개 작업)에서, Gate 실행 결과는 `frameworks.json`(388개 작업)에서 읽는다.", "",
           "## 1. 공격 작업(ASR)", "", head, sep,
           "| 공격 작업 수 | " + cells(lambda c: str(c["n_attack"])) + " |",
           "| 비정상 호출 없음 | " + cells(lambda c: str(c.get("attack_no_violation", 0))) + " |",
           "| 비정상 호출 모두 차단 | " + cells(lambda c: str(c.get("attack_blocked", 0))) + " |",
           "| 비정상 호출 일부 허용 | " + cells(lambda c: str(c.get("attack_call_allowed", 0))) + " |",
           "| 최종 답변을 통한 정책 위반 | " + cells(lambda c: str(c.get("attack_answer_only", 0))) + " |",
-          "| **예상 잔여 ASR** | " + cells(lambda c: short_pct(c.get("attack_call_allowed", 0) + c.get("attack_answer_only", 0), c["n_attack"])) + " |",
-          "| 실측 ASR | " + cells(lambda c: short_pct(c["live_asr"]["k"], c["live_asr"]["n"])) + " |", "",
+          "| **판정 사례 기반 잔여 ASR** | " + cells(lambda c: short_pct(c.get("attack_call_allowed", 0) + c.get("attack_answer_only", 0), c["n_attack"])) + " |",
+          "| Gate 실행 결과 ASR | " + cells(lambda c: short_pct(c["live_asr"]["k"], c["live_asr"]["n"])) + " |", "",
           "## 2. 정상 작업(Utility)", "", head, sep,
           "| 정상 작업 수 | " + cells(lambda c: str(c["n_benign"])) + " |",
           "| 판정 대상 호출 없음 | " + cells(lambda c: str(c.get("benign_no_action", 0))) + " |",
           "| 정상 호출 모두 허용 | " + cells(lambda c: str(c.get("benign_all_allowed", 0))) + " |",
           "| 정상 호출 일부 차단 | " + cells(lambda c: str(c.get("benign_false_block", 0))) + " |",
-          "| **예상 Utility 손실** | " + cells(lambda c: short_pct(c.get("benign_false_block", 0), c["n_benign"])) + " |",
-          "| 실측 Utility 하락 | " + cells(lambda c: f"{100 * c['live_utility_diff']:+.1f}%p") + " |",
-          "| 실측 Utility | " + cells(lambda c: short_pct(c["live_utility"]["k"], c["live_utility"]["n"])) + " |", ""]
+          "| **판정 사례 기반 Utility 손실** | " + cells(lambda c: short_pct(c.get("benign_false_block", 0), c["n_benign"])) + " |",
+          "| Gate 실행 결과 Utility 하락 | " + cells(lambda c: f"{100 * c['live_utility_diff']:+.1f}%p") + " |",
+          "| Gate 실행 결과 Utility | " + cells(lambda c: short_pct(c["live_utility"]["k"], c["live_utility"]["n"])) + " |", ""]
     LINK_MD.write_text("\n".join(md) + "\n")
     print(f"link -> {LINK_MD}, {LINK_JSON}")
 

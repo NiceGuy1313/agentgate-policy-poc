@@ -1,7 +1,7 @@
 """정책 준수율 보고서(COMPLIANCE.md)의 그림 두 개를 그린다.
 
 compliance_decisions.png: 에이전트·판정 방식별 판정 결과 구성(위반 차단 / 위반 허용 / 정상 허용 / 정상 차단)
-compliance_link.png: 준수율 사례로 본 예상 잔여 ASR·Utility 손실과 live 실측값(frameworks.json) 비교
+compliance_link.png: 판정 사례 기반 잔여 ASR·Utility 손실과 Gate 실행 결과(frameworks.json) 비교
 입력: results/summary/compliance_calls_<agent>.json·compliance_labels_<agent>.json, compliance_link.json(compliance_review.py link)
 사용법: python scripts/analysis/make_compliance_figures.py
 """
@@ -25,8 +25,8 @@ import compliance_review as cr  # noqa: E402
 FIG_DIR = PROJECT_ROOT / "results" / "figures"
 JUDGE_LABEL = {"A": "LLM Judge (Policy)", "B": "Static Checker (Policy)"}
 JUDGE_COLOR = {"A": "#e8710a", "B": "#1a73e8"}
-PARTS = [("violation blocked", "#1e8e3e"), ("violation allowed", "#d93025"),
-         ("normal allowed", "#a8dab5"), ("normal blocked", "#f6aea9")]
+PARTS = [("abnormal call blocked", "#1e8e3e"), ("abnormal call allowed", "#d93025"),
+         ("normal call allowed", "#a8dab5"), ("normal call blocked", "#f6aea9")]
 
 
 def decisions(rows: list[dict], j: str) -> list[int]:
@@ -96,8 +96,8 @@ def draw_link(out) -> None:
         ax.set_title(title, fontsize=11)
         ax.set_ylim(0, top * 1.35)
         ax.spines[["top", "right"]].set_visible(False)
-        handles = [Patch(color="#9aa0a6", label="Expected from compliance cases (80 tasks)")] + [
-            Patch(color=JUDGE_COLOR[j], label=f"Measured, {JUDGE_LABEL[j]} (live, 388 tasks)") for j in ("A", "B")]
+        handles = [Patch(color="#9aa0a6", label="Judgment-based (80 tasks)")] + [
+            Patch(color=JUDGE_COLOR[j], label=f"Gate run, {JUDGE_LABEL[j]} (388 tasks)") for j in ("A", "B")]
         ax.legend(handles=handles, frameon=False, fontsize=7, loc="upper right")
     fig.tight_layout()
     fig.savefig(out, dpi=160)
