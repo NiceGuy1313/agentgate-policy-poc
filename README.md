@@ -1,10 +1,37 @@
 # AgentGate — LLM 에이전트 툴 호출 Policy Gate
 
 - 구성
-  - Policy Gate: 에이전트의 툴 호출을 실행 전에 Policy로 판정하여 허용 또는 차단 (1–8절)
   - Observatory: 에이전트 코드에 행동 로그를 AI 모델로 삽입하고, 누락 여부를 정적 검증기로 확인 (9절, [`observatory/`](observatory/README.md))
+  - Policy Gate: 에이전트의 툴 호출을 실행 전에 Policy로 판정하여 허용 또는 차단 (1–8절)
 
-## Policy Gate
+## 전체 사용 흐름
+
+```text
+① 로그 삽입 → ② 로그 검증 → ③ Policy Gate 연결 → ④ Policy Gate 테스트
+   (Observatory, 9절)          (Adapter, 8절)        (대시보드·CLI, 5–7절)
+```
+
+- **① 로그 삽입**: 대상 에이전트 저장소에 `observatory/` 복사 후 실행, LLM 호출·툴 실행·사용자 입력 위치에 로그 자동 삽입
+- **② 로그 검증**: 같은 실행의 마지막 단계, 값 흐름별 로그 누락 판정(`PASS` 또는 실패 사유)과 에이전트 루프 그림(`observatory/verify/loop.json`) 생성
+- **③ Policy Gate 연결**: ②에서 확인한 툴 실행 지점에 Adapter 작성(`bridge.invoke`), `config/frameworks.yaml` 등록 후 conformance 통과
+- **④ Policy Gate 테스트**: 대시보드 또는 CLI에서 `no_gate`·`gate_*` 조건 실행 후 ASR·Utility 비교
+- ①·②와 ③·④는 별도 단계: Observatory는 기록만 하고, Policy Gate 판정은 Adapter 연결 후 적용
+- 대시보드 주소: Observatory `http://127.0.0.1:8001`, Policy Gate `http://127.0.0.1:8000`
+
+```bash
+# ①·② 대상 에이전트 저장소에서
+cp -R observatory <에이전트 저장소>/ && cd <에이전트 저장소>
+uv run observatory/run.py --scope <파일...>
+uv run observatory/dashboard.py
+
+# ③ 이 저장소에서 Adapter 등록 후 검사
+python -m agentgate.harness.conformance --framework <name> --conditions no_gate gate_static_rules
+
+# ④ 테스트
+uvicorn dashboard.app:app --host 127.0.0.1 --port 8000
+```
+
+## Policy Gate 개요
 
 - AgentDojo 시나리오 테스트 Policy Gate 적용
 - 판정 기준: Policy R1–R10 ([`docs/rulebook.md`](docs/rulebook.md))
