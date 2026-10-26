@@ -11,8 +11,8 @@
    (Observatory, 9절)          (Adapter, 8절)        (대시보드·CLI, 5–7절)
 ```
 
-- **① 로그 삽입**: 대상 에이전트 저장소에 `observatory/` 복사 후 실행, LLM 호출·툴 실행·사용자 입력 위치에 로그 자동 삽입
-- **② 로그 검증**: 같은 실행의 마지막 단계, 값 흐름별 로그 누락 판정(`PASS` 또는 실패 사유)과 에이전트 루프 그림(`observatory/verify/loop.json`) 생성
+- **① 로그 삽입**: 대상 에이전트 저장소에 `observatory/` 복사 후 실행, LLM 호출·툴 실행·사용자 입력 위치에 로그 자동 삽입 ([`observatory/README.md`](observatory/README.md))
+- **② 로그 검증**: 같은 실행의 마지막 단계, 값 흐름별 로그 누락 판정(`PASS` 또는 실패 사유)과 에이전트 루프 그림(`observatory/verify/loop.json`) 생성 ([`observatory/README.md`](observatory/README.md) "동작 방식")
 - **③ Policy Gate 연결**: ②에서 확인한 툴 실행 지점에 Adapter 작성(`bridge.invoke`), `config/frameworks.yaml` 등록 후 conformance 통과
 - **④ Policy Gate 테스트**: 대시보드 또는 CLI에서 `no_gate`·`gate_*` 조건 실행 후 ASR·Utility 비교
 - ①·②와 ③·④는 별도 단계: Observatory는 기록만 하고, Policy Gate 판정은 Adapter 연결 후 적용
