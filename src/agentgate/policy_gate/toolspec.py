@@ -10,7 +10,7 @@ TaskSpec 추출기와 분리된 부품이다. TaskSpec 추출기는 계속 프�
     emails·ibans·urls는 정규화한 형태, amounts는 float로 저장한다.
   - 판정 쪽(정책, 판정 LLM)은 툴 응답 원문이 아니라 이 검증된 JSON만 본다.
   스키마 상수와 검증(`validate_toolspec`)은 LLM을 쓰지 않는 `agentgate.policy_gate.toolspec_schema`에 있고 여기서 다시 내보낸다.
-모델은 AGENTGATE_TOOLSPEC_MODEL(기본 claude-haiku-5-5). 캐시: data/cache/toolspec/<model>/<해시>.json
+모델은 AGENTGATE_TOOLSPEC_PROVIDER(기본 anthropic, ollama 가능)·AGENTGATE_TOOLSPEC_MODEL(기본 claude-haiku-5-5). 캐시: data/cache/toolspec/<model>/<해시>.json
 비용: 지시문과 툴 목록(suite마다 고정, 851–1606 토큰)에 prompt-cache 지점을 둔다. 툴 응답을 미리 아는 경우(정답 궤적)는
 `extract_many`가 Message Batches(50% 가격)로 한 번에 추출해 같은 디스크 캐시를 채운다.
 """
@@ -63,6 +63,7 @@ class ToolSpecExtractor:
         self.tools = tools
         self.tool_names = {t["name"] for t in tools}
         self._client = client
+        self.provider = getattr(client, "provider", "anthropic") if client else (os.environ.get("AGENTGATE_TOOLSPEC_PROVIDER") or "anthropic")
         self.model = client.model if client else (model or os.environ.get("AGENTGATE_TOOLSPEC_MODEL")
                                                   or DEFAULT_MODEL)
         self.cache_dir = CACHE_DIR / self.model.replace("/", "_").replace(":", "_")
@@ -70,7 +71,7 @@ class ToolSpecExtractor:
     @property
     def client(self) -> LLMClient:
         if self._client is None:
-            self._client = LLMClient(provider="anthropic", model=self.model, effort="low")
+            self._client = LLMClient(provider=self.provider, model=self.model, effort="low")
         return self._client
 
     def render(self, tool: str, args: dict, output_text: str) -> str:
@@ -102,7 +103,7 @@ class ToolSpecExtractor:
         keys = [self._key(p) for p in prompts]
         results: list[ToolSpecResult | None] = [self._cached(k) for k in keys]
         missing = {k: i for i, (k, r) in enumerate(zip(keys, results)) if r is None}
-        if missing and batch:
+        if missing and batch and self.provider == "anthropic":   # Message Batches is anthropic only
             params = {k: self.client.anthropic_params(SYSTEM_PROMPT, prompts[i], 4000,
                                                       cache_user_prefix=self.cache_prefix(prompts[i]))
                       for k, i in missing.items()}

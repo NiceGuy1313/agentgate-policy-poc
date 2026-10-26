@@ -47,3 +47,7 @@ nohup.out
 
 # Experiment reports and outputs (local only)
 results/runs/
+
+# Word/Office exports and assistant outputs (local only)
+*.docx
+Claude outputs/
