@@ -1,5 +1,11 @@
 # AgentGate — LLM 에이전트 툴 호출 Policy Gate
 
+- 구성
+  - Policy Gate: 에이전트의 툴 호출을 실행 전에 Policy로 판정하여 허용 또는 차단 (1–8절)
+  - Observatory: 에이전트 코드에 행동 로그를 AI 모델로 삽입하고, 누락 여부를 정적 검증기로 확인 (9절, [`observatory/`](observatory/README.md))
+
+## Policy Gate
+
 - AgentDojo 시나리오 테스트 Policy Gate 적용
 - 판정 기준: Policy R1–R10 ([`docs/rulebook.md`](docs/rulebook.md))
 - 판정 결과: `ALLOW` → 툴 실행, `BLOCK` → 차단 메시지를 툴 결과로 반환
@@ -190,7 +196,34 @@ frameworks:
 python -m agentgate.harness.conformance --framework my-framework --conditions no_gate gate_static_rules
 ```
 
-## 9. 문서·결과
+## 9. Observatory — 로그 삽입·검증
+
+- 목적: 정책 준수 판단에 필요한 에이전트 행동(LLM 호출과 응답, 툴 호출과 인자·결과, 사용자 입력)을 누락 없이 기록
+- 구성
+  - 로그 삽입: AI 모델(Claude Code)이 에이전트 코드의 LLM 호출, 툴 실행, 사용자 입력 위치에 로그 삽입
+  - 로그 검증: AST로 데이터 흐름 그래프를 구성하고, LLM 응답·사용자 입력·툴 결과가 툴 호출, 다음 LLM 호출, 최종 출력으로 전달되는 경로마다 값을 기록하는 로그가 있는지 판정
+  - 대시보드: 실행 기록과 코드에서 추출한 에이전트 루프 그림을 한 화면에 표시
+- 사용 방식: `observatory/` 폴더를 대상 에이전트 저장소 루트에 복사하여 실행, Policy Gate 설치와 무관
+- 요구 사항: `uv`, `git`(대상 에이전트 폴더가 git 저장소), Claude Code CLI 로그인
+
+```bash
+cp -R observatory <에이전트 저장소>/
+cd <에이전트 저장소>
+
+# 로그 삽입·검증: --scope에 실행 루프, 모델 호출, 사용자 입력이 있는 파일 지정
+uv run observatory/run.py --scope <파일...>
+
+# 실행 기록 확인: 대시보드(기본 http://127.0.0.1:8001) 실행 후 다른 터미널에서 에이전트 실행
+uv run observatory/dashboard.py
+OBSERVATORY_RUNS=$PWD/observatory/runs <에이전트 실행 명령>
+```
+
+- 결과: 콘솔 마지막 줄 `PASS` 또는 실패 사유, `observatory/verify/`(`report.json` · `loop.json` · `loop.mmd`), 변경 내용은 `git diff`
+- 다른 LLM 사용: `observatory/litellm.yaml`의 litellm 프록시 경유 (Qwen3.8-27B 등, [`observatory/README.md`](observatory/README.md) "다른 LLM으로 실행")
+- 대시보드 포트: 기본 8001(Policy Gate 대시보드 8000과 동시 실행 가능)
+- 상세: [`observatory/README.md`](observatory/README.md)
+
+## 10. 문서·결과
 
 - [`docs/architecture.md`](docs/architecture.md): 모듈 구조, 단일 집행 지점, fail-closed
 - [`docs/rulebook.md`](docs/rulebook.md): Policy R1–R10, TaskSpec·ToolSpec
@@ -198,8 +231,9 @@ python -m agentgate.harness.conformance --framework my-framework --conditions no
 - [`docs/integration_guide.md`](docs/integration_guide.md): 외부 Wrapper 규약(contract v1)
 - [`results/RESULTS.md`](results/RESULTS.md): 프레임워크별 실험 결과
 - [`results/COMPLIANCE.md`](results/COMPLIANCE.md): 정책 준수율 분석
+- [`observatory/README.md`](observatory/README.md): Observatory 동작 방식, 판정 기준, 옵션
 
-## 10. 폴더 구조
+## 11. 폴더 구조
 
 ```text
 src/agentgate/   core · policy_gate · environments · adapters · harness · experiment · scenarios · agents · llm
@@ -209,4 +243,5 @@ scripts/         평가·분석 스크립트
 dashboard/       대시보드(FastAPI)
 examples/        contract v1 참조 Wrapper
 results/         RESULTS.md · COMPLIANCE.md · figures/ · summary/
+observatory/     로그 삽입·검증 도구(Observatory), 대상 에이전트 저장소에 복사해 사용
 ```
