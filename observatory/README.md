@@ -69,7 +69,7 @@ uv run observatory/run.py --scope agent.py llm.py tools.py
 **2. 실행 기록 보기.** 터미널 두 개를 씁니다.
 
 ```bash
-# 터미널 1: dashboard (http://127.0.0.1:8000)
+# 터미널 1: dashboard (http://127.0.0.1:8001)
 uv run observatory/dashboard.py
 
 # 터미널 2: .env의 키를 불러오고, OBSERVATORY_RUNS를 설정해 에이전트를 실행
@@ -112,7 +112,7 @@ uv run observatory/run.py --model qwen --budget 0 --scope agent.py llm.py tools.
 
 | 옵션 | 설명 |
 |---|---|
-| `--serve`, `--serve-only`, `--port` | dashboard를 실행(기본 8000). `--serve-only`는 다시 띄울 때 |
+| `--serve`, `--serve-only`, `--port` | dashboard를 실행(기본 8001). `--serve-only`는 다시 띄울 때 |
 | `--no-claude` | Claude 세션 없이 판정과 루프 그림만 다시 (값 흐름과 지워진 줄 비교는 세션이 있을 때만) |
 | `--model`, `--budget` | Claude 모델(기본 `sonnet`)과 세션당 최대 비용 USD(기본 3, 0이면 제한 없음) |
 | `--scope <파일...>` | 에이전트를 이루는 파일. 1단계 세션은 이 파일만 읽고, 그 안에서 구현이 보이지 않는 호출 목록에서 기준점을 고른다 |

@@ -297,7 +297,7 @@ if __name__ == "__main__":
     parser.add_argument("--budget", type=float, default=3.0, help="max USD per Claude Code session (0: no limit)")
     parser.add_argument("--serve", action="store_true", help="start the dashboard when done")
     parser.add_argument("--serve-only", action="store_true", help="only start the dashboard")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8001)
     parser.add_argument(
         "--no-claude", action="store_true", help="skip the Claude Code sessions (the agent is already wired)"
     )

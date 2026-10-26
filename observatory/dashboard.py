@@ -4,7 +4,7 @@
 # ///
 """Agent Observatory dashboard: shows the LLM calls and tool executions an agent reports through observatory_log.py.
 
-    uv run observatory/dashboard.py [--runs observatory/runs] [--port 8000]
+    uv run observatory/dashboard.py [--runs observatory/runs] [--port 8001]
 
 It knows nothing about any agent. It only reads the run files (JSON lines) that observatory_log.py appends to the
 directory named by OBSERVATORY_RUNS, so start the agent as usual with that variable set, e.g.
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--runs", type=Path, default=KIT / "runs", help="directory of run files (default: observatory/runs)"
     )
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
     try:
         server = make_server(args.runs.resolve(), args.port)

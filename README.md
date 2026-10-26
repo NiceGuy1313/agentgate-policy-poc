@@ -213,14 +213,14 @@ cd <에이전트 저장소>
 # 로그 삽입·검증: --scope에 실행 루프, 모델 호출, 사용자 입력이 있는 파일 지정
 uv run observatory/run.py --scope <파일...>
 
-# 실행 기록 확인: 대시보드(기본 http://127.0.0.1:8000) 실행 후 다른 터미널에서 에이전트 실행
+# 실행 기록 확인: 대시보드(기본 http://127.0.0.1:8001) 실행 후 다른 터미널에서 에이전트 실행
 uv run observatory/dashboard.py
 OBSERVATORY_RUNS=$PWD/observatory/runs <에이전트 실행 명령>
 ```
 
 - 결과: 콘솔 마지막 줄 `PASS` 또는 실패 사유, `observatory/verify/`(`report.json` · `loop.json` · `loop.mmd`), 변경 내용은 `git diff`
 - 다른 LLM 사용: `observatory/litellm.yaml`의 litellm 프록시 경유 (Qwen3.8-27B 등, [`observatory/README.md`](observatory/README.md) "다른 LLM으로 실행")
-- 대시보드 포트: Policy Gate 대시보드와 같은 8000 기본값, 동시 실행 시 `--port`로 변경
+- 대시보드 포트: 기본 8001(Policy Gate 대시보드 8000과 동시 실행 가능)
 - 상세: [`observatory/README.md`](observatory/README.md)
 
 ## 10. 문서·결과
