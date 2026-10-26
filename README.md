@@ -1,6 +1,6 @@
 # AgentGate — LLM 에이전트 툴 호출 Policy Gate
 
-- LLM 에이전트의 effect 툴 호출(송금·전송·삭제·URL 방문 등)을 실행 직전에 차단하는 Policy Gate
+- AgentDojo 시나리오 테스트 Policy Gate 적용
 - 판정 기준: Policy R1–R10 ([`docs/rulebook.md`](docs/rulebook.md))
 - 판정 결과: `ALLOW` → 툴 실행, `BLOCK` → 차단 메시지를 툴 결과로 반환
 - 평가 환경: AgentDojo v1.2.2(`agentdojo==0.1.35`)
