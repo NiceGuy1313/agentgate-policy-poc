@@ -119,18 +119,37 @@
     - 금액: 프롬프트에 있는 값, `amount_cap` 이하인 값, 지목 데이터·위임 요청 targets에 있는 값
   - **target 일치**: 정규화 후 동일한 값, URL은 동일 host, 이름·텍스트는 토큰 경계 기준 포함(짧은 쪽 4자 이상)
 
-| 규칙 | 코드 해석 |
-|---|---|
-| R1 | 툴 이름이 `requested_ops`에 정확히 포함. 방문 툴(`get_webpage`)은 R7에서 판단 |
-| R2 | (a) destination·amount·url·password·target_id·booking 인자 값이 요청 targets와 일치하고 근거 있는 값이 아님, 또는 (b) `action`이 툴 이름과 같고 그 툴이 `requested_ops`에 없음 → 그 요청이 위임 자료가 아니면 BLOCK |
-| R3 | 모든 destination 값이 근거 있는 값 |
-| R4 | outgoing 툴에만 적용. `egress_requested=false`이고 content가 민감한 읽기 결과와 `min_overlap_chars` 이상 중복, 고가치 토큰(코드·계좌·카드 번호) 포함, 파일 첨부·공유 중 하나면 BLOCK. 목적지가 모두 근거 있는 값이면 지목·위임 자료의 읽기 결과는 중복 검사에서 제외. 첨부·공유는 예외 없이 BLOCK. 한 호출에 담긴 서로 다른 읽기 결과와 첨부의 수가 `min_distinct_reads` 이상이면 BLOCK |
-| R5 | 금액 해석 불가, `amount_cap` 초과, 근거 없는 금액이면 BLOCK |
-| R6 | delete·account·share 툴은 `requested_ops`에 포함 필요. target_id 출처는 프롬프트 또는 지목 자료, 새 비밀번호 출처는 프롬프트. 현재 세션에서 보낸 메시지 삭제는 BLOCK |
-| R7 | 방문 URL은 근거 있는 값. outgoing 툴 content 속 URL이 지목하지 않은 응답에만 있고 위임 요청 targets에도 없으면 BLOCK |
-| R8 | R2에서 일치한 요청(위임 자료 포함)의 `claims` 중 하나라도 true면 BLOCK |
-| R9 | 요청이 나온 응답이 `delegated_sources`와 일치할 때만 위임. 위임 항목이 사람이면 레코드 `author`도 그 사람과 일치 필요. author·record가 없는 요청은 응답의 레코드가 하나 이하일 때만 위임으로 인정 |
-| R10 | 모든 규칙 통과 시 ALLOW |
+- 규칙별 코드 해석
+  - **R1**
+    - 툴 이름이 사용자가 요청한 툴 목록(`requested_ops`)에 정확히 포함
+    - 웹페이지 방문 툴(`get_webpage`)은 R7에서 판단
+  - **R2**: 아래 중 하나에 해당하고 해당 요청이 위임 자료에서 나온 것이 아니면 BLOCK
+    - 목적지·금액·URL·비밀번호·대상 id·예약 인자 값(`destination`·`amount`·`url`·`password`·`target_id`·`booking`)이 요청 대상 값(`targets`)과 일치하고 근거 있는 값이 아님
+    - 요청 수행 툴(`action`)이 현재 툴과 같고, 그 툴이 사용자가 요청한 툴 목록(`requested_ops`)에 없음
+  - **R3**: 모든 목적지 인자 값(`destination`)이 근거 있는 값
+  - **R4**: 외부 전송 툴(outgoing)에만 적용
+    - 사용자가 외부 전송을 요청하지 않았고(`egress_requested=false`) 아래 중 하나면 BLOCK
+      - 본문 인자(`content`)가 민감한 읽기 결과와 최소 중복 길이(`min_overlap_chars`) 이상 중복
+      - 고가치 토큰(코드·계좌·카드 번호) 포함
+      - 파일 첨부·공유
+    - 목적지가 모두 근거 있는 값이면 지목·위임 자료의 읽기 결과는 중복 검사에서 제외
+    - 첨부·공유는 예외 없이 BLOCK
+    - 한 호출에 담긴 서로 다른 읽기 결과와 첨부의 수가 최소 개수(`min_distinct_reads`) 이상이면 BLOCK
+  - **R5**: 금액 해석 불가, 1회 송금 상한(`amount_cap`) 초과, 근거 없는 금액이면 BLOCK
+  - **R6**
+    - 삭제·계정·공유 툴(delete·account·share)은 사용자가 요청한 툴 목록(`requested_ops`)에 포함 필요
+    - 대상 id(`target_id`) 출처: 프롬프트 또는 지목 자료
+    - 새 비밀번호 출처: 프롬프트
+    - 현재 세션에서 보낸 메시지 삭제는 BLOCK
+  - **R7**
+    - 방문 URL은 근거 있는 값
+    - 외부 전송 툴 본문(`content`) 속 URL이 지목하지 않은 응답에만 있고 위임 요청 대상 값(`targets`)에도 없으면 BLOCK
+  - **R8**: R2에서 일치한 요청(위임 자료 포함)에 권한 사칭·지시 무시·긴급성·은폐 표시(`claims`) 중 하나라도 있으면 BLOCK
+  - **R9**
+    - 요청이 나온 응답이 사용자가 위임한 자료(`delegated_sources`)와 일치할 때만 위임으로 인정
+    - 위임 항목이 사람이면 레코드 작성자(`author`)도 그 사람과 일치 필요
+    - 작성자·레코드 정보(`author`·`record`)가 없는 요청은 응답의 레코드가 하나 이하일 때만 위임으로 인정
+  - **R10**: 모든 규칙 통과 시 ALLOW
 
 - ToolSpec이 `None`인 응답의 처리: 레코드·요청이 없는 응답으로 간주
   - 지목 데이터로 쓰지 못함: R3·R5·R7에서 차단 쪽으로 작용
