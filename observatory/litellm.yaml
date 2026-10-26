@@ -1,0 +1,12 @@
+# Claude Code를 다른 LLM으로 돌리기 위한 litellm 프록시 설정 (README의 "다른 LLM으로 실행").
+# model_name이 run.py --model에 넘기는 이름이고, model이 실제로 호출할 모델입니다.
+# 키는 환경변수(observatory/.env의 DEEPINFRA_API_KEY)에서 읽습니다. 이 파일에는 키를 적지 않습니다.
+model_list:
+  - model_name: qwen
+    litellm_params: {model: deepinfra/Qwen/Qwen3.8-27B, api_key: os.environ/DEEPINFRA_API_KEY}
+  - model_name: glimmer
+    litellm_params: {model: deepinfra/meta-models/Muse-Glimmer-30B, api_key: os.environ/DEEPINFRA_API_KEY}
+  - model_name: nemotron
+    litellm_params: {model: deepinfra/nvidia/NVIDIA-Nemotron-3.5-Lightning, api_key: os.environ/DEEPINFRA_API_KEY}
+litellm_settings: {drop_params: true, num_retries: 3, request_timeout: 600}
+general_settings: {master_key: sk-local-observatory}  # 프록시 접속용 로컬 토큰 (127.0.0.1에서만 받음)
