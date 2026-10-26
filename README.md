@@ -25,7 +25,6 @@ pip install -e '.[dev,dashboard,smolagents,mini-swe-agent]'
 ## 2. LLM 설정 (로컬 Ollama 기준)
 
 - LLM 사용 환경: 평가 대상 에이전트, TaskSpec 추출기, ToolSpec 추출기, 판정 LLM(`gate_llm_judge`)
-- 모든 부품을 Ollama 하나로 구성 가능, API 키 불필요
 - 설정 파일: `.env`(git 제외), 형식은 `.env.example`
 
 - Ollama 서버 준비 및 모델 내려받기
