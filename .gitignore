@@ -51,3 +51,4 @@ results/runs/
 # Word/Office exports and assistant outputs (local only)
 *.docx
 Claude outputs/
+*.zip
