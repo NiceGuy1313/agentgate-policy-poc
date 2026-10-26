@@ -31,9 +31,9 @@ pip install -e '.[dev,dashboard,smolagents,mini-swe-agent]'
 - Ollama 서버 준비 및 모델 내려받기
 
 ```bash
-ollama serve                      # 로컬 서버 기동 (기본 http://localhost:11434)
-ollama pull gpt-oss:20b           # 사용할 모델 내려받기
-curl http://localhost:11434/api/tags   # 모델 이름 확인
+ollama serve
+ollama pull gpt-oss:20b
+curl http://localhost:11434/api/tags
 ```
 
 - `.env` 작성
@@ -43,14 +43,13 @@ cp .env.example .env
 ```
 
 ```bash
-# .env — 로컬 Ollama 단독 구성
-OLLAMA_HOST=http://localhost:11434        # 로컬 서버 주소
-OLLAMA_API_KEY=                           # 로컬 서버는 비움
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_API_KEY=
 
 # 평가 대상 에이전트
 AGENTGATE_AGENT_PROVIDER=ollama
-AGENTGATE_AGENT_MODEL=gpt-oss:20b         # /api/tags의 모델 이름
-AGENTGATE_AGENT_THINK=                    # 선택: true | false | low | medium | high
+AGENTGATE_AGENT_MODEL=gpt-oss:20b
+AGENTGATE_AGENT_THINK=
 
 # TaskSpec 추출기
 AGENTGATE_LLM_PROVIDER=ollama
@@ -60,7 +59,7 @@ AGENTGATE_LLM_MODEL=gpt-oss:20b
 AGENTGATE_TOOLSPEC_PROVIDER=ollama
 AGENTGATE_TOOLSPEC_MODEL=gpt-oss:20b
 
-# 판정 LLM (gate_llm_judge): 비우면 에이전트 설정 그대로 사용
+# 판정 LLM (gate_llm_judge)
 AGENTGATE_JUDGE_PROVIDER=
 AGENTGATE_JUDGE_MODEL=
 ```
@@ -69,13 +68,14 @@ AGENTGATE_JUDGE_MODEL=
 
 ```bash
 OLLAMA_HOST=https://ollama.com
-OLLAMA_API_KEY=<Ollama Cloud 키>          # https://ollama.com 에서 발급
-AGENTGATE_AGENT_MODEL=gpt-oss:120b        # ":cloud" 접미사 없이 기재
+OLLAMA_API_KEY=<Ollama Cloud 키>
+AGENTGATE_AGENT_MODEL=gpt-oss:120b
 ```
 
 - 주의 사항
-  - 모델 이름: `ollama list` 또는 `/api/tags` 출력과 동일하게 기재
-  - 판정 LLM: 에이전트가 Ollama일 때 `claude-*` 모델 지정 시 실행 거부
+  - 모델 이름: `ollama list` 출력과 동일하게 기재, Cloud는 `:cloud` 접미사 제외
+  - 로컬 서버: `OLLAMA_API_KEY` 비움
+  - 판정 LLM: 비우면 에이전트 설정 사용, 에이전트가 Ollama일 때 `claude-*` 모델 지정 시 실행 거부
   - 추출 결과 캐시: `data/cache/{taskspec,toolspec,judge}/<모델>/`, 모델 변경 시 새로 추출
 
 ## 3. 설치 확인
@@ -162,22 +162,23 @@ from agentgate.harness.tool_schema import gated_callable
 
 class MyAdapter(FrameworkAdapter):
     name = "my-framework"
-    routes_tools_through_bridge = True             # Gate 경유 선언
+    routes_tools_through_bridge = True
 
     def run(self, task, bridge, model, options, max_steps, sink):
-        tools = [make_tool(s, fn=gated_callable(bridge, s["name"]))   # 툴 본문 = Gate 호출
+        tools = [make_tool(s, fn=gated_callable(bridge, s["name"]))
                  for s in bridge.tool_schemas()]
         output = run_agent(task, tools)
         return FrameworkResult(final_output=output, steps=...)
 ```
 
 - 외부 프로세스 Wrapper: HTTP contract v1 ([`docs/integration_guide.md`](docs/integration_guide.md), 예시 [`examples/contract_wrapper/minimal_agent.py`](examples/contract_wrapper/minimal_agent.py))
+- 클라이언트: `src/agentgate/harness/agentgate_client.py` 복사 사용, `invoke`가 툴 실행 대신 결과 또는 차단 메시지 반환
 
 ```python
-from agentgate_client import GateSession          # src/agentgate/harness/agentgate_client.py 복사
+from agentgate_client import GateSession
 
 gate = GateSession.from_env()
-result = gate.invoke(tool_name, tool_args)        # 툴 실행 대신 호출, 차단 시 차단 메시지 반환
+result = gate.invoke(tool_name, tool_args)
 gate.finish(final_answer)
 ```
 
