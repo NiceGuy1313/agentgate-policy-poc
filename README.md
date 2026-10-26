@@ -1,7 +1,7 @@
 # AgentGate — LLM 에이전트 툴 호출 Policy Gate
 
 - LLM 에이전트의 effect 툴 호출(송금·전송·삭제·URL 방문 등)을 실행 직전에 차단하는 Policy Gate
-- 판정 기준: 룰북 R1–R10 ([`docs/rulebook.md`](docs/rulebook.md))
+- 판정 기준: Policy R1–R10 ([`docs/rulebook.md`](docs/rulebook.md))
 - 판정 결과: `ALLOW` → 툴 실행, `BLOCK` → 차단 메시지를 툴 결과로 반환
 - 평가 환경: AgentDojo v1.2.2(`agentdojo==0.1.35`)
 - 지원 프레임워크: `native`(AgentDojo pipeline), `smolagents`, `mini-swe-agent`, contract v1 외부 Wrapper
@@ -24,7 +24,7 @@ pip install -e '.[dev,dashboard,smolagents,mini-swe-agent]'
 
 ## 2. LLM 설정 (로컬 Ollama 기준)
 
-- LLM 사용 부품: 평가 대상 에이전트, TaskSpec 추출기, ToolSpec 추출기, 판정 LLM(`gate_llm_judge`)
+- LLM 사용 환경: 평가 대상 에이전트, TaskSpec 추출기, ToolSpec 추출기, 판정 LLM(`gate_llm_judge`)
 - 모든 부품을 Ollama 하나로 구성 가능, API 키 불필요
 - 설정 파일: `.env`(git 제외), 형식은 `.env.example`
 
@@ -45,6 +45,7 @@ cp .env.example .env
 ```bash
 OLLAMA_HOST=http://localhost:11434
 OLLAMA_API_KEY=
+OLLAMA_NUM_CTX=16384
 
 # 평가 대상 에이전트
 AGENTGATE_AGENT_PROVIDER=ollama
@@ -75,6 +76,7 @@ AGENTGATE_AGENT_MODEL=gpt-oss:120b
 - 주의 사항
   - 모델 이름: `ollama list` 출력과 동일하게 기재, Cloud는 `:cloud` 접미사 제외
   - 로컬 서버: `OLLAMA_API_KEY` 비움
+  - `OLLAMA_NUM_CTX`: 요청별 context 길이, 서버 기본값이 커서 메모리 부족·CPU 실행 시 축소 (`ollama ps`로 확인)
   - 판정 LLM: 비우면 에이전트 설정 사용, 에이전트가 Ollama일 때 `claude-*` 모델 지정 시 실행 거부
   - 추출 결과 캐시: `data/cache/{taskspec,toolspec,judge}/<모델>/`, 모델 변경 시 새로 추출
 
@@ -92,7 +94,7 @@ python -m agentgate.harness.conformance --framework smolagents --conditions no_g
 
 - `no_gate`: 방어 없음, 호출 기록만(기준선)
 - `gate_static_rules`: 정적 규칙 코드로 판정, 판정 단계 LLM 호출 없음
-- `gate_llm_judge`: 판정 LLM이 룰북 적용
+- `gate_llm_judge`: 판정 LLM이 Policy 적용
 
 ## 5. 실행 — 대시보드
 
@@ -114,12 +116,6 @@ python -m agentgate.experiment.cli \
   --model ollama:gpt-oss:20b \
   --pilot \
   --out results/runs/demo
-```
-
-- LLM 없는 결정적 실행(정답 궤적 에이전트)
-
-```bash
-python -m agentgate.experiment.cli --agent scripted --spec oracle --pilot --out results/runs/scripted
 ```
 
 - 주요 옵션
@@ -149,7 +145,7 @@ python scripts/analysis/summarize_live.py --run results/runs/demo
 python scripts/analysis/inspect_trace.py pair banking user_task_0 injection_task_0 --mode enforce
 ```
 
-## 8. 내 에이전트에 Gate 연결
+## 8. Tool Wrapper 삽입 에이전트 연결
 
 - 원칙: 툴을 직접 실행하지 않고 툴 실행 지점에서 `bridge.invoke` 호출
 - Gate 밖 툴 실행 발생 시 해당 run 무효(`valid: false`)
@@ -198,7 +194,7 @@ python -m agentgate.harness.conformance --framework my-framework --conditions no
 ## 9. 문서·결과
 
 - [`docs/architecture.md`](docs/architecture.md): 모듈 구조, 단일 집행 지점, fail-closed
-- [`docs/rulebook.md`](docs/rulebook.md): 룰북 R1–R10, TaskSpec·ToolSpec
+- [`docs/rulebook.md`](docs/rulebook.md): Policy R1–R10, TaskSpec·ToolSpec
 - [`docs/adapter_guide.md`](docs/adapter_guide.md): Adapter 부착 위치와 절차
 - [`docs/integration_guide.md`](docs/integration_guide.md): 외부 Wrapper 규약(contract v1)
 - [`results/RESULTS.md`](results/RESULTS.md): 프레임워크별 실험 결과

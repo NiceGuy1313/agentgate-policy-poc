@@ -3,7 +3,7 @@
 전제하는 endpoint 사실(Ollama docs: github.com/ollama/ollama docs/api.md, docs/cloud.mdx):
 POST {host}/api/chat, GET {host}/api/tags. host는 cloud면 https://ollama.com(Authorization: Bearer $OLLAMA_API_KEY),
 local server면 http://localhost:11434(키 없음)이다. cloud 모델 이름은 /api/tags가 반환하는 이름이다(ollama.com을
-직접 호출할 때는 ":cloud" 접미사 없음). request·response 메시지 형식은 agentgate/agents/ollama_agent.py에 있다.
+직접 호출할 때는 ":cloud" 접미사 없음). OLLAMA_NUM_CTX가 있으면 요청마다 options.num_ctx로 보낸다. request·response 메시지 형식은 agentgate/agents/ollama_agent.py에 있다.
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ class OllamaClient:
         if "ollama.com" in self.host and not self.api_key:
             raise RuntimeError("OLLAMA_API_KEY is not set (required for https://ollama.com)")
         self.timeout, self.max_retries = timeout, max_retries
+        # local servers load the model with the server's context length; OLLAMA_NUM_CTX overrides it per request
+        self.num_ctx = int(os.environ["OLLAMA_NUM_CTX"]) if os.environ.get("OLLAMA_NUM_CTX") else None
 
     def _headers(self) -> dict:
         headers = {"Content-Type": "application/json"}
@@ -36,6 +38,8 @@ class OllamaClient:
 
     def chat(self, payload: dict) -> dict:
         payload = {**payload, "stream": False}
+        if self.num_ctx:
+            payload["options"] = {**payload.get("options", {}), "num_ctx": self.num_ctx}
         last_error = None
         for attempt in range(self.max_retries + 1):
             try:
